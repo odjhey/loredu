@@ -12,14 +12,14 @@ created_at: 2026-08-26T12:10:00+08:00
 | Term | Meaning |
 |---|---|
 | **Record** | Immutable persisted Loredu object. |
-| **Draft** | Caller-constructed precursor of a record: the caller-owned fields only. `id` and `recorded_at` do not exist on a draft — the kernel assigns them at append. |
+| **Draft** | Caller-constructed precursor of a record: the caller-owned fields only. `id`, `schema`, and `recorded_at` do not exist on a draft — the application owns and assigns them at append; omitted `scope`, `metadata`, and common `sources` become explicit persisted `{}`, `{}`, and `[]`. |
 | **Entry** | Canonical free-form record of something observed, learned, decided, questioned, or worth retaining. |
 | **Claim** | Structured proposition supported by one or more entries or explicit evidence. A claim is not assumed to be absolute truth. |
-| **Relation** | Durable or rebuildable statement connecting records, such as `supports`, `contradicts`, `duplicates`, or `supersedes`. |
+| **Relation** | Directed binary statement connecting two records: an ordered `from` endpoint, a `to` endpoint, and one closed `relation_type` such as `supports`, `contradicts`, `duplicates`, or `supersedes`. Loredu stores no synthesized inverse and makes no type-specific judgment in M0. |
 | **Resolution** | Explicit judgment that determines how competing or changing claims should be interpreted by a projection. |
-| **Verification** | Record that a claim, pattern, source, or projection was checked against a stated basis or snapshot. |
+| **Verification** | Record that claim ids were checked against a required non-empty basis of source reference strings and optional snapshots; it records the check without judging the result. |
 | **Actor** | Human, agent, program, or system that created a record or resolution. |
-| **SourceRef** | Stable reference to external evidence, optionally with a locator and snapshot/version identity. |
+| **SourceRef** | Common optional provenance object `{ref, locator?, snapshot?}`. Each value is a non-empty trimmed string of at most 1024 characters, and supplied spelling is preserved. |
 | **Corpus** | Body of material an activity investigates. A corpus may be a repository, document set, website, process evidence set, or another source collection. |
 | **Snapshot** | Identifiable state of a corpus or source used as a verification basis. |
 | **Activity** | External investigation/review/run that consumes and may produce Loredu knowledge. Loredu does not execute the activity. |

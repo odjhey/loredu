@@ -48,6 +48,25 @@ The application layer enforces reference-before-referrer at write time (a claim 
 
 Version control of a store directory (e.g. Git) is an external history/sync layer, not part of these semantics — the store must be correct with or without it.
 
+## Logical cases and provider conformance
+
+M0 exercises the application and this provider-neutral port with the test-only
+`InMemoryStore` exposed from `@loredu/kernel/testing`. Portable logical
+`RecordStore` cases—complete-record-in/position-only-out, append/read/scan/stream
+ordering, duplicate identity rejection, reference-independent store mechanics,
+and read-your-writes—may run against both `InMemoryStore` and
+`PlainFileStore` (and later adapters).
+
+`InMemoryStore` is only a logical reference seam. It cannot prove durability or
+provider behavior: filesystem layout, locking, atomic visibility, fsync or
+crash survival, and replay across store instances/processes belong to
+`PlainFileStore` and future durable adapters. M1 owns the reusable conformance
+suite, with its portable logical subset separated from provider/durability cases;
+the latter run against `PlainFileStore` and each future durable adapter, never
+against the in-memory seam as durability evidence. The Markdown/YAML
+serialize/parse round-trip in T06 is M1 adapter evidence; this port defines no
+wire format.
+
 ## Concurrency ownership
 
 The port defines the safety guarantees; each adapter implements them with whatever mechanism fits its medium:
