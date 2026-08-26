@@ -57,6 +57,8 @@ initialized plain-file store at ./lore
 
 One directory, human-inspectable, Git-friendly ([decision 0003](../../decisions/0003-plain-files-first.md)). No daemon, no config required to start.
 
+The store root is always explicit and project-local — never a global `~/.loredu`. Every command resolves it as: `--store <dir>` flag → `LOR_STORE` env var → nearest `lore/` walking up from the working directory (git-style) → actionable error suggesting `lor init`. Stores are self-contained directories, so multiple projects coexist and tests isolate in temp dirs with no ceremony.
+
 ## Journey 1 — first activity on an empty store
 
 ```text
@@ -221,6 +223,8 @@ Grouped by milestone; **AC n** = acceptance criterion in [goal and scope](../sco
 | T13 | `append` with an existing id → error, original untouched | store contract |
 | T14 | store files are hand-inspectable Markdown + frontmatter; hand-added valid record is picked up on replay | ADR 0003 |
 | T15 | domain layer compiles/tests with a pure in-memory store (no Bun/fs import in core) | ADR 0001/0007 |
+| T16 | concurrent-writer safety: a second writer against a locked store fails loudly with no corruption; the store replays clean afterward | store contract |
+| T17 | store-root resolution honors flag > env > upward discovery, in that order; no resolved root → actionable error; two stores in sibling dirs are fully isolated (no reads or writes outside the resolved root) | journey 0 |
 
 ### M2 — reconciliation, resolution, projections
 

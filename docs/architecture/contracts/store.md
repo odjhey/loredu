@@ -30,6 +30,20 @@ Exact method names are language-specific and are not part of this contract.
 - `append` never silently replaces a record with the same identity;
 - `append` returns a monotonic stream position; `head` exposes the latest position so derived views can be checked for staleness against their `basis` ([decision 0006](../../decisions/0006-explicit-version-basis.md));
 - how a position is represented is an adapter detail (the plain-file adapter may derive it from deterministic replay order), but positions must be stable across replays.
+
+## Concurrency ownership
+
+The port defines the safety guarantees; each adapter implements them with whatever mechanism fits its medium:
+
+- appends are atomic — a reader never observes a torn or partial record;
+- positions remain monotonic under any interleaving the adapter permits;
+- a writer that cannot obtain safe access fails loudly; it never corrupts or silently drops a record.
+
+v0.x assumes a single writer at a time. The plain-file adapter satisfies the guarantees with lock-file + atomic-rename (the pattern proven in the watchtower ledger consumer); a database-backed canonical store would use transactions. Multi-writer coordination beyond this is explicitly deferred.
+
+## Store roots
+
+A store is a self-contained directory; nothing about a store lives outside its root. Callers may operate any number of stores side by side. Surfaces resolve the root explicitly — flag, then environment, then upward discovery from the working directory — and never fall back to a global per-user location. This keeps multiple projects independent and makes test isolation a temp directory, not a mocking exercise.
 - reads return the original canonical record, not a projected/mutated representation;
 - ordering/cursors are deterministic enough to replay projections;
 - store adapters preserve record data required by the published record schema;
