@@ -1,3 +1,4 @@
+import { assertDenseDataArray, enumerableOwnDataKeys } from "./own-properties";
 import { RecordValidationError } from "./validation-error";
 
 export type JsonPrimitive = null | boolean | number | string;
@@ -40,11 +41,9 @@ function canonicalize(value: unknown, path: string, ancestors: WeakSet<object>):
 
   try {
     if (Array.isArray(value)) {
+      assertDenseDataArray(value, path);
       const result: JsonValue[] = [];
       for (let index = 0; index < value.length; index += 1) {
-        if (!Object.hasOwn(value, index)) {
-          throw new RecordValidationError(`${path}[${index}]`, "must not be a sparse array element");
-        }
         result.push(canonicalize(value[index], `${path}[${index}]`, ancestors));
       }
       return Object.freeze(result);
@@ -54,13 +53,8 @@ function canonicalize(value: unknown, path: string, ancestors: WeakSet<object>):
       throw new RecordValidationError(path, "must be a plain JSON object");
     }
 
-    const symbols = Object.getOwnPropertySymbols(value);
-    if (symbols.length > 0) {
-      throw new RecordValidationError(path, "must not contain symbol-keyed properties");
-    }
-
     const result: Record<string, JsonValue> = {};
-    for (const key of Object.keys(value).sort()) {
+    for (const key of enumerableOwnDataKeys(value, path).sort()) {
       Object.defineProperty(result, key, {
         value: canonicalize((value as Record<string, unknown>)[key], propertyPath(path, key), ancestors),
         enumerable: true,

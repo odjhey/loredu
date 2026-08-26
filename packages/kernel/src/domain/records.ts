@@ -1,5 +1,11 @@
 import { canonicalizeJsonValue, type JsonValue } from "./json-value";
 import {
+  assertDenseDataArray,
+  assertExactOwnDataProperties,
+  assertOwnDataProperties,
+  enumerableOwnDataKeys,
+} from "./own-properties";
+import {
   assertRecordIdForKind,
   type ClaimId,
   type EntryId,
@@ -216,18 +222,7 @@ function expectExactKeys(
   allowed: readonly string[],
   field: string,
 ): void {
-  const allowedKeys = new Set(allowed);
-  for (const key of Object.keys(object)) {
-    if (!allowedKeys.has(key)) {
-      throw new RecordValidationError(
-        field === "record" ? key : `${field}.${key}`,
-        "is not a recognized field",
-      );
-    }
-  }
-  if (Object.getOwnPropertySymbols(object).length > 0) {
-    throw new RecordValidationError(field, "must not contain symbol-keyed fields");
-  }
+  assertExactOwnDataProperties(object, allowed, field);
 }
 
 function required(object: { [key: string]: unknown }, key: string, path = key): unknown {
@@ -287,7 +282,7 @@ function parseSourceRef(value: unknown, field: string): SourceRef {
 }
 
 function parseSources(value: unknown, field: string): readonly SourceRef[] {
-  if (!Array.isArray(value)) throw new RecordValidationError(field, "must be an array of SourceRef objects");
+  assertDenseDataArray(value, field);
   return Object.freeze(value.map((source, index) => parseSourceRef(source, `${field}[${index}]`)));
 }
 
@@ -302,11 +297,8 @@ function parseActor(value: unknown, field = "actor"): Actor {
 
 function parseScope(value: unknown, field = "scope"): Scope {
   const object = expectObject(value, field);
-  if (Object.getOwnPropertySymbols(object).length > 0) {
-    throw new RecordValidationError(field, "must not contain symbol-keyed fields");
-  }
   const scope: { [key: string]: string } = {};
-  for (const key of Object.keys(object)) {
+  for (const key of enumerableOwnDataKeys(object, field)) {
     assertIdentifierSafeToken(key, `${field} key ${JSON.stringify(key)}`);
     const item = object[key];
     assertIdentifierSafeToken(item, `${field}.${key}`);
@@ -322,11 +314,8 @@ function parseScope(value: unknown, field = "scope"): Scope {
 
 function parseMetadata(value: unknown, field = "metadata"): Metadata {
   const object = expectObject(value, field);
-  if (Object.getOwnPropertySymbols(object).length > 0) {
-    throw new RecordValidationError(field, "must not contain symbol-keyed fields");
-  }
   const metadata: { [key: string]: JsonValue } = {};
-  for (const key of Object.keys(object)) {
+  for (const key of enumerableOwnDataKeys(object, field)) {
     const separator = key.indexOf(".");
     if (separator <= 0 || separator === key.length - 1) {
       throw new RecordValidationError(`${field} key ${JSON.stringify(key)}`, "must be <namespace>.<name>");
@@ -388,7 +377,22 @@ function daysInMonth(year: number, month: number): number {
   return [4, 6, 9, 11].includes(month) ? 30 : 31;
 }
 
-function instantMilliseconds(value: unknown, field: string): number {
+interface ParsedInstant {
+  readonly epochSecond: bigint;
+  readonly fraction: string;
+}
+
+function daysFromCivil(year: number, month: number, day: number): number {
+  const adjustedYear = year - (month <= 2 ? 1 : 0);
+  const era = Math.floor(adjustedYear / 400);
+  const yearOfEra = adjustedYear - era * 400;
+  const shiftedMonth = month + (month > 2 ? -3 : 9);
+  const dayOfYear = Math.floor((153 * shiftedMonth + 2) / 5) + day - 1;
+  const dayOfEra = yearOfEra * 365 + Math.floor(yearOfEra / 4) - Math.floor(yearOfEra / 100) + dayOfYear;
+  return era * 146_097 + dayOfEra - 719_468;
+}
+
+function parseInstant(value: unknown, field: string): ParsedInstant {
   if (typeof value !== "string") throw new RecordValidationError(field, "must be an RFC3339 instant string");
   const match = RFC3339_PATTERN.exec(value);
   if (!match) {
@@ -415,15 +419,32 @@ function instantMilliseconds(value: unknown, field: string): number {
   ) {
     throw new RecordValidationError(field, "must contain a valid RFC3339 calendar value");
   }
-  const milliseconds = new Date(value).getTime();
-  if (!Number.isFinite(milliseconds)) {
-    throw new RecordValidationError(field, "must contain a valid RFC3339 calendar value");
+
+  const localSecond =
+    BigInt(daysFromCivil(year, month, day)) * 86_400n + BigInt(hour * 3_600 + minute * 60 + second);
+  const offsetMagnitude = BigInt(offsetHour * 3_600 + offsetMinute * 60);
+  const signedOffset = match[8] === "Z" || match[9] === "+" ? offsetMagnitude : -offsetMagnitude;
+  return Object.freeze({
+    epochSecond: localSecond - signedOffset,
+    fraction: match[7] ?? "",
+  });
+}
+
+function compareInstants(left: ParsedInstant, right: ParsedInstant): number {
+  if (left.epochSecond < right.epochSecond) return -1;
+  if (left.epochSecond > right.epochSecond) return 1;
+  const length = Math.max(left.fraction.length, right.fraction.length);
+  for (let index = 0; index < length; index += 1) {
+    const leftDigit = left.fraction.charCodeAt(index) || 48;
+    const rightDigit = right.fraction.charCodeAt(index) || 48;
+    if (leftDigit < rightDigit) return -1;
+    if (leftDigit > rightDigit) return 1;
   }
-  return milliseconds;
+  return 0;
 }
 
 function expectInstant(value: unknown, field: string): string {
-  instantMilliseconds(value, field);
+  parseInstant(value, field);
   return value as string;
 }
 
@@ -443,7 +464,7 @@ function parseReferenceIds<K extends RecordKind>(
   field: string,
   nonEmpty: boolean,
 ): readonly RecordIdFor<K>[] {
-  if (!Array.isArray(value)) throw new RecordValidationError(field, "must be an array of record ids");
+  assertDenseDataArray(value, field);
   if (nonEmpty && value.length === 0) throw new RecordValidationError(field, "must be a non-empty array");
   return Object.freeze(
     value.map((id, index) => {
@@ -584,7 +605,7 @@ function parseClaimFields(
   if (
     validFrom !== undefined &&
     validUntil !== undefined &&
-    instantMilliseconds(validUntil, "valid_until") < instantMilliseconds(validFrom, "valid_from")
+    compareInstants(parseInstant(validUntil, "valid_until"), parseInstant(validFrom, "valid_from")) < 0
   ) {
     throw new RecordValidationError("valid_until", "must not precede valid_from");
   }
@@ -663,7 +684,8 @@ function parseVerificationFields(object: {
     true,
   ) as readonly ClaimId[];
   const basis = required(object, "verified_against", "verified_against");
-  if (!Array.isArray(basis) || basis.length === 0) {
+  assertDenseDataArray(basis, "verified_against");
+  if (basis.length === 0) {
     throw new RecordValidationError("verified_against", "must be a non-empty array");
   }
   return Object.freeze({
@@ -694,6 +716,7 @@ const VERIFICATION_FIELDS = ["targets", "verified_against", "result"] as const;
 /** Validate caller input, reject stamped fields, deeply copy it, and freeze the draft. */
 export function parseRecordDraft(value: unknown): RecordDraft {
   const object = expectObject(value, "record");
+  assertOwnDataProperties(object, "record");
   for (const forbidden of ["schema", "id", "recorded_at"] as const) {
     if (hasOwn(object, forbidden)) {
       throw new RecordValidationError(forbidden, "is application-owned and must not be supplied on a draft");
@@ -737,6 +760,7 @@ export function parseRecordDraft(value: unknown): RecordDraft {
 /** Validate a complete known-schema record, deeply copy it, and freeze the public value. */
 export function parsePersistedRecord(value: unknown): PersistedRecord {
   const object = expectObject(value, "record");
+  assertOwnDataProperties(object, "record");
   const schema = required(object, "schema", "schema");
   if (schema !== RECORD_SCHEMA_ID) {
     throw new RecordValidationError("schema", `unknown schema; expected ${RECORD_SCHEMA_ID}`);

@@ -206,7 +206,7 @@ describe("five-family draft and persisted unions", () => {
     );
   });
 
-  test("fails loudly on unknown schema, kind, and extra fields", () => {
+  test("fails loudly on unknown schema, kind, and enumerable extra fields", () => {
     expectFieldError(
       () => parsePersistedRecord({ ...persistedEnvelope("entry"), schema: "loredu.record/v2", body: "x" }),
       "schema",
@@ -218,6 +218,28 @@ describe("five-family draft and persisted unions", () => {
       "extra",
       "not a recognized field",
     );
+  });
+
+  test("rejects hidden, symbol, and accessor envelope fields without invoking getters", () => {
+    const hidden = validEntryDraft();
+    Object.defineProperty(hidden, "hidden", { value: true, enumerable: false });
+    expectFieldError(() => parseRecordDraft(hidden), "hidden", "not a recognized field");
+
+    const symbolic = validEntryDraft();
+    Object.defineProperty(symbolic, Symbol("hidden"), { value: true, enumerable: false });
+    expectFieldError(() => parseRecordDraft(symbolic), "record", "symbol-keyed");
+
+    let getterReads = 0;
+    const accessor: Record<string, unknown> = { kind: "entry", actor: ACTOR };
+    Object.defineProperty(accessor, "body", {
+      enumerable: true,
+      get() {
+        getterReads += 1;
+        return "must not execute";
+      },
+    });
+    expectFieldError(() => parseRecordDraft(accessor), "body", "not an accessor");
+    expect(getterReads).toBe(0);
   });
 });
 
@@ -287,6 +309,40 @@ describe("identifier-safe fields and semantic-specific strings", () => {
     expect(
       parseRecordDraft({ ...validEntryDraft(), sources: [{ ref: "😀".repeat(1024) }] }).sources?.[0]?.ref,
     ).toBe("😀".repeat(1024));
+
+    const hiddenSource: Record<string, unknown> = { ref: "source" };
+    Object.defineProperty(hiddenSource, "hidden", { value: true, enumerable: false });
+    expectFieldError(
+      () => parseRecordDraft({ ...validEntryDraft(), sources: [hiddenSource] }),
+      "sources[0].hidden",
+      "not a recognized field",
+    );
+  });
+
+  test("rejects unsupported own properties and sparsity on contract collection arrays", () => {
+    const sources = [{ ref: "source" }] as Array<{ ref: string }> & { hidden?: boolean };
+    Object.defineProperty(sources, "hidden", { value: true, enumerable: false });
+    expectFieldError(
+      () => parseRecordDraft({ ...validEntryDraft(), sources }),
+      "sources.hidden",
+      "unsupported array property",
+    );
+
+    const targets = [IDS.claim] as string[] & { annotation?: string };
+    targets.annotation = "extra";
+    expectFieldError(
+      () => parseRecordDraft({ ...validVerificationDraft(), targets }),
+      "targets.annotation",
+      "unsupported array property",
+    );
+    expectFieldError(
+      () => parseRecordDraft({ ...validEntryDraft(), sources: new Array(1) }),
+      "sources[0]",
+      "sparse",
+    );
+    expect(parseRecordDraft({ ...validEntryDraft(), sources: [{ ref: "normal" }] }).sources).toEqual([
+      { ref: "normal" },
+    ]);
   });
 });
 
@@ -317,6 +373,20 @@ describe("actors, metadata, and structural JSON", () => {
       "actor.type",
     );
     expectFieldError(() => parseRecordDraft({ ...validEntryDraft(), actor: { type: "agent" } }), "actor.id");
+  });
+
+  test("rejects hidden dynamic scope and metadata entries rather than dropping them", () => {
+    const scope: Record<string, unknown> = { repo: "loredu" };
+    Object.defineProperty(scope, "hidden", { value: "value", enumerable: false });
+    expectFieldError(() => parseRecordDraft({ ...validClaimDraft(), scope }), "scope.hidden", "enumerable");
+
+    const metadata: Record<string, unknown> = { "vendor.visible": true };
+    Object.defineProperty(metadata, "vendor.hidden", { value: true, enumerable: false });
+    expectFieldError(
+      () => parseRecordDraft({ ...validEntryDraft(), metadata }),
+      "metadata.vendor.hidden",
+      "enumerable",
+    );
   });
 
   test("preserves unknown namespaced metadata and deeply freezes JSON values", () => {
@@ -379,6 +449,46 @@ describe("actors, metadata, and structural JSON", () => {
     const circular: { self?: unknown } = {};
     circular.self = circular;
     expectFieldError(() => canonicalizeJsonValue(circular), "value.self", "circular");
+  });
+
+  test("rejects hidden, symbol, accessor, and array-extra JSON without reading hostile getters", () => {
+    const hidden = { visible: true };
+    Object.defineProperty(hidden, "hidden", { value: true, enumerable: false });
+    expectFieldError(() => canonicalizeJsonValue(hidden), "value.hidden", "enumerable");
+
+    const symbolic = { visible: true };
+    Object.defineProperty(symbolic, Symbol("hidden"), { value: true });
+    expectFieldError(() => canonicalizeJsonValue(symbolic), "value", "symbol-keyed");
+
+    let objectGetterReads = 0;
+    const accessor: Record<string, unknown> = {};
+    Object.defineProperty(accessor, "secret", {
+      enumerable: true,
+      get() {
+        objectGetterReads += 1;
+        return "must not execute";
+      },
+    });
+    expectFieldError(() => canonicalizeJsonValue(accessor), "value.secret", "not an accessor");
+    expect(objectGetterReads).toBe(0);
+
+    const array = [1] as number[] & { extra?: boolean };
+    array.extra = true;
+    expectFieldError(() => canonicalizeJsonValue(array), "value.extra", "unsupported array property");
+
+    let arrayGetterReads = 0;
+    const accessorArray = [1];
+    Object.defineProperty(accessorArray, "0", {
+      enumerable: true,
+      configurable: true,
+      get() {
+        arrayGetterReads += 1;
+        return 1;
+      },
+    });
+    expectFieldError(() => canonicalizeJsonValue(accessorArray), "value[0]", "not an accessor");
+    expect(arrayGetterReads).toBe(0);
+    expect(canonicalizeJsonValue({ normal: [1, 2] })).toEqual({ normal: [1, 2] });
   });
 });
 
@@ -508,6 +618,41 @@ describe("timestamps and validity", () => {
     expect(draft.kind === "claim" && draft.valid_from).toBe("2024-02-29T10:00:00.123+02:30");
   });
 
+  test("compares arbitrary fractional precision and signed offsets exactly", () => {
+    for (const [validFrom, validUntil] of [
+      ["2024-01-01T00:00:00.0002Z", "2024-01-01T00:00:00.0001Z"],
+      ["2024-01-01T00:00:00.12345678901234567892Z", "2024-01-01T00:00:00.12345678901234567891Z"],
+      ["2024-01-01T00:00:00.0000000002+01:30", "2023-12-31T22:30:00.0000000001Z"],
+    ] as const) {
+      expectFieldError(
+        () =>
+          parseRecordDraft({
+            ...validClaimDraft(),
+            valid_from: validFrom,
+            valid_until: validUntil,
+          }),
+        "valid_until",
+        "must not precede",
+      );
+    }
+
+    const equivalent = parseRecordDraft({
+      ...validClaimDraft(),
+      valid_from: "2024-01-01T00:00:00.123456789-02:30",
+      valid_until: "2024-01-01T02:30:00.1234567890Z",
+    });
+    expect(equivalent.kind === "claim" && equivalent.valid_from).toBe("2024-01-01T00:00:00.123456789-02:30");
+    expect(equivalent.kind === "claim" && equivalent.valid_until).toBe("2024-01-01T02:30:00.1234567890Z");
+
+    expect(
+      parseRecordDraft({
+        ...validClaimDraft(),
+        valid_from: "0000-01-01T00:00:00.1Z",
+        valid_until: "9999-12-31T23:59:59.999999999999999999999999Z",
+      }),
+    ).toMatchObject({ valid_from: "0000-01-01T00:00:00.1Z" });
+  });
+
   test("rejects absent offsets, invalid calendars/offsets, and inverted instants", () => {
     for (const timestamp of [
       "2024-01-01T00:00:00",
@@ -584,6 +729,57 @@ describe("claim-key and scope identity", () => {
     expect(scopesEqual({ a: "1", b: "2" }, { b: "2", a: "1" })).toBe(true);
     expect(scopesEqual(undefined, {})).toBe(true);
     expect(scopesEqual({ a: "1" }, { a: "1", b: "2" })).toBe(false);
+  });
+
+  test("public structural claim keys compare scope pairs as a validated unordered set", () => {
+    const common = { subject: { type: "code-area", id: "commands" }, predicate: "location" } as const;
+    const left = {
+      ...common,
+      scope: [
+        ["b", "2"],
+        ["a", "1"],
+      ],
+    } as const;
+    const right = {
+      ...common,
+      scope: [
+        ["a", "1"],
+        ["b", "2"],
+      ],
+    } as const;
+    expect(claimKeysEqual(left, right)).toBe(true);
+    expect(left.scope).toEqual([
+      ["b", "2"],
+      ["a", "1"],
+    ]);
+    expect(right.scope).toEqual([
+      ["a", "1"],
+      ["b", "2"],
+    ]);
+
+    expectFieldError(
+      () =>
+        claimKeysEqual(
+          {
+            ...common,
+            scope: [
+              ["a", "1"],
+              ["a", "1"],
+            ],
+          },
+          { ...common, scope: [["a", "1"]] },
+        ),
+      "left.scope[1][0]",
+      "duplicates scope key",
+    );
+
+    const pair = ["a", "1"] as [string, string] & { hidden?: boolean };
+    Object.defineProperty(pair, "hidden", { value: true, enumerable: false });
+    expectFieldError(
+      () => claimKeysEqual({ ...common, scope: [pair] }, { ...common, scope: [["a", "1"]] }),
+      "left.scope[0].hidden",
+      "unsupported array property",
+    );
   });
 
   test("declared claim keys preserve consumer vocabulary and distinguish perspective", () => {
