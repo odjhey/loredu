@@ -42,6 +42,8 @@ created_at: 2026-08-26T12:10:00+08:00
 | [0013: Agent decision authority](./decisions/0013-agent-decision-authority.md) | Agents decide and land without sign-off until production; the obligation is the record, not the gate |
 | [0014: Minimal frontmatter](./decisions/0014-minimal-frontmatter.md) | Git owns last-changed time; `status` gets a vocabulary with real signal and no draft-by-default |
 | [0015: Catalog accounting and the docs gate](./decisions/0015-catalog-accounting-and-docs-gate.md) | Every T-number implemented via `@covers` or deferred in `catalog-status.json`; structural gate over the corpus; both gates self-tested |
+| [0016: Workspace scaffold and kernel type isolation](./decisions/0016-workspace-scaffold-and-kernel-type-isolation.md) | Bun workspaces with TypeScript sources as exports; kernel purity enforced as a typecheck error |
+| [0017: Branch protection posture](./decisions/0017-branch-protection-posture.md) | `ci-required` the only required status, zero reviews, squash-only, no bypass actors, up-to-date-before-merge on |
 
 ## Agents and process
 
