@@ -1,0 +1,52 @@
+# Machine-readable agent policy. Keep in sync with agent-policy.md.
+# Harnesses that cannot consume YAML fall back to agent-policy.md.
+version: 0
+status: draft
+updated_at: 2026-08-26T15:40:00+08:00
+
+entrypoint: AGENTS.md
+policy_doc: docs/ai/agent-policy.md
+
+indexes:
+  flat: docs/INDEX.md
+  guide: docs/README.md
+
+find_docs:
+  script: docs/scripts/find-docs.mjs
+  run: bun docs/scripts/find-docs.mjs
+  skill: .agents/skills/find-docs/SKILL.md
+
+sources_of_truth:
+  terminology: docs/architecture/ubiquitous-language.md
+  contracts: docs/architecture/contracts/README.md
+  decisions: docs/decisions/README.md
+  scope: docs/v0.x/scope/goal-and-scope.md
+  plan: docs/v0.x/execution/implementation-plan.md
+
+worktrees:
+  root: .worktrees
+  path_pattern: .worktrees/<name>
+  invent_other_paths: false
+
+human_gates:
+  - id: adr_review
+    description: New or changed decision records require operator review.
+    path: docs/decisions
+  - id: contract_change
+    description: Changes to published contracts require operator review.
+    path: docs/architecture/contracts
+  - id: scope_change
+    description: Changes to v0.x scope or plan milestones require operator review.
+    paths: [docs/v0.x/scope, docs/v0.x/execution]
+  - id: pr_merge
+    description: PR review is required; agents do not merge their own PRs.
+
+trust:
+  unverified_when: generated present and verified absent
+  do_not_rely_on: [archived, superseded, past stale_after]
+
+closure:
+  domain_doc_playbook: docs/playbooks/domain-doc-update.md
+  require_domain_doc_decision: true
+  require_index_links: true
+  require_updated_at_bump: true
