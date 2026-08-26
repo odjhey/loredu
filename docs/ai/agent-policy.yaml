@@ -41,6 +41,36 @@ decision_authority:
     - any choice a future agent would have to reverse-engineer
   failure_mode: unrecorded decision
 
+# Mandatory for every work item that touches a domain contract. See ADR 0022.
+contract_driven_work:
+  applies_when: work touches a domain contract
+  mandatory: true
+  obligations:
+    - id: identify_authorities
+      requirement: Identify the governing contracts, ADRs, and behavioral catalog rows.
+    - id: enumerate_invariants
+      requirement: Enumerate every normative invariant, including MUST, ONLY, REQUIRED, REJECT, NEVER, closed vocabularies, type/family restrictions, equality, ownership, and persistence rules.
+    - id: record_contract_matrix
+      requirement: Record those invariants in the work item's Contract Matrix.
+    - id: classify_invariants
+      requirement: Classify each invariant as in scope, explicitly out of scope, dependent, or ambiguous.
+    - id: evidence_in_scope
+      requirement: Every in-scope invariant must eventually have implementation evidence and appropriate test/review evidence.
+    - id: reject_broader_behavior
+      requirement: Accepted behavior broader than the contract is a bug.
+    - id: reject_narrower_behavior
+      requirement: Behavior narrower than the contract is a bug unless explicitly allowed.
+    - id: preserve_semantic_distinctions
+      requirement: Generic helpers must not erase semantic distinctions required by a contract.
+    - id: escalate_public_decisions
+      requirement: If work requires a new public semantic/API/persisted-shape/ownership decision, report NEEDS_DECISION. Do not silently settle it in implementation.
+    - id: escalate_decomposition_mismatch
+      requirement: If the existing task decomposition no longer matches reality, report NEEDS_REPLAN.
+    - id: interpret_ci_narrowly
+      requirement: Green CI proves only what its checks assert.
+    - id: return_to_watchtower
+      requirement: Return findings and evidence to Watchtower; do not assume the next step.
+
 operator_required:
   - id: production_release
     description: Production release and the compatibility promises that come with it.

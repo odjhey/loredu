@@ -37,6 +37,23 @@ This repo is agent-first and design-first: it holds contracts, decision records,
 6. Load skills when their trigger conditions apply.
 7. Prefer repository scripts and deterministic CLI tooling over manually recreating a documented procedure.
 
+## Contract-driven work protocol
+
+For any work touching a domain contract:
+
+1. Identify the governing contracts, ADRs, and behavioral catalog rows.
+2. Enumerate every normative invariant, including MUST, ONLY, REQUIRED, REJECT, NEVER, closed vocabularies, type/family restrictions, equality, ownership, and persistence rules.
+3. Record those invariants in the work item's Contract Matrix.
+4. Classify each invariant as in scope, explicitly out of scope, dependent, or ambiguous.
+5. Every in-scope invariant must eventually have implementation evidence and appropriate test/review evidence.
+6. Accepted behavior broader than the contract is a bug.
+7. Behavior narrower than the contract is a bug unless explicitly allowed.
+8. Generic helpers must not erase semantic distinctions required by a contract.
+9. If work requires a new public semantic/API/persisted-shape/ownership decision, report NEEDS_DECISION. Do not silently settle it in implementation.
+10. If the existing task decomposition no longer matches reality, report NEEDS_REPLAN.
+11. Green CI proves only what its checks assert.
+12. Return findings and evidence to Watchtower; do not assume the next step.
+
 ## Trust rules
 
 Read the frontmatter before relying on a doc ([ADR 0014](../decisions/0014-minimal-frontmatter.md) defines the schema):

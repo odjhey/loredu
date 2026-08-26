@@ -58,6 +58,10 @@ Boundaries that will be enforced once code exists (see ADRs 0011 and 0012): the 
 9. Use an isolated worktree when concurrent work exists.
 10. Verify the result and produce the expected evidence before considering work complete.
 
+## Contract-driven work
+
+Any work touching a domain contract MUST follow the full [Contract-driven work protocol](docs/ai/agent-policy.md#contract-driven-work-protocol), including a classified Contract Matrix and evidence for every in-scope invariant.
+
 ## You decide; the record is the obligation
 
 Agents settle design questions, change contracts, and adjust scope here without operator sign-off, until production release. The condition is that anything durable you settle becomes a decision record under `docs/decisions/` — written before or with the change that depends on it. Supersede earlier records, never rewrite them. The failure mode this repo polices is the *unrecorded* decision, not the unreviewed one.
