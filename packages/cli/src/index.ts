@@ -28,8 +28,9 @@ export function versionLine(home: string = defaultLoreduHome()): string {
 /** Runs one invocation and returns the process exit code. */
 export function run(argv: readonly string[], io: CliIo): number {
   if (argv.length === 1 && (argv[0] === "--version" || argv[0] === "-v")) {
-    io.out(versionLine());
-    return 0;
+    // Deliberate runtime break for the compile-smoke proof: this compiles and
+    // typechecks cleanly, so only running the built binary catches it.
+    throw new Error("deliberate runtime failure for the compile-smoke proof");
   }
   io.err(NOT_IMPLEMENTED_MESSAGE);
   return 1;
