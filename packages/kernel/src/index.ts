@@ -5,7 +5,13 @@ export type {
 } from "./application/append";
 export { appendRecord, createApplication } from "./application/append";
 export type { BasisBearing, BasisIdentity } from "./application/basis";
-export { basisIdentitiesEqual, basisIdentityOf } from "./application/basis";
+export {
+  basisIdentitiesEqual,
+  basisIdentityOf,
+  composeM0RulesetVersion,
+  createBasisIdentity,
+  M0_CORE_RULESET_VERSION,
+} from "./application/basis";
 export type { ClaimKey, ClaimKeyInput, ScopePair } from "./domain/claim-key";
 export {
   canonicalizeScope,

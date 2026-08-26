@@ -5,9 +5,11 @@ import {
   basisIdentityOf,
   type ClaimPolicy,
   type Clock,
+  composeM0RulesetVersion,
   createApplication,
   DEFAULT_CLAIM_POLICY,
   type EntryDraft,
+  M0_CORE_RULESET_VERSION,
   type PersistedRecord,
   type RandomSource,
   RECORD_SCHEMA_ID,
@@ -251,6 +253,111 @@ describe("A1 application kernel", () => {
       ["a", "1"],
       ["z", "2"],
     ]);
+  });
+
+  test("application assembles deterministic default and captured custom policy rulesets without callbacks", async () => {
+    expect(M0_CORE_RULESET_VERSION).toBe("loredu.core-ruleset/m0-v1");
+    expect(composeM0RulesetVersion(DEFAULT_CLAIM_POLICY.version)).toBe(
+      "loredu.core-ruleset/m0-v1+claim-policy/loredu.claim-policy/default-v1",
+    );
+    const defaultApp = createApplication({
+      store: new InMemoryStore(),
+      clock: new FixedClock(instant),
+      random: new SeededRandomSource(21),
+    });
+    expect((await defaultApp.basis(null)).ruleset).toBe(
+      "loredu.core-ruleset/m0-v1+claim-policy/loredu.claim-policy/default-v1",
+    );
+
+    const calls = { identity: 0, semantics: 0, advisories: 0 };
+    let clockCalls = 0;
+    const clock: Clock = {
+      now() {
+        clockCalls += 1;
+        return instant;
+      },
+    };
+    const mutablePolicy = {
+      version: "consumer/custom-v1",
+      identity(claim: Parameters<ClaimPolicy["identity"]>[0]) {
+        calls.identity += 1;
+        return DEFAULT_CLAIM_POLICY.identity(claim);
+      },
+      semantics() {
+        calls.semantics += 1;
+        return "coexisting" as const;
+      },
+      advisories() {
+        calls.advisories += 1;
+        return [];
+      },
+    };
+    const makeCustom = (version: string) =>
+      createApplication({
+        store: new InMemoryStore(),
+        clock: new FixedClock(instant),
+        random: new SeededRandomSource(22),
+        claimPolicy: { ...mutablePolicy, version },
+      });
+    const custom = createApplication({
+      store: new InMemoryStore(),
+      clock,
+      random: new SeededRandomSource(22),
+      claimPolicy: mutablePolicy,
+    });
+    mutablePolicy.version = "consumer/mutated-after-assembly";
+    const expected = "loredu.core-ruleset/m0-v1+claim-policy/consumer/custom-v1";
+    expect((await custom.basis({ b: 2, a: 1 })).ruleset).toBe(expected);
+    expect((await custom.basis([])).ruleset).toBe(expected);
+    expect((await makeCustom("consumer/custom-v1").basis(null)).ruleset).toBe(expected);
+    expect((await makeCustom("consumer/custom-v2").basis(null)).ruleset).not.toBe(expected);
+    expect(clockCalls).toBe(0);
+    await custom.append(entry());
+    expect(clockCalls).toBe(1);
+    expect(calls).toEqual({ identity: 0, semantics: 0, advisories: 0 });
+  });
+
+  test("application basis snapshots successful head and canonical immutable opaque query", async () => {
+    const store = new InMemoryStore();
+    const app = createApplication({
+      store,
+      clock: new FixedClock(instant),
+      random: new SeededRandomSource(31),
+    });
+    const query = { nested: { z: 2, a: 1 }, ordered: [1, "1", null] };
+    const before = await app.basis(query);
+    expect(before.stream_position).toBe(0);
+    expect(Object.keys(before.query as object)).toEqual(["nested", "ordered"]);
+    expect(Object.keys((before.query as { nested: object }).nested)).toEqual(["a", "z"]);
+    expect(Object.isFrozen(before)).toBe(true);
+    expect(Object.isFrozen(before.query)).toBe(true);
+    expect(Object.isFrozen((before.query as { nested: object }).nested)).toBe(true);
+    query.nested.a = 9;
+    expect((before.query as { nested: { a: number } }).nested.a).toBe(1);
+
+    await app.append(entry("committed"));
+    expect((await app.basis(query)).stream_position).toBe(1);
+    const failingStore: RecordStore = {
+      append: async () => {
+        throw new Error("failed append");
+      },
+      get: store.get.bind(store),
+      stream: store.stream.bind(store),
+      head: store.head.bind(store),
+    };
+    await expect(
+      appendRecord(entry("failed"), {
+        store: failingStore,
+        clock: new FixedClock(instant),
+        random: new SeededRandomSource(32),
+      }),
+    ).rejects.toThrow("failed append");
+    expect((await app.basis(query)).stream_position).toBe(1);
+
+    const reordered = await app.basis({ ordered: [1, "1", null], nested: { a: 9, z: 2 } });
+    expect(basisIdentitiesEqual({ basis: await app.basis(query) }, { basis: reordered })).toBe(true);
+    const orderChanged = await app.basis({ ordered: ["1", 1, null], nested: { a: 9, z: 2 } });
+    expect(basisIdentitiesEqual({ basis: reordered }, { basis: orderChanged })).toBe(false);
   });
 
   test("basis identity excludes display-only computed_at", () => {

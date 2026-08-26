@@ -1,3 +1,4 @@
+import type { JsonValue } from "../domain/json-value";
 import { RECORD_ID_ENTROPY_BYTES, type RecordId, recordIdFromBytes } from "../domain/record-id";
 import { RECORD_SCHEMA_ID } from "../domain/record-kind";
 import {
@@ -7,13 +8,16 @@ import {
   type RecordDraft,
 } from "../domain/records";
 import { RecordValidationError } from "../domain/validation-error";
+import { type ClaimPolicy, DEFAULT_CLAIM_POLICY } from "../policy/claim-policy";
 import type { Clock, RandomSource } from "../ports/capabilities";
 import type { RecordStore, StreamPosition } from "../ports/record-store";
+import { type BasisIdentity, composeM0RulesetVersion, createBasisIdentity } from "./basis";
 
 export interface ApplicationCapabilities {
   readonly store: RecordStore;
   readonly clock: Clock;
   readonly random: RandomSource;
+  readonly claimPolicy?: ClaimPolicy;
 }
 
 export interface AppendRecordResult {
@@ -81,13 +85,17 @@ export interface LoreduApplication {
   get(id: RecordId | string): Promise<PersistedRecord | undefined>;
   stream(afterPosition?: StreamPosition): ReturnType<RecordStore["stream"]>;
   head(): Promise<StreamPosition>;
+  basis(query: JsonValue): Promise<BasisIdentity>;
 }
 
 export function createApplication(capabilities: ApplicationCapabilities): LoreduApplication {
+  const policyVersion = (capabilities.claimPolicy ?? DEFAULT_CLAIM_POLICY).version;
+  const ruleset = composeM0RulesetVersion(policyVersion);
   return Object.freeze({
     append: (draft: unknown) => appendRecord(draft, capabilities),
     get: (id: RecordId | string) => capabilities.store.get(id),
     stream: (afterPosition?: StreamPosition) => capabilities.store.stream(afterPosition),
     head: () => capabilities.store.head(),
+    basis: async (query: JsonValue) => createBasisIdentity(await capabilities.store.head(), ruleset, query),
   });
 }

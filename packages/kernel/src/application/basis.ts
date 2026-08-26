@@ -12,13 +12,29 @@ export interface BasisBearing {
   readonly computed_at?: string;
 }
 
+export const M0_CORE_RULESET_VERSION = "loredu.core-ruleset/m0-v1" as const;
+
+/** Compose the exact M0 core and active ClaimPolicy identities. */
+export function composeM0RulesetVersion(policyVersion: string): string {
+  return `${M0_CORE_RULESET_VERSION}+claim-policy/${policyVersion}`;
+}
+
+/** Construct and deeply freeze one opaque-query basis identity. */
+export function createBasisIdentity(
+  streamPosition: StreamPosition,
+  ruleset: string,
+  query: JsonValue,
+): BasisIdentity {
+  return Object.freeze({
+    stream_position: streamPosition,
+    ruleset,
+    query: canonicalizeJsonValue(query, "basis.query"),
+  });
+}
+
 /** Copy the identity-bearing basis, deliberately excluding display-only `computed_at`. */
 export function basisIdentityOf(value: BasisBearing): BasisIdentity {
-  return Object.freeze({
-    stream_position: value.basis.stream_position,
-    ruleset: value.basis.ruleset,
-    query: canonicalizeJsonValue(value.basis.query, "basis.query"),
-  });
+  return createBasisIdentity(value.basis.stream_position, value.basis.ruleset, value.basis.query);
 }
 
 export function basisIdentitiesEqual(left: BasisBearing, right: BasisBearing): boolean {
