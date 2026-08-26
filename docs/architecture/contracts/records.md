@@ -69,6 +69,16 @@ sources: []
 
 A Claim may be submitted directly by a human/program without automated extraction, but provenance should still identify its basis when available.
 
+### Claim identity
+
+The claim key is declared at write time and is the unit of deterministic reconciliation ([decision 0004](../../decisions/0004-claim-identity-key.md)):
+
+```text
+claim_key = (scope, subject.type, subject.id, predicate, perspective?)
+```
+
+`subject.id` and `predicate` are stable identifiers, not free prose. Two claims reconcile automatically (duplicate, support, conflict, temporal precedence) only when their keys match; differing `perspective` values produce distinct keys so alternative views coexist. Validation rejects claims with missing or malformed key fields — unkeyed knowledge belongs in an Entry.
+
 ## Relation
 
 Relations connect records without mutating them. Initial vocabulary:
@@ -121,3 +131,5 @@ result: confirmed | contradicted | unchanged | needs_revalidation
 5. Contradictory claims are legal historical data.
 6. Current truth is a projection, not a mutable field on a canonical record.
 7. The complete projection must be reconstructable from canonical records.
+8. Every claim declares a well-formed claim key; deterministic reconciliation never crosses key boundaries.
+9. Every persisted record schema version remains replayable; schema evolution is additive or versioned, never breaking ([decision 0005](../../decisions/0005-embedded-kernel-compatibility.md)).

@@ -13,7 +13,7 @@ updated_at: 2026-08-26T12:10:00+08:00
 
 ## Goal
 
-Prove that Loredu can maintain small, inspectable, provenance-aware operational knowledge across repeated activities without depending on a CLI, model runtime, crawler framework, graph/vector database, daemon, or external service.
+Prove that Loredu can maintain small, inspectable, provenance-aware operational knowledge across repeated activities without depending on a CLI, model runtime, crawler framework, graph/vector database, daemon, or external service — and that embedding it in one of our real products beats the notes-file that product would otherwise hand-roll ([decision 0005](../../decisions/0005-embedded-kernel-compatibility.md)).
 
 ## v0.x must prove
 
@@ -27,6 +27,9 @@ Prove that Loredu can maintain small, inspectable, provenance-aware operational 
 8. Working Lore produces a bounded context rather than returning the whole history.
 9. A plain-file `RecordStore` can persist and replay the complete alpha state.
 10. The same core contracts can represent at least one technical and one non-technical activity fixture.
+11. Two actors recording the same fact with different free text but the same declared claim key are reconciled (corroboration or conflict), and the same fact under different perspectives coexists without destructive conflict ([decision 0004](../../decisions/0004-claim-identity-key.md)).
+12. Embedding ergonomics: a consumer reaches "appended entry + claim" and "Working Lore in hand" in a few calls with no runtime dependencies beyond the store adapter.
+13. At least one real consumer from [candidate consumers](../../reports/candidate-consumers.md) is wired in before any contract is marked `status: current`.
 
 ## Included
 

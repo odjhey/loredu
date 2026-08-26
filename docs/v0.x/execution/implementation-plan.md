@@ -1,6 +1,6 @@
 ---
 name: v0x_implementation_plan
-description: "M0–M3 implementation sequence for the Loredu domain kernel, plain-file store, projections, and Working Lore."
+description: "M0–M4 implementation sequence for the Loredu domain kernel, plain-file store, projections, Working Lore, and the first real consumer."
 type: plan
 tags: [v0.x, execution]
 status: draft
@@ -17,14 +17,15 @@ The implementation sequence starts from the application contracts and deliberate
 
 Implement and test:
 
-- immutable record envelope;
+- immutable record envelope with explicit schema version;
 - Entry, Claim, Relation, Resolution, Verification shapes;
+- claim key declaration and well-formedness validation (subject/predicate/perspective normalization rules, [decision 0004](../../decisions/0004-claim-identity-key.md));
 - opaque ID generation/validation;
 - `recorded_at` and optional validity fields;
 - scope, actor, and provenance/reference structures;
-- record validation and compatibility rules.
+- record validation and compatibility rules (any shipped schema version stays replayable, [decision 0005](../../decisions/0005-embedded-kernel-compatibility.md)).
 
-Exit: records can be created, validated, serialized, and compared without any storage or UI dependency.
+Exit: records can be created, validated, serialized, and compared without any storage or UI dependency, and malformed claim keys are rejected with actionable errors.
 
 ## M1 — Plain-file persistence
 
@@ -42,7 +43,7 @@ Exit: deleting all derived state and replaying the Markdown records reconstructs
 
 ## M2 — Reconciliation and projection
 
-Implement deterministic baseline rules for:
+Implement deterministic baseline rules, all scoped within a claim key:
 
 - duplicate detection where identity/value/source makes it unambiguous;
 - same-value corroboration/support;
@@ -65,9 +66,27 @@ Implement:
 - stable handles for drilling into claims, evidence, and entries;
 - item/character budgets.
 
-Do not require embeddings or a model reranker.
+Do not require embeddings or a model reranker. Ranking sits behind a `Ranker` port with a deterministic baseline, so a consumer can substitute its own without core changes.
 
 Exit: the acceptance activity receives useful context that remains bounded as historical records accumulate.
+
+## M4 — First real consumer
+
+Embed the kernel in one consumer from [candidate consumers](../../reports/candidate-consumers.md) — real writers, real corpus, no hand-tuned fixtures.
+
+Exit: the consumer records and retrieves knowledge through the published contracts alone; friction found here (key vocabulary, ergonomics, missing disclosure handles) feeds contract revisions before anything is marked `status: current`.
+
+## Acceptance scenario C — cross-actor claim keying
+
+1. Actor A (human) records a claim with free text "notice period is 30 days" under key `(scope, policy, agreement-x, notice_period_days)`.
+2. Actor B (program) records the same fact with different phrasing and provenance under the same declared key.
+3. Actor C records `observed_process` and `documented_process` variants of another fact as distinct perspectives.
+
+Verify:
+
+- A and B reconcile as corroboration; a differing value under the same key surfaces as a candidate conflict;
+- the perspective variants coexist without destructive conflict and appear as an attention item;
+- a claim with a malformed or missing key is rejected at validation, not silently stored.
 
 ## Acceptance scenario A — repeated technical investigation
 
