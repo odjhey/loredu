@@ -29,7 +29,11 @@ Exact method names are language-specific and are not part of this contract.
 
 - `append` never silently replaces a record with the same identity;
 - `append` returns a monotonic stream position; `head` exposes the latest position so derived views can be checked for staleness against their `basis` ([decision 0006](../../decisions/0006-explicit-version-basis.md));
-- how a position is represented is an adapter detail (the plain-file adapter may derive it from deterministic replay order), but positions must be stable across replays.
+- how a position is represented is an adapter detail (the plain-file adapter may derive it from deterministic replay order), but positions must be stable across replays;
+- reads return the original canonical record, not a projected/mutated representation;
+- ordering/cursors are deterministic enough to replay projections;
+- store adapters preserve record data required by the published record schema;
+- application logic must not depend on provider-specific paths, tables, SDK objects, or query languages.
 
 ## Append is the commit point
 
@@ -53,7 +57,7 @@ The port defines the safety guarantees; each adapter implements them with whatev
 - positions remain monotonic under any interleaving the adapter permits;
 - a writer that cannot obtain safe access fails loudly; it never corrupts or silently drops a record.
 
-v0.x assumes a single writer at a time. The plain-file adapter satisfies the guarantees with lock-file + atomic-rename (the pattern proven in the watchtower ledger consumer); a database-backed canonical store would use transactions. Multi-writer coordination beyond this is explicitly deferred.
+v0.x assumes a single writer at a time. The plain-file adapter satisfies the guarantees with lock-file + atomic-rename (the pattern the watchtower ledger — a [candidate consumer](../../reports/candidate-consumers.md) — already proved in its own codebase); a database-backed canonical store would use transactions. Multi-writer coordination beyond this is explicitly deferred.
 
 ## Store roots
 
@@ -61,13 +65,10 @@ A store is a self-contained directory; nothing about a store lives outside its r
 
 - an explicit path flag always wins;
 - otherwise a store name resolves to `$LOREDU_HOME/stores/<name>` (`LOREDU_HOME` defaults to `~/.loredu`), keeping the home root free for configuration and other non-store concerns;
+- with neither flag, the default store name is `default`, resolved the same way (`$LOREDU_HOME/stores/default`) — it enjoys no special creation rules;
 - if the resolved store does not exist, the call **fails with an actionable error** — no upward discovery from the working directory, no silent creation outside `init`.
 
 Predictability over magic: resolution never depends on where a command happens to be run from. Test isolation is pointing `LOREDU_HOME` at a temp directory, not a mocking exercise.
-- reads return the original canonical record, not a projected/mutated representation;
-- ordering/cursors are deterministic enough to replay projections;
-- store adapters preserve record data required by the published record schema;
-- application logic must not depend on provider-specific paths, tables, SDK objects, or query languages.
 
 ## Alpha adapter
 

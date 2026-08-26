@@ -62,15 +62,20 @@ Do not bind the core to an orchestration framework.
 
 ## Agent-ergonomic interface principles
 
-Borrow:
+The concrete reference is [axi's 10 principles](https://github.com/kunchenguid/axi#the-10-principles) for agent-ergonomic tools. Loredu is inspired by them, not bound to them — the kernel's own contracts (append-only records, basis, hypermedia envelope) decide the shape. Mapping each:
 
-- minimal default schemas;
-- content-first orientation;
-- truncation with explicit full-detail escape hatches;
-- precomputed summaries that avoid unnecessary round trips;
-- contextual disclosure and stable drill-down handles;
-- definitive empty/attention states;
-- hypermedia-style responses (REST's "hypertext as the engine of application state"): every response embeds the runnable affordances to continue, so callers navigate by link instead of memorized surface.
+| axi principle | Loredu stance |
+|---|---|
+| 1. Token-efficient output | Partially adopted: compact line-oriented text mode mirrors the `--json` envelope. TOON is not a core format — JSON is the machine contract, and a caller that wants TOON pipes for it (`lor claims --json \| toon`), the same composition rule as querying. |
+| 2. Minimal default schemas | Adopted: default list/lore output is compact lines (key, value, handle, state) — full records only behind `show`. |
+| 3. Content truncation with escape hatches | Adopted via handles instead of a `--full` flag: bounded packets state full counts and carry runnable continuation/expansion commands ([decision 0009](../decisions/0009-hypermedia-pagination.md)). |
+| 4. Pre-computed aggregates | Adopted: Working Lore `orientation` counts and `lor status` totals avoid enumeration round trips. |
+| 5. Definitive empty states | Adopted: an empty scope returns a definitive empty packet with a basis, exit 0 — never an error (journey 1). |
+| 6. Structured errors, exit codes, idempotent mutations | Adopted for errors/exit codes (stable, distinct, actionable; no interactive prompts). Deliberate divergence on idempotent mutations: `append` is append-only by design — a retried write creates a second record, and reconciliation surfaces it as a duplicate/corroboration rather than the store deduplicating silently. |
+| 7. Ambient context | Adapted, inverted order: the skill ships inside the binary (`lor skill`); session integrations are thin wrappers that defer to it ([decision 0008](../decisions/0008-cli-first-agent-reactive.md)). |
+| 8. Content first | Adopted: bare `lor` prints the orientation/status view, not help text. |
+| 9. Contextual disclosure | Adopted as core semantics, stricter than the source: `advice` next steps are deterministic and non-speculative, a contract rule rather than a UX nicety. |
+| 10. Consistent help | Adopted: concise per-subcommand reference alongside `lor skill` for the full agent guide. |
 
 These apply to Loredu application views and future surfaces; a CLI is not required for the core.
 

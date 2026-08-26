@@ -29,6 +29,7 @@ snapshot: optional-snapshot
 basis:
   stream_position: position-of-last-record-included
   ruleset: ruleset-version
+  query: activity-scope-and-temporal-bounds
   computed_at: timestamp
 orientation:
   current_count: 0

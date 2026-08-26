@@ -28,7 +28,7 @@ Every command returns the same envelope shape in text and `--json`:
     { "why": "another claim exists under this key with a different value", "run": "lor show clm_7f3k" },
     { "why": "record your judgment once verified against the source", "run": "lor resolve --targets clm_7f3k,clm_x4x8 --decision prefer --replacement clm_x4x8 --reason \"...\"" }
   ],
-  "basis": { "position": 6 }
+  "basis": { "stream_position": 6 }
 }
 ```
 
@@ -64,7 +64,7 @@ Store resolution is predictable, never cwd-dependent: `--store <path>` (used as-
 ```text
 $ lor lore --activity investigate --scope repo=rozoro
 no knowledge yet for this scope
-basis: position=0 ruleset=r1
+basis: stream_position=0 ruleset=r1
 ```
 
 A definitive empty state (borrowed agent-ergonomics principle), never an error, and even the empty packet carries a basis.
@@ -130,6 +130,8 @@ healthy
 
 All checks are mechanical and available before full reconciliation exists. `lor status --check` exits nonzero only on health failures.
 
+Content first (borrowed agent-ergonomics principle): bare `lor` with no arguments prints this orientation view — live data, never a help screen. Help stays consistent and concise: `lor <command> --help` prints a per-command reference; `lor skill` remains the full agent guide.
+
 ## Namespacing and key hygiene
 
 The kernel enforces key **shape** only (identifier-safe, no prose). Namespacing and vocabulary are the consumer's to impose — Loredu models healthy conventions in its examples and CLI output (e.g. `--scope repo=rozoro`, subjects like `code-area/command-registration`) without mandating them. The agent's duplicate-detection tool is the query engine, not a kernel rule: `lor claims` filters by any field (`--scope`, `--subject-type`, `--subject`, `--predicate`, `--value`, `--actor`, `--since`), so an agent checks for existing keys before inventing one, and `status` advisories catch what slips through.
@@ -150,7 +152,7 @@ current:
   (code-area command-registration) location = src/commands   [clm_7f3k, corroborated]
 attention:
   conflict: location = src/commands vs src/cli/commands      [clm_7f3k ~ clm_x4x8]
-basis: position=4 ruleset=r1
+basis: stream_position=4 ruleset=r1
 ```
 
 Bounded, ranked, with stable handles — not a record dump.
@@ -188,10 +190,10 @@ Every id printed anywhere is resolvable — the progressive-disclosure promise.
 
 ```text
 $ lor head
-position=6
+stream_position=6
 ```
 
-A cached lore packet with `basis.position=4` is stale the moment `head` moves past it for the scope. And deleting every derived artifact then replaying the plain files reproduces identical projections for the same basis and query ([decision 0006](../../decisions/0006-explicit-version-basis.md)).
+A cached lore packet with `basis.stream_position=4` is stale the moment `head` moves past it for the scope. And deleting every derived artifact then replaying the plain files reproduces identical projections for the same basis and query ([decision 0006](../../decisions/0006-explicit-version-basis.md)).
 
 ## Journey 9 — teach the agents
 
@@ -206,7 +208,7 @@ Grouped by milestone; **AC n** = acceptance criterion in [goal and scope](../sco
 | # | Given / When / Then | Covers |
 |---|---|---|
 | T01 | valid entry (free text only, no claim) → accepted, id returned | AC 1, invariant 3 |
-| T02 | entry/claim carries `schema: lor.record/v1`, `recorded_at`, actor | AC 1 |
+| T02 | entry/claim carries `schema: loredu.record/v1`, `recorded_at`, actor | AC 1 |
 | T03 | claim missing `predicate` (or any key field) → rejected with an actionable message naming the field | AC 11, ADR 0004 |
 | T04 | claim with free prose in `subject.id` (violates normalization) → rejected | ADR 0004 |
 | T05 | records are value-immutable: no API mutates a created record | invariant 1 |
@@ -242,7 +244,7 @@ Grouped by milestone; **AC n** = acceptance criterion in [goal and scope](../sco
 | T26 | `valid_at` after an amendment's effective date returns amended value even if recorded late | AC 7, S B |
 | T27 | combined `as_of` + `valid_at` distinguishes historical knowledge from later correction | AC 7, S B |
 | T28 | delete derived state, replay → identical projection for same basis + query | AC 5, ADR 0006 |
-| T29 | every projection result carries `basis` (position, ruleset, query, computed_at) | AC 14 |
+| T29 | every projection result carries `basis` (stream_position, ruleset, query, computed_at) | AC 14 |
 | T30 | ruleset version bump → cached view marked invalid without touching canonical records | ADR 0006 |
 
 ### M3 — Working Lore
@@ -268,18 +270,19 @@ Grouped by milestone; **AC n** = acceptance criterion in [goal and scope](../sco
 | T55 | end-to-end scenario B (30→60-day amendment, all four temporal queries) through the binary | S B |
 | T56 | end-to-end journey 0→8 as one scripted session on a fresh temp dir | AC 12 (ergonomics) |
 | T57 | AC 12 measured: journey 2 (entry + claim) is ≤ 2 commands; journey 1 (lore) is 1 command | AC 12 |
+| T58 | content first: bare `lor` prints the orientation/status view (live data, exit 0), not help; `lor <command> --help` prints a concise per-command reference; an unknown flag fails with an actionable error, never ignored | agent ergonomics, journey 3b |
 
 ### Agent-reactive envelope (ships with the early CLI)
 
 | # | Given / When / Then | Covers |
 |---|---|---|
-| T60 | every mutation response (`--json`) contains `result`, `reconciliation`, `advice`, `basis`; every `advice` entry is a runnable command | ADR 0008 |
+| T60 | every mutation response (`--json`) contains `ok`, `result`, `reconciliation`, `advice`, `basis`; every `advice` entry is a runnable command | ADR 0008 |
 | T61 | second claim, same key + same value → corroboration feedback, no attention raised | journey 3 |
-| T62 | second claim, same key + different value → conflict-candidate feedback with `advice` advice naming both ids | journey 3 |
+| T62 | second claim, same key + different value → conflict-candidate feedback with `advice` entries naming both ids | journey 3 |
 | T63 | agent chain: execute the `advice` commands from T62 (show → resolve) → `lor status` reports healthy, `--check` exits 0 | journey 3b |
 | T64 | `lor status` flags dangling `derived_from`, malformed records, and same-key groups with no relation/resolution among them | journey 3b |
 | T65 | `lor skill` prints the agent guide; a fresh store + only the guide's commands completes journeys 1–5 | journey 9 |
-| T66 | `advice` advice is deterministic: same store state → byte-identical advice; no advice on healthy state | ADR 0008 |
+| T66 | `advice` is deterministic: same store state → byte-identical advice; no advice on healthy state | ADR 0008 |
 | T67 | `lor claims` filters compose across fields (scope + predicate + value, etc.) and return stable ordering with `--json` | key hygiene |
 | T68 | same value recorded under two different keys in one scope → `status` advisory (non-blocking); `--check` still exits 0 | key hygiene |
 

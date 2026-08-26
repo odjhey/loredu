@@ -28,7 +28,7 @@ TypeScript (strict) on the Bun toolchain.
 
 - `bun:test` runs the unit and behavioral suites;
 - the CLI ships as a compiled single-file executable via `bun build --compile` (per-platform targets as needed);
-- the application core stays dependency-light; schema validation may use zod (already the idiom in the xatu consumer) but provider/framework dependencies remain banned from the core per [0001](./0001-application-core-first.md);
+- the application core stays dependency-light; schema validation may use zod (already the idiom in the xatu candidate consumer's codebase) but provider/framework dependencies remain banned from the core per [0001](./0001-application-core-first.md);
 - consumers embed either the TypeScript application API or the CLI; Node-compatible package publishing is a later, separate decision.
 
 ## Consequences

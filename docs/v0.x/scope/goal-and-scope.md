@@ -13,7 +13,7 @@ updated_at: 2026-08-26T12:10:00+08:00
 
 ## Goal
 
-Prove that Loredu can maintain small, inspectable, provenance-aware operational knowledge across repeated activities without depending on a CLI, model runtime, crawler framework, graph/vector database, daemon, or external service — and that embedding it in one of our real products beats the notes-file that product would otherwise hand-roll ([decision 0005](../../decisions/0005-embedded-kernel-compatibility.md)).
+Prove that Loredu can maintain small, inspectable, provenance-aware operational knowledge across repeated activities without depending on a model runtime, crawler framework, graph/vector database, daemon, or external service — and that embedding it in one of our real products beats the notes-file that product would otherwise hand-roll ([decision 0005](../../decisions/0005-embedded-kernel-compatibility.md)). The `lor` CLI ships early as an adapter over these contracts ([decision 0008](../../decisions/0008-cli-first-agent-reactive.md)), but the application core itself never depends on it ([decision 0001](../../decisions/0001-application-core-first.md)).
 
 ## v0.x must prove
 
@@ -42,14 +42,14 @@ Prove that Loredu can maintain small, inspectable, provenance-aware operational 
 - current and historical projections;
 - bounded Working Lore representation;
 - simple filtering/ranking sufficient for fixtures;
+- the agent-operable `lor` CLI as an adapter (M1.5, [decisions 0007](../../decisions/0007-typescript-bun.md)–[0009](../../decisions/0009-hypermedia-pagination.md));
 - conformance and end-to-end tests around the published contracts.
 
 ## Explicitly deferred
 
-- CLI design;
 - daemon/service topology;
 - HTTP/API server;
-- Rozoro-specific integration;
+- Rozoro orchestration integration beyond embedding the kernel in the watchtower attention ledger as the first consumer ([candidate consumers](../../reports/candidate-consumers.md));
 - automatic code/web/document crawling;
 - PDF extraction/OCR;
 - LLM/model dependency;

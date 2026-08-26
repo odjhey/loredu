@@ -17,7 +17,7 @@ Deterministic reconciliation ([0002](./0002-append-only-record-model.md)) only f
 
 Because Loredu is an embedded kernel used by several products ([0005](./0005-embedded-kernel-compatibility.md)), leaving identity to each consumer's convention would make reconciliation semantics silently diverge across products — the exact failure the shared core exists to prevent. The core does not need to *compute* identity semantically (no LLM in the core), but it must *define* how identity is declared.
 
-Real consumers already demonstrate the pattern: the watchtower attention ledger supersedes items on the `(task, reason)` pair, and the no-mistakes extraction runbook identifies findings by `(pattern id, version)`. Both invented a local claim key; the kernel should own the discipline.
+Two of the [candidate consumers](../reports/candidate-consumers.md) — existing internal tools that would embed Loredu — already demonstrate the pattern in their own codebases: the watchtower attention ledger supersedes items on the `(task, reason)` pair, and the no-mistakes extraction runbook identifies findings by `(pattern id, version)`. Both invented a local claim key; the kernel should own the discipline.
 
 ## Options considered
 

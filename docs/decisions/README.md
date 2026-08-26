@@ -22,5 +22,5 @@ Initial decisions:
 - [0005: Embedded kernel, not a standalone product](./0005-embedded-kernel-compatibility.md)
 - [0006: Versioning is explicit at every layer](./0006-explicit-version-basis.md)
 - [0007: TypeScript on Bun](./0007-typescript-bun.md)
-- [0008: CLI first, agent-reactive](./0008-cli-first-agent-reactive.md)
+- [0008: CLI before full reconciliation; agent-reactive responses](./0008-cli-first-agent-reactive.md)
 - [0009: Hypermedia responses and basis-pinned pagination](./0009-hypermedia-pagination.md)
