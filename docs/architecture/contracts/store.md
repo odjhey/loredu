@@ -16,17 +16,20 @@ The application core depends on record semantics, not a persistence technology.
 A minimal store provides equivalent capabilities to:
 
 ```text
-append(record) -> record id
+append(record) -> record id + stream position
 get(id) -> record | not-found
 scan(filter) -> ordered records
-stream(after-cursor?) -> ordered records
+stream(after-position?) -> ordered records
+head() -> current stream position
 ```
 
 Exact method names are language-specific and are not part of this contract.
 
 ## Required behavior
 
-- `append` never silently replaces a record with the same identity.
+- `append` never silently replaces a record with the same identity;
+- `append` returns a monotonic stream position; `head` exposes the latest position so derived views can be checked for staleness against their `basis` ([decision 0006](../../decisions/0006-explicit-version-basis.md));
+- how a position is represented is an adapter detail (the plain-file adapter may derive it from deterministic replay order), but positions must be stable across replays.
 - reads return the original canonical record, not a projected/mutated representation;
 - ordering/cursors are deterministic enough to replay projections;
 - store adapters preserve record data required by the published record schema;

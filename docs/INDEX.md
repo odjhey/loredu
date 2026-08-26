@@ -32,6 +32,9 @@ updated_at: 2026-08-26T12:10:00+08:00
 | [0001: Application core first](./decisions/0001-application-core-first.md) | Keep CLI, models, crawlers, and providers outside the core |
 | [0002: Append-only record model](./decisions/0002-append-only-record-model.md) | Preserve history and rebuild projections from immutable records |
 | [0003: Plain files first](./decisions/0003-plain-files-first.md) | Markdown/frontmatter adapter for alpha; indexes remain replaceable |
+| [0004: Claim identity is a declared key](./decisions/0004-claim-identity-key.md) | Caller-declared claim keys scope deterministic reconciliation |
+| [0005: Embedded kernel, not a standalone product](./decisions/0005-embedded-kernel-compatibility.md) | Consumer-driven stabilization and the record compatibility policy |
+| [0006: Versioning is explicit at every layer](./decisions/0006-explicit-version-basis.md) | Stream positions, ruleset versions, and basis stamps on derived views |
 
 ## Reports
 
@@ -39,6 +42,7 @@ updated_at: 2026-08-26T12:10:00+08:00
 |---|---|
 | [Reports](./reports/README.md) | Assessment index |
 | [Borrowed design patterns](./reports/borrowed-design-patterns.md) | Prior-art ideas Loredu adopts without importing the surrounding platforms |
+| [Candidate consumers](./reports/candidate-consumers.md) | Real internal tools mapped to Loredu concepts and the first-consumer choice |
 
 ## v0.x
 
@@ -49,4 +53,4 @@ updated_at: 2026-08-26T12:10:00+08:00
 | [Scope](./v0.x/scope/README.md) | v0.x scope index |
 | [Goal and scope](./v0.x/scope/goal-and-scope.md) | What v0.x proves and explicitly does not build |
 | [Execution](./v0.x/execution/README.md) | v0.x execution index |
-| [Implementation plan](./v0.x/execution/implementation-plan.md) | M0–M3 delivery sequence and acceptance scenarios |
+| [Implementation plan](./v0.x/execution/implementation-plan.md) | M0–M4 delivery sequence and acceptance scenarios |

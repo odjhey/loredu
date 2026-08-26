@@ -11,11 +11,11 @@ updated_at: 2026-08-26T12:10:00+08:00
 
 # Product architecture
 
-## Product thesis
+## Thesis
 
-Loredu is an application-level operational knowledge substrate. Activities record what they learn as durable entries; structured claims can be extracted by humans, agents, or deterministic software; Loredu preserves provenance and temporal history, performs deterministic reconciliation, records explicit resolutions, and exposes bounded working knowledge to later activities.
+Loredu is an embedded operational knowledge kernel — a utility our own products build on, not a standalone product ([decision 0005](../decisions/0005-embedded-kernel-compatibility.md)). Activities record what they learn as durable entries; structured claims can be extracted by humans, agents, or deterministic software; Loredu preserves provenance and temporal history, performs deterministic reconciliation, records explicit resolutions, and exposes bounded working knowledge to later activities.
 
-Loredu is not the activity itself. It should remain useful whether the caller is a human, a crawler, a review tool, an agent, an orchestrator, a future CLI, or another application.
+Loredu is not the activity itself. Consumers own their writers, extraction quality, surfaces, and domain vocabulary; Loredu owns consistent record, reconciliation, and disclosure semantics across all of them. It should remain useful whether the caller is a human, a crawler, a review tool, an agent, an orchestrator, a future CLI, or another application. Concrete candidate consumers are catalogued in [candidate consumers](../reports/candidate-consumers.md).
 
 ## Core loop
 
@@ -94,13 +94,15 @@ Loredu does not own:
                  │ prepare       │
                  └───────┬───────┘
                          │ ports
-              ┌──────────┼──────────┐
-              ▼          ▼          ▼
-            Store    Extractor    Resolver
-              │
-       PlainFileStore
-       first adapter
+          ┌──────────┬───┴──────┬──────────┐
+          ▼          ▼          ▼          ▼
+        Store    Extractor   Resolver   Ranker
+          │
+   PlainFileStore
+   first adapter
 ```
+
+`Ranker` follows the same pattern as `Extractor` and `Resolver`: the core ships a deterministic baseline for Working Lore selection; a consumer may plug in lexical search, embeddings, or model reranking without the core knowing.
 
 The domain and application layers must not depend on a CLI, agent harness, model SDK, crawler, or persistence vendor. Provider-native types stop at adapters.
 

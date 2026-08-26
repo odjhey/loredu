@@ -18,3 +18,6 @@ Initial decisions:
 - [0001: Application core first](./0001-application-core-first.md)
 - [0002: Append-only record model](./0002-append-only-record-model.md)
 - [0003: Plain files first](./0003-plain-files-first.md)
+- [0004: Claim identity is a declared key](./0004-claim-identity-key.md)
+- [0005: Embedded kernel, not a standalone product](./0005-embedded-kernel-compatibility.md)
+- [0006: Versioning is explicit at every layer](./0006-explicit-version-basis.md)

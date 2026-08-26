@@ -35,6 +35,8 @@ updated_at: 2026-08-26T12:10:00+08:00
 | **valid_from / valid_until** | When the claim is believed to apply in the external world. Either may be unknown. |
 | **as_of** | Query boundary limiting knowledge to records available at that time. |
 | **valid_at** | Query asking what a projection believes applied at that external-world time. |
+| **Stream position** | Monotonic position in the canonical record stream, returned by `append` and exposed as the store head. |
+| **Basis** | Stamp on a derived view recording the stream position, ruleset version, and query it was computed from; enables deterministic staleness checks. |
 
 ## Important distinctions
 
