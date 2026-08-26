@@ -225,6 +225,8 @@ Grouped by milestone; **AC n** = acceptance criterion in [goal and scope](../sco
 | T15 | domain layer compiles/tests with a pure in-memory store (no Bun/fs import in core) | ADR 0001/0007 |
 | T16 | concurrent-writer safety: a second writer against a locked store fails loudly with no corruption; the store replays clean afterward | store contract |
 | T17 | store-root resolution honors flag > env > upward discovery, in that order; no resolved root → actionable error; two stores in sibling dirs are fully isolated (no reads or writes outside the resolved root) | journey 0 |
+| T18 | append is the commit point: a returned position implies the record survives a simulated crash (kill between staging and completion leaves either no record or a whole one, never a torn file); replay stays clean | store contract |
+| T19 | reference-before-referrer: a claim citing a nonexistent `derived_from` (or relation/resolution citing missing targets) is rejected at write time with an actionable error | store contract, ADR 0004 |
 
 ### M2 — reconciliation, resolution, projections
 
