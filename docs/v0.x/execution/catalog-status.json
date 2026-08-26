@@ -29,9 +29,9 @@
       "reason": "kernel record types and validation not implemented yet"
     },
     "T06": {
-      "milestone": "M0",
-      "group": "M0 — records and validation",
-      "reason": "kernel record types and validation not implemented yet"
+      "milestone": "M1",
+      "group": "M1 — plain-file store",
+      "reason": "M1 Markdown/YAML serialize/parse codec is not implemented yet; M0 defines no wire format"
     },
     "T07": {
       "milestone": "M0",
@@ -69,9 +69,9 @@
       "reason": "plain-file store adapter not implemented yet"
     },
     "T15": {
-      "milestone": "M1",
-      "group": "M1 — plain-file store",
-      "reason": "plain-file store adapter not implemented yet"
+      "milestone": "M0",
+      "group": "M0 — records and validation",
+      "reason": "M0 public-export test seam (InMemoryStore and kernel-safe deterministic helpers) is not implemented yet; this row does not claim durable-provider behavior"
     },
     "T16": {
       "milestone": "M1",
@@ -300,22 +300,22 @@
     },
     "T80": {
       "milestone": "M0",
-      "group": "Kernel invariants and the policy seam (issue #6)",
+      "group": "M0 — kernel invariants and the policy seam (issue #6); tests located in reconciliation/",
       "reason": "kernel invariants and ClaimPolicy seam not implemented yet"
     },
     "T81": {
       "milestone": "M0",
-      "group": "Kernel invariants and the policy seam (issue #6)",
+      "group": "M0 — kernel invariants and the policy seam (issue #6); tests located in reconciliation/",
       "reason": "kernel invariants and ClaimPolicy seam not implemented yet"
     },
     "T82": {
       "milestone": "M0",
-      "group": "Kernel invariants and the policy seam (issue #6)",
+      "group": "M0 — kernel invariants and the policy seam (issue #6); tests located in reconciliation/",
       "reason": "kernel invariants and ClaimPolicy seam not implemented yet"
     },
     "T83": {
       "milestone": "M0",
-      "group": "Kernel invariants and the policy seam (issue #6)",
+      "group": "M0 — kernel invariants and the policy seam (issue #6); tests located in reconciliation/",
       "reason": "kernel invariants and ClaimPolicy seam not implemented yet"
     },
     "T84": {
