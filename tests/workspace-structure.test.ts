@@ -276,6 +276,8 @@ describe("ambient capability spellings", () => {
     ["computed Math.random", 'Math["random"]();'],
     ["direct new Date", "new Date();"],
     ["parenthesized new Date", "new (Date)();"],
+    ["Date.now with ignored argument", "Date.now(1);"],
+    ["Math.random with ignored argument", "Math.random(1);"],
   ] as const) {
     test(`rejects ${name}`, () => {
       expectRule(`${source}\n`, "ambient-capability");

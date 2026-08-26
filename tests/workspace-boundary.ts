@@ -119,10 +119,8 @@ function sourceFacts(file: string, text: string): SourceFacts {
           ? stringLiteral(node.arguments[0])
           : undefined;
       if (specifier) specifiers.push(specifier);
-      if (node.arguments.length === 0) {
-        if (member("Date", "now", node.expression)) ambientUses.add("Date.now()");
-        if (member("Math", "random", node.expression)) ambientUses.add("Math.random()");
-      }
+      if (member("Date", "now", node.expression)) ambientUses.add("Date.now()");
+      if (member("Math", "random", node.expression)) ambientUses.add("Math.random()");
     } else if (ts.isNewExpression(node)) {
       const expression = unwrap(node.expression);
       if (ts.isIdentifier(expression) && expression.text === "Date" && (node.arguments?.length ?? 0) === 0) {
