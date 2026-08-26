@@ -7,7 +7,7 @@ mutating no record; `as_of` / `valid_at` and their combination; replay reproduci
 identical projection for the same basis; and every projection carrying its `basis`.
 
 Also rows **T80–T83** — the kernel invariants and the ClaimPolicy seam:
-`recorded_at` stamped at commit and never backdatable, `computed_at` outside basis
+`recorded_at` stamped at commit and never open to backdating, `computed_at` outside basis
 identity, the default policy being byte-identical with M1.5 behavior while naming
 its version in `basis.ruleset`, and the draft/record split enforced at both compile
 time and runtime.

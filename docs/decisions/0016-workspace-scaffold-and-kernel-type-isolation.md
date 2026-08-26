@@ -93,7 +93,7 @@ One thing does live in `tests/` today: the structural guardrails at the tree roo
 `/testing` published separately, no environment import in kernel production code, no
 production import of `/testing`). They claim no T-number because they test the repository
 rather than the product, and they overlap deliberately with the Phase C boundary-checker
-spike — they are meant to be superseded by it, not to pre-empt its choice.
+spike — they are meant to be superseded by it, not to settle its choice in advance.
 
 **`@loredu/kernel/testing` is a declared seam with no test doubles in it.** The subpath
 exists and is typechecked, exporting only the `StoreUnderTest` shape a conformance suite
@@ -111,7 +111,7 @@ forbids — in the one place it would be least visible.
   import its sources), so an adapter can never consume a kernel that does not compile.
 - `bun test` currently runs exactly one file, the structural guardrails. That number is
   the honest count of executable coverage in this repo and should rise with M0.
-- Scripts under `docs/scripts/` remain unlinted until a follow-up brings them in.
+- Scripts under `docs/scripts/` stay outside Biome's scope until a follow-up brings them in.
 
 ## Rule or follow-up
 
