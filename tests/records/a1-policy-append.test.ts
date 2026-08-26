@@ -3,6 +3,7 @@ import {
   appendRecord,
   basisIdentitiesEqual,
   basisIdentityOf,
+  type ClaimPolicy,
   type Clock,
   createApplication,
   DEFAULT_CLAIM_POLICY,
@@ -208,8 +209,8 @@ describe("A1 application kernel", () => {
     expect(await store.head()).toBe(2);
   });
 
-  test("default policy is deterministic declared-key/exclusive/no-advisories", () => {
-    const claim = {
+  test("policy advisories are optional and collection-capable while the default stays empty", () => {
+    const first = {
       kind: "claim",
       actor,
       scope: { z: "2", a: "1" },
@@ -218,10 +219,35 @@ describe("A1 application kernel", () => {
       value: 1,
       confidence: "observed",
     } as const;
+    const second = { ...first, value: 2 } as const;
+    const claims = Object.freeze([first, second] as const);
+
+    const withoutAdvisories: ClaimPolicy = {
+      version: "consumer/minimal-v1",
+      identity: DEFAULT_CLAIM_POLICY.identity,
+      semantics: () => "exclusive",
+    };
+    expect(withoutAdvisories.advisories).toBeUndefined();
+
+    const custom: ClaimPolicy = {
+      ...withoutAdvisories,
+      version: "consumer/related-v1",
+      advisories(related) {
+        return Object.freeze(
+          related.length > 1 ? [{ code: "related-claims", message: `${related.length} related claims` }] : [],
+        );
+      },
+    };
+    expect(custom.advisories?.(claims)).toEqual([{ code: "related-claims", message: "2 related claims" }]);
+    expect(custom.advisories?.(claims)).toEqual(custom.advisories?.(claims));
+    expect(claims).toEqual([first, second]);
+
     expect(DEFAULT_CLAIM_POLICY.version).toBe("loredu.claim-policy/default-v1");
-    expect(DEFAULT_CLAIM_POLICY.semantics(claim)).toBe("exclusive");
-    expect(DEFAULT_CLAIM_POLICY.advisories(claim)).toEqual([]);
-    expect(DEFAULT_CLAIM_POLICY.identity(claim).scope).toEqual([
+    expect(DEFAULT_CLAIM_POLICY.semantics(first)).toBe("exclusive");
+    const defaultResult = DEFAULT_CLAIM_POLICY.advisories?.(claims);
+    expect(defaultResult).toEqual([]);
+    expect(Object.isFrozen(defaultResult)).toBe(true);
+    expect(DEFAULT_CLAIM_POLICY.identity(first).scope).toEqual([
       ["a", "1"],
       ["z", "2"],
     ]);
