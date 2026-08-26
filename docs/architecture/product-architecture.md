@@ -13,7 +13,7 @@ updated_at: 2026-08-26T12:10:00+08:00
 
 ## Thesis
 
-Loredu is an embedded operational knowledge kernel — a utility our own products build on, not a standalone product ([decision 0005](../decisions/0005-embedded-kernel-compatibility.md)). Activities append what they learn as immutable, provenance-carrying records; structured claims declare identity keys ([decision 0004](../decisions/0004-claim-identity-key.md)) so knowledge about the same fact meets instead of piling up, and history is preserved along both recorded time and external validity time.
+Loredu is an embedded operational knowledge kernel — a utility for our own products to build on, not a standalone product ([decision 0005](../decisions/0005-embedded-kernel-compatibility.md)). Activities append what they learn as immutable, provenance-carrying records; structured claims declare identity keys ([decision 0004](../decisions/0004-claim-identity-key.md)) so knowledge about the same fact meets instead of piling up, and history is preserved along both recorded time and external validity time.
 
 The kernel's dividing line is **mechanical versus judgment**. Loredu detects deterministically — duplicates, corroboration, conflict candidates, key divergence, dangling provenance, stale views — and never makes open-ended judgments. Humans, agents, and programs judge; their resolutions are appended as records with the same provenance discipline as everything else. This is why the kernel needs no model runtime: extraction and resolution are caller capabilities, not core assumptions.
 

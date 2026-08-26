@@ -13,7 +13,7 @@ updated_at: 2026-08-26T00:00:00+08:00
 
 ## Context
 
-Loredu is not sold or shipped on its own. It is a consistent knowledge core embedded by our own smaller products — extraction runbooks, docs assistants, attention ledgers, project-fact crawlers ([candidate consumers](../reports/candidate-consumers.md)). Those consumers own their writers, their extraction quality, their UI, and their domain vocabulary; Loredu owns record semantics, provenance, reconciliation, resolution, projections, and bounded disclosure.
+Loredu is not sold or shipped on its own. It is a consistent knowledge core designed to be embedded by our own smaller products — extraction runbooks, docs assistants, attention ledgers, project-fact crawlers ([candidate consumers](../reports/candidate-consumers.md)). Nothing embeds it yet; the candidates are the design pressure. Those consumers own their writers, their extraction quality, their UI, and their domain vocabulary; Loredu owns record semantics, provenance, reconciliation, resolution, projections, and bounded disclosure.
 
 This framing changes what "success" and "stability" mean. A kernel's value is measured by whether embedding it beats the notes-file each product would otherwise hand-roll, and its contracts become expensive to change the moment two products persist records against them.
 

@@ -39,11 +39,16 @@ updated_at: 2026-08-26T12:10:00+08:00
 | **Basis** | Stamp on a derived view recording the stream position, ruleset version, and query it was computed from; enables deterministic staleness checks. |
 | **Handle** | Stable, runnable reference embedded in a response — an identifier plus the command that expands it. The unit of progressive disclosure. |
 | **Cursor** | Opaque continuation token for a paginated result, pinned to the basis position so a page chain stays consistent while records append. |
-| **Envelope** | The uniform response shape every surface returns: `result`, `reconciliation`, `advice`, `page`, `basis`. |
+| **Envelope** | The uniform response shape every surface returns: `ok`, `result`, `reconciliation`, `advice`, `basis` — plus `page` on list-returning results. |
+| **ok** | Envelope field stating whether the call succeeded. Failures carry a structured, actionable error and a distinct nonzero exit code. |
 | **Advice** | Deterministic, runnable follow-up entries in a response — corrective (close an attention item) or navigational (continue a list, expand a handle). Never speculative. |
 | **Page** | Bounded slice of a list result: returned count, total count, and a cursor when more exists. Truncation is never silent. |
 | **Health** | Mechanically checkable store condition that blocks a health check: unresolved same-key groups, malformed records, dangling references. |
 | **Advisory** | Non-blocking mechanical hint, e.g. the same value under different keys in one scope suggesting key divergence. |
+| **Scope** | Caller-declared namespace a claim key belongs to (e.g. `repo=rozoro`); the consumer owns its vocabulary. |
+| **Perspective** | Optional claim-key component distinguishing coexisting views of the same subject/predicate, e.g. `documented_process` vs `observed_process`. |
+| **Confidence** | Claim field grading evidential strength: `candidate`, `observed`, `corroborated`, `confirmed`, `authoritative`. |
+| **Ruleset** | Versioned bundle of deterministic reconciliation/resolution rules; its version is part of every basis. |
 
 ## Naming rule
 

@@ -1,6 +1,6 @@
 ---
 name: candidate_consumers
-description: "Four real internal consumers mapped to Loredu concepts, what each one stresses, and which should be embedded first."
+description: "Four real internal tools that are candidates to embed Loredu, mapped to its concepts, what each one stresses, and which should be embedded first."
 type: report
 tags: [reports, consumers, v0.x]
 status: draft

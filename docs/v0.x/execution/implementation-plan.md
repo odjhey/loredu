@@ -1,6 +1,6 @@
 ---
 name: v0x_implementation_plan
-description: "M0–M4 implementation sequence for the Loredu domain kernel, plain-file store, projections, Working Lore, and the first real consumer."
+description: "M0–M4 implementation sequence (including the M1.5 CLI milestone) for the Loredu domain kernel, plain-file store, projections, Working Lore, and the first real consumer."
 type: plan
 tags: [v0.x, execution]
 status: draft
@@ -47,7 +47,7 @@ Exit: deleting all derived state and replaying the Markdown records reconstructs
 Pulled ahead of full reconciliation ([decision 0008](../../decisions/0008-cli-first-agent-reactive.md)) so real usage and dogfooding start as early as possible. Implement:
 
 - commands: `init`, `add entry`, `add claim`, `relate`, `resolve`, `add verification`, `show`, `history`, `claims` (query engine: composable filters over any key/envelope field — scope, subject-type, subject, predicate, value, actor, since), `head`, `status` (`--check`), `skill`;
-- the agent-reactive response envelope (`result`, `reconciliation`, `advice`, `basis`) in text and `--json`, with stable exit codes;
+- the agent-reactive response envelope (`ok`, `result`, `reconciliation`, `advice`, `basis`) in text and `--json`, with stable exit codes;
 - cursor pagination on every list command (`--limit`/`--cursor`, basis-pinned, explicit `returned`/`total`, runnable continuation in `advice`) and link-following handles on every printed id ([decision 0009](../../decisions/0009-hypermedia-pagination.md));
 - the mechanical key-overlap slice of reconciliation: same key + same value → corroboration feedback; same key + different value → conflict candidate + advice; unresolved same-key groups, dangling refs, and malformed records surfaced by `status` as health failures, plus non-blocking advisories (same value under different keys in one scope → possible key divergence);
 - namespacing stays consumer-imposed: the kernel validates key shape only; examples and CLI output model healthy conventions without mandating them;
@@ -96,18 +96,6 @@ Embed the kernel in one consumer from [candidate consumers](../../reports/candid
 
 Exit: the consumer records and retrieves knowledge through the published contracts alone; friction found here (key vocabulary, ergonomics, missing disclosure handles) feeds contract revisions before anything is marked `status: current`.
 
-## Acceptance scenario C — cross-actor claim keying
-
-1. Actor A (human) records a claim with free text "notice period is 30 days" under key `(scope, policy, agreement-x, notice_period_days)`.
-2. Actor B (program) records the same fact with different phrasing and provenance under the same declared key.
-3. Actor C records `observed_process` and `documented_process` variants of another fact as distinct perspectives.
-
-Verify:
-
-- A and B reconcile as corroboration; a differing value under the same key surfaces as a candidate conflict;
-- the perspective variants coexist without destructive conflict and appear as an attention item;
-- a claim with a malformed or missing key is rejected at validation, not silently stored.
-
 ## Acceptance scenario A — repeated technical investigation
 
 1. Run/entry 1 records: `CLI commands appear under src/commands`.
@@ -134,6 +122,18 @@ Verify:
 - current `valid_at` after the amendment effective date returns the amended value;
 - combined `as_of` + `valid_at` distinguishes historical knowledge from later correction;
 - evidence resolves to both base and amendment references.
+
+## Acceptance scenario C — cross-actor claim keying
+
+1. Actor A (human) records a claim with free text "notice period is 30 days" under key `(scope, policy, agreement-x, notice_period_days)`.
+2. Actor B (program) records the same fact with different phrasing and provenance under the same declared key.
+3. Actor C records `observed_process` and `documented_process` variants of another fact as distinct perspectives.
+
+Verify:
+
+- A and B reconcile as corroboration; a differing value under the same key surfaces as a candidate conflict;
+- the perspective variants coexist without destructive conflict and appear as an attention item;
+- a claim with a malformed or missing key is rejected at validation, not silently stored.
 
 ## Guardrail scenario — business-process perspectives
 

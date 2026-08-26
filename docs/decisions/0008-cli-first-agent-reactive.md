@@ -13,7 +13,7 @@ updated_at: 2026-08-26T00:00:00+08:00
 
 ## Context
 
-The original sequence (M0 → M1 → M2 → M3 → CLI) delays real usage until every projection exists. The first user wants to hand agents a binary as early as possible and let them record, reconcile, and resolve through it. The [ubiquitous language](../architecture/ubiquitous-language.md) already splits the work the right way: **reconcile is mechanical, resolve is judgment**. The judgment half never needed M2 — the agent is the Resolver, writing Relation and Resolution records that are already first-class in the record contract. And the cheapest mechanical slice — grouping claims by their declared key ([0004](./0004-claim-identity-key.md)) — is nearly free, while the expensive parts of M2 are temporal precedence and projection logic.
+Sequencing the CLI after M2/M3 (M0 → M1 → M2 → M3 → CLI) would delay real usage until every projection exists. The first user wants to hand agents a binary as early as possible and let them record, reconcile, and resolve through it. The [ubiquitous language](../architecture/ubiquitous-language.md) already splits the work the right way: **reconcile is mechanical, resolve is judgment**. The judgment half never needed M2 — the agent is the Resolver, writing Relation and Resolution records that are already first-class in the record contract. And the cheapest mechanical slice — grouping claims by their declared key ([0004](./0004-claim-identity-key.md)) — is nearly free, while the expensive parts of M2 are temporal precedence and projection logic.
 
 ## Options considered
 
@@ -25,7 +25,7 @@ The original sequence (M0 → M1 → M2 → M3 → CLI) delays real usage until 
 
 Insert an **agent-operable CLI milestone (M1.5)** between M1 and M2. The binary is `lor`.
 
-**Agent-reactive response envelope.** Every command returns `{ok, result, reconciliation, next, basis}` in text and `--json`. `advice` is a list of runnable follow-up commands with reasons, derived **only from deterministic checks** — key overlap, dangling references, unresolved same-key groups, malformed records. The envelope never speculates and is byte-stable for the same store state. Its shape is fixed now; from M2 onward the full ruleset fills `reconciliation` instead of the key-overlap slice, and the advice gets richer without the shape changing.
+**Agent-reactive response envelope.** Every command returns `{ok, result, reconciliation, advice, basis}` in text and `--json`. `advice` is a list of runnable follow-up commands with reasons, derived **only from deterministic checks** — key overlap, dangling references, unresolved same-key groups, malformed records. The envelope never speculates and is byte-stable for the same store state. Its shape is fixed now; from M2 onward the full ruleset fills `reconciliation` instead of the key-overlap slice, and the advice gets richer without the shape changing.
 
 **Chain until healthy.** `lor status` defines health mechanically (no unresolved same-key groups, no malformed records, no dangling refs) and terminates the agent's action loop; `--check` exits nonzero for scripts. An agent adds a record, reads the advice, inspects, verifies, resolves — all in one session — until status is healthy.
 

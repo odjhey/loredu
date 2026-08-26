@@ -13,9 +13,9 @@ updated_at: 2026-08-26T00:00:00+08:00
 
 ## Context
 
-Loredu already versions knowledge (append-only history, supersession, bitemporal queries — [0002](./0002-append-only-record-model.md)) and record schemas (`schema: loredu.record/v1` with a never-break replay policy — [0005](./0005-embedded-kernel-compatibility.md)). But derived views had no version identity: nothing tied a projection or Working Lore packet to the record-stream state and ruleset it was computed from.
+Earlier decisions already version knowledge (append-only history, supersession, bitemporal queries — [0002](./0002-append-only-record-model.md)) and record schemas (`schema: loredu.record/v1` with a never-break replay policy — [0005](./0005-embedded-kernel-compatibility.md)). But derived views have no version identity yet: nothing ties a projection or Working Lore packet to the record-stream state and ruleset it was computed from.
 
-That gap is not hypothetical. The xatu artifact-intelligence consumer ([candidate consumers](../reports/candidate-consumers.md)) stores evidence bundles with an ID but no basis, so nothing can detect that a bundle went stale relative to updated facts. A kernel whose core promise is bounded, trustworthy context must let a consumer ask "is this packet still current?" without replaying history.
+That gap is not hypothetical. The xatu artifact-intelligence candidate consumer ([candidate consumers](../reports/candidate-consumers.md)) — an existing tool that would embed Loredu — stores evidence bundles with an ID but no basis, so nothing can detect that a bundle went stale relative to updated facts. A kernel whose core promise is bounded, trustworthy context must let a consumer ask "is this packet still current?" without replaying history.
 
 ## Options considered
 
