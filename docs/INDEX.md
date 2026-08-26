@@ -41,6 +41,7 @@ created_at: 2026-08-26T12:10:00+08:00
 | [0012: Developer experience and CI gating](./decisions/0012-dx-and-ci-gating.md) | Biome + cspell, single fail-closed ci-required gate with fail-safe path selection, catalog drift check, AGENTS.md symlink convention |
 | [0013: Agent decision authority](./decisions/0013-agent-decision-authority.md) | Agents decide and land without sign-off until production; the obligation is the record, not the gate |
 | [0014: Minimal frontmatter](./decisions/0014-minimal-frontmatter.md) | Git owns last-changed time; `status` gets a vocabulary with real signal and no draft-by-default |
+| [0015: Catalog accounting and the docs gate](./decisions/0015-catalog-accounting-and-docs-gate.md) | Every T-number implemented via `@covers` or deferred in `catalog-status.json`; structural gate over the corpus; both gates self-tested |
 
 ## Agents and process
 
@@ -72,3 +73,4 @@ created_at: 2026-08-26T12:10:00+08:00
 | [Implementation plan](./v0.x/execution/implementation-plan.md) | M0–M4 delivery sequence (including the M1.5 CLI milestone) and acceptance scenarios |
 | [First user journey](./v0.x/execution/first-user-journey.md) | Expected CLI usage journeys and the automated behavioral test catalog |
 | [Agent skill draft](./v0.x/execution/agent-skill.md) | The guide embedded in the binary and printed by `lor skill` |
+| [Catalog status](./v0.x/execution/catalog-status.json) | Which behavioral-catalog T-numbers are deferred, and to which milestone |

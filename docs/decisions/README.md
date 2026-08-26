@@ -27,4 +27,5 @@ Initial decisions:
 - [0012: Developer experience and CI gating](./0012-dx-and-ci-gating.md)
 - [0013: Agent decision authority and the record obligation](./0013-agent-decision-authority.md)
 - [0014: Minimal frontmatter — git owns time, status carries signal](./0014-minimal-frontmatter.md)
+- [0015: Catalog accounting, the docs gate, and proving both fire](./0015-catalog-accounting-and-docs-gate.md)
 - [0016: Workspace scaffold — TS sources as exports, and kernel purity as a compiler error](./0016-workspace-scaffold-and-kernel-type-isolation.md)

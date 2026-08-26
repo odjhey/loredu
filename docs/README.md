@@ -63,12 +63,22 @@ docs/
 ├── ai/            agent behavior policy (human- and machine-readable)
 ├── playbooks/     repeatable procedures for agents and operators
 ├── reports/       assessments and findings (generated, operator-verified)
-└── scripts/       docs tooling (find-docs.mjs)
+└── scripts/       docs tooling (find-docs, check-docs, check-catalog, check-selftest)
 ```
 
 ## Finding docs by query
 
 `bun docs/scripts/find-docs.mjs` queries the frontmatter above: `--type`, `--tag`, `--name`, `--status`, `--stale`, `--all`, `--json`, or free-text terms. Stale and archived docs are hidden by default. It is zero-dependency, so `node` works too. The `find-docs` skill documents it and lives at `.agents/skills/find-docs/SKILL.md`, exposed to harnesses through the `.claude/skills` symlink.
+
+## Checks
+
+CI runs these on every change, and they are the fastest way to verify a docs edit locally ([ADR 0015](./decisions/0015-catalog-accounting-and-docs-gate.md)):
+
+```sh
+bun docs/scripts/check-docs.mjs        # required frontmatter, unique names, status vocabulary, links, anchors, reachability
+bun docs/scripts/check-catalog.mjs     # every behavioral-catalog T-number implemented xor deferred
+bun docs/scripts/check-selftest.mjs    # proves both gates still fire on synthetic violations
+```
 
 ## Maintenance rules
 

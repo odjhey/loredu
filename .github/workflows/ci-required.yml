@@ -1,0 +1,163 @@
+name: ci-required
+
+# One required status check for the whole repo (ADR 0012). A path selector picks
+# the suite; a fail-closed aggregate is the only job branch protection requires,
+# because requiring conditionally-skipped jobs directly would deadlock PRs whose
+# paths do not select them.
+
+on:
+  pull_request:
+  push:
+    branches: [master]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-required-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  select:
+    name: select suite
+    runs-on: ubuntu-latest
+    outputs:
+      docs_only: ${{ steps.classify.outputs.docs_only }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      # Fail safe: anything we cannot classify with confidence selects the full
+      # suite. A wrong "docs-only" answer skips real checks; a wrong "full"
+      # answer only costs time.
+      - id: classify
+        name: classify changed paths
+        run: |
+          set -uo pipefail
+          base=""
+          case "${{ github.event_name }}" in
+            pull_request) base="${{ github.event.pull_request.base.sha }}" ;;
+            push)         base="${{ github.event.before }}" ;;
+          esac
+
+          if [ -z "$base" ] || [ "$base" = "0000000000000000000000000000000000000000" ]; then
+            echo "no usable base ref — selecting full suite"
+            echo "docs_only=false" >> "$GITHUB_OUTPUT"; exit 0
+          fi
+          if ! git cat-file -e "$base^{commit}" 2>/dev/null; then
+            echo "base $base not present — selecting full suite"
+            echo "docs_only=false" >> "$GITHUB_OUTPUT"; exit 0
+          fi
+          if ! changed=$(git diff --name-only "$base" "${{ github.sha }}"); then
+            echo "diff failed — selecting full suite"
+            echo "docs_only=false" >> "$GITHUB_OUTPUT"; exit 0
+          fi
+          if [ -z "$changed" ]; then
+            echo "no changed paths reported — selecting full suite"
+            echo "docs_only=false" >> "$GITHUB_OUTPUT"; exit 0
+          fi
+
+          echo "changed paths:"; echo "$changed" | sed 's/^/  /'
+          # Counted explicitly rather than with `grep -qv`: that combination exits
+          # differently across grep implementations, and the disagreement lands on
+          # the unsafe side (a mixed change read as docs-only skips real checks).
+          total=$(printf '%s\n' "$changed" | grep -c '' || true)
+          prose=$(printf '%s\n' "$changed" | grep -cE '^docs/' || true)
+          code_in_docs=$(printf '%s\n' "$changed" | grep -cE '^docs/scripts/' || true)
+          echo "paths: total=$total under-docs=$prose docs-scripts=$code_in_docs"
+
+          # docs/scripts/** is the gate's own code, not prose: code gets the full
+          # suite even when it lives under docs/.
+          if [ "$total" -gt 0 ] && [ "$prose" -eq "$total" ] && [ "$code_in_docs" -eq 0 ]; then
+            echo "→ docs-only suite"
+            echo "docs_only=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "→ full workspace suite"
+            echo "docs_only=false" >> "$GITHUB_OUTPUT"
+          fi
+
+  docs-suite:
+    name: docs suite
+    needs: select
+    if: needs.select.outputs.docs_only == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version-file: .bun-version
+      - name: spelling
+        run: bunx cspell --no-progress --no-summary "docs/**/*.md" "*.md" ".agents/**/*.md"
+      - name: docs structure
+        run: bun docs/scripts/check-docs.mjs
+      - name: catalog integrity
+        run: bun docs/scripts/check-catalog.mjs
+      - name: gates fire on synthetic violations
+        run: bun docs/scripts/check-selftest.mjs
+
+  workspace-suite:
+    name: workspace suite
+    needs: select
+    if: needs.select.outputs.docs_only != 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version-file: .bun-version
+
+      # Everything the docs suite runs — the corpus is checked on every change,
+      # not only on docs-only changes.
+      - name: spelling
+        run: bunx cspell --no-progress --no-summary "docs/**/*.md" "*.md" ".agents/**/*.md"
+      - name: docs structure
+        run: bun docs/scripts/check-docs.mjs
+      - name: catalog integrity
+        run: bun docs/scripts/check-catalog.mjs
+      - name: gates fire on synthetic violations
+        run: bun docs/scripts/check-selftest.mjs
+
+      # Self-arming reminder: the moment the workspace scaffold lands, this job
+      # turns red until its suite is wired here (issue #9 Phase A/B). A missing
+      # gate should fail loudly, not pass quietly.
+      - name: workspace checks
+        run: |
+          set -euo pipefail
+          if [ -f package.json ]; then
+            echo "::error::Workspace scaffold present but the full suite is not wired here."
+            echo "Add to this job (ADR 0012): biome check → typecheck → bun test → kernel boundary check → lor compile smoke."
+            exit 1
+          fi
+          echo "No workspace scaffold yet (issue #9 Phase A); docs checks above are the whole suite."
+
+  ci-required:
+    name: ci-required
+    needs: [select, docs-suite, workspace-suite]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      # Fail closed: every selected suite must have succeeded. A skipped suite
+      # is only acceptable when the selector did not choose it.
+      - name: assert selected suites succeeded
+        env:
+          DOCS_ONLY: ${{ needs.select.outputs.docs_only }}
+          SELECT: ${{ needs.select.result }}
+          DOCS: ${{ needs.docs-suite.result }}
+          WORKSPACE: ${{ needs.workspace-suite.result }}
+        run: |
+          set -euo pipefail
+          echo "select=$SELECT docs_only=$DOCS_ONLY docs-suite=$DOCS workspace-suite=$WORKSPACE"
+
+          [ "$SELECT" = "success" ] || { echo "::error::selector did not succeed"; exit 1; }
+
+          if [ "$DOCS_ONLY" = "true" ]; then
+            expected_docs=success; expected_workspace=skipped
+          else
+            expected_docs=skipped; expected_workspace=success
+          fi
+
+          fail=0
+          [ "$DOCS" = "$expected_docs" ] || { echo "::error::docs-suite is '$DOCS', expected '$expected_docs'"; fail=1; }
+          [ "$WORKSPACE" = "$expected_workspace" ] || { echo "::error::workspace-suite is '$WORKSPACE', expected '$expected_workspace'"; fail=1; }
+          exit $fail

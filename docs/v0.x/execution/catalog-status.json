@@ -1,0 +1,322 @@
+{
+  "schema": "loredu.catalog-status/v1",
+  "catalog": "docs/v0.x/execution/first-user-journey.md",
+  "note": "Every catalog T-number is either claimed by an executable test under tests/ (via an @covers annotation) or listed here with the milestone that will implement it. Never both, never neither. See ADR 0015.",
+  "deferred": {
+    "T01": {
+      "milestone": "M0",
+      "group": "M0 — records and validation",
+      "reason": "kernel record types and validation not implemented yet"
+    },
+    "T02": {
+      "milestone": "M0",
+      "group": "M0 — records and validation",
+      "reason": "kernel record types and validation not implemented yet"
+    },
+    "T03": {
+      "milestone": "M0",
+      "group": "M0 — records and validation",
+      "reason": "kernel record types and validation not implemented yet"
+    },
+    "T04": {
+      "milestone": "M0",
+      "group": "M0 — records and validation",
+      "reason": "kernel record types and validation not implemented yet"
+    },
+    "T05": {
+      "milestone": "M0",
+      "group": "M0 — records and validation",
+      "reason": "kernel record types and validation not implemented yet"
+    },
+    "T06": {
+      "milestone": "M0",
+      "group": "M0 — records and validation",
+      "reason": "kernel record types and validation not implemented yet"
+    },
+    "T07": {
+      "milestone": "M0",
+      "group": "M0 — records and validation",
+      "reason": "kernel record types and validation not implemented yet"
+    },
+    "T08": {
+      "milestone": "M0",
+      "group": "M0 — records and validation",
+      "reason": "kernel record types and validation not implemented yet"
+    },
+    "T10": {
+      "milestone": "M1",
+      "group": "M1 — plain-file store",
+      "reason": "plain-file store adapter not implemented yet"
+    },
+    "T11": {
+      "milestone": "M1",
+      "group": "M1 — plain-file store",
+      "reason": "plain-file store adapter not implemented yet"
+    },
+    "T12": {
+      "milestone": "M1",
+      "group": "M1 — plain-file store",
+      "reason": "plain-file store adapter not implemented yet"
+    },
+    "T13": {
+      "milestone": "M1",
+      "group": "M1 — plain-file store",
+      "reason": "plain-file store adapter not implemented yet"
+    },
+    "T14": {
+      "milestone": "M1",
+      "group": "M1 — plain-file store",
+      "reason": "plain-file store adapter not implemented yet"
+    },
+    "T15": {
+      "milestone": "M1",
+      "group": "M1 — plain-file store",
+      "reason": "plain-file store adapter not implemented yet"
+    },
+    "T16": {
+      "milestone": "M1",
+      "group": "M1 — plain-file store",
+      "reason": "plain-file store adapter not implemented yet"
+    },
+    "T17": {
+      "milestone": "M1",
+      "group": "M1 — plain-file store",
+      "reason": "plain-file store adapter not implemented yet"
+    },
+    "T18": {
+      "milestone": "M1",
+      "group": "M1 — plain-file store",
+      "reason": "plain-file store adapter not implemented yet"
+    },
+    "T19": {
+      "milestone": "M1",
+      "group": "M1 — plain-file store",
+      "reason": "plain-file store adapter not implemented yet"
+    },
+    "T20": {
+      "milestone": "M2",
+      "group": "M2 — reconciliation, resolution, projections",
+      "reason": "reconciliation and projection engine not implemented yet"
+    },
+    "T21": {
+      "milestone": "M2",
+      "group": "M2 — reconciliation, resolution, projections",
+      "reason": "reconciliation and projection engine not implemented yet"
+    },
+    "T22": {
+      "milestone": "M2",
+      "group": "M2 — reconciliation, resolution, projections",
+      "reason": "reconciliation and projection engine not implemented yet"
+    },
+    "T23": {
+      "milestone": "M2",
+      "group": "M2 — reconciliation, resolution, projections",
+      "reason": "reconciliation and projection engine not implemented yet"
+    },
+    "T24": {
+      "milestone": "M2",
+      "group": "M2 — reconciliation, resolution, projections",
+      "reason": "reconciliation and projection engine not implemented yet"
+    },
+    "T25": {
+      "milestone": "M2",
+      "group": "M2 — reconciliation, resolution, projections",
+      "reason": "reconciliation and projection engine not implemented yet"
+    },
+    "T26": {
+      "milestone": "M2",
+      "group": "M2 — reconciliation, resolution, projections",
+      "reason": "reconciliation and projection engine not implemented yet"
+    },
+    "T27": {
+      "milestone": "M2",
+      "group": "M2 — reconciliation, resolution, projections",
+      "reason": "reconciliation and projection engine not implemented yet"
+    },
+    "T28": {
+      "milestone": "M2",
+      "group": "M2 — reconciliation, resolution, projections",
+      "reason": "reconciliation and projection engine not implemented yet"
+    },
+    "T29": {
+      "milestone": "M2",
+      "group": "M2 — reconciliation, resolution, projections",
+      "reason": "reconciliation and projection engine not implemented yet"
+    },
+    "T30": {
+      "milestone": "M2",
+      "group": "M2 — reconciliation, resolution, projections",
+      "reason": "reconciliation and projection engine not implemented yet"
+    },
+    "T40": {
+      "milestone": "M3",
+      "group": "M3 — Working Lore",
+      "reason": "Working Lore assembly not implemented yet"
+    },
+    "T41": {
+      "milestone": "M3",
+      "group": "M3 — Working Lore",
+      "reason": "Working Lore assembly not implemented yet"
+    },
+    "T42": {
+      "milestone": "M3",
+      "group": "M3 — Working Lore",
+      "reason": "Working Lore assembly not implemented yet"
+    },
+    "T43": {
+      "milestone": "M3",
+      "group": "M3 — Working Lore",
+      "reason": "Working Lore assembly not implemented yet"
+    },
+    "T44": {
+      "milestone": "M3",
+      "group": "M3 — Working Lore",
+      "reason": "Working Lore assembly not implemented yet"
+    },
+    "T45": {
+      "milestone": "M3",
+      "group": "M3 — Working Lore",
+      "reason": "Working Lore assembly not implemented yet"
+    },
+    "T50": {
+      "milestone": "M1.5",
+      "group": "CLI conformance (compiled binary)",
+      "reason": "lor binary not built yet"
+    },
+    "T51": {
+      "milestone": "M1.5",
+      "group": "CLI conformance (compiled binary)",
+      "reason": "lor binary not built yet"
+    },
+    "T52": {
+      "milestone": "M1.5",
+      "group": "CLI conformance (compiled binary)",
+      "reason": "lor binary not built yet"
+    },
+    "T53": {
+      "milestone": "M1.5",
+      "group": "CLI conformance (compiled binary)",
+      "reason": "lor binary not built yet"
+    },
+    "T54": {
+      "milestone": "M1.5",
+      "group": "CLI conformance (compiled binary)",
+      "reason": "lor binary not built yet"
+    },
+    "T55": {
+      "milestone": "M1.5",
+      "group": "CLI conformance (compiled binary)",
+      "reason": "lor binary not built yet"
+    },
+    "T56": {
+      "milestone": "M1.5",
+      "group": "CLI conformance (compiled binary)",
+      "reason": "lor binary not built yet"
+    },
+    "T57": {
+      "milestone": "M1.5",
+      "group": "CLI conformance (compiled binary)",
+      "reason": "lor binary not built yet"
+    },
+    "T58": {
+      "milestone": "M1.5",
+      "group": "CLI conformance (compiled binary)",
+      "reason": "lor binary not built yet"
+    },
+    "T60": {
+      "milestone": "M1.5",
+      "group": "Agent-reactive envelope (ships with the early CLI)",
+      "reason": "response envelope not implemented yet"
+    },
+    "T61": {
+      "milestone": "M1.5",
+      "group": "Agent-reactive envelope (ships with the early CLI)",
+      "reason": "response envelope not implemented yet"
+    },
+    "T62": {
+      "milestone": "M1.5",
+      "group": "Agent-reactive envelope (ships with the early CLI)",
+      "reason": "response envelope not implemented yet"
+    },
+    "T63": {
+      "milestone": "M1.5",
+      "group": "Agent-reactive envelope (ships with the early CLI)",
+      "reason": "response envelope not implemented yet"
+    },
+    "T64": {
+      "milestone": "M1.5",
+      "group": "Agent-reactive envelope (ships with the early CLI)",
+      "reason": "response envelope not implemented yet"
+    },
+    "T65": {
+      "milestone": "M1.5",
+      "group": "Agent-reactive envelope (ships with the early CLI)",
+      "reason": "response envelope not implemented yet"
+    },
+    "T66": {
+      "milestone": "M1.5",
+      "group": "Agent-reactive envelope (ships with the early CLI)",
+      "reason": "response envelope not implemented yet"
+    },
+    "T67": {
+      "milestone": "M1.5",
+      "group": "Agent-reactive envelope (ships with the early CLI)",
+      "reason": "response envelope not implemented yet"
+    },
+    "T68": {
+      "milestone": "M1.5",
+      "group": "Agent-reactive envelope (ships with the early CLI)",
+      "reason": "response envelope not implemented yet"
+    },
+    "T70": {
+      "milestone": "M1.5",
+      "group": "Pagination and link-following (ADR 0009)",
+      "reason": "pagination and affordance links not implemented yet"
+    },
+    "T71": {
+      "milestone": "M1.5",
+      "group": "Pagination and link-following (ADR 0009)",
+      "reason": "pagination and affordance links not implemented yet"
+    },
+    "T72": {
+      "milestone": "M1.5",
+      "group": "Pagination and link-following (ADR 0009)",
+      "reason": "pagination and affordance links not implemented yet"
+    },
+    "T73": {
+      "milestone": "M1.5",
+      "group": "Pagination and link-following (ADR 0009)",
+      "reason": "pagination and affordance links not implemented yet"
+    },
+    "T74": {
+      "milestone": "M1.5",
+      "group": "Pagination and link-following (ADR 0009)",
+      "reason": "pagination and affordance links not implemented yet"
+    },
+    "T75": {
+      "milestone": "M1.5",
+      "group": "Pagination and link-following (ADR 0009)",
+      "reason": "pagination and affordance links not implemented yet"
+    },
+    "T80": {
+      "milestone": "M0",
+      "group": "Kernel invariants and the policy seam (issue #6)",
+      "reason": "kernel invariants and ClaimPolicy seam not implemented yet"
+    },
+    "T81": {
+      "milestone": "M0",
+      "group": "Kernel invariants and the policy seam (issue #6)",
+      "reason": "kernel invariants and ClaimPolicy seam not implemented yet"
+    },
+    "T82": {
+      "milestone": "M0",
+      "group": "Kernel invariants and the policy seam (issue #6)",
+      "reason": "kernel invariants and ClaimPolicy seam not implemented yet"
+    },
+    "T83": {
+      "milestone": "M0",
+      "group": "Kernel invariants and the policy seam (issue #6)",
+      "reason": "kernel invariants and ClaimPolicy seam not implemented yet"
+    }
+  }
+}
