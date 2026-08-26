@@ -25,17 +25,23 @@ The repo is agent-first and design-first, and currently holds **no source tree**
 
 ## Commands
 
-Everything the `ci-required` gate runs, runnable locally (node also works in place of bun):
+Everything the `ci-required` gate runs, from a fresh clone:
 
 ```sh
-bun docs/scripts/check-docs.mjs        # frontmatter, unique names, status vocabulary, links, anchors, reachability
-bun docs/scripts/check-catalog.mjs     # every behavioral-catalog T-number implemented xor deferred
-bun docs/scripts/check-selftest.mjs    # proves both gates still fire on synthetic violations
-bunx cspell --no-progress "docs/**/*.md" "*.md" ".agents/**/*.md"
-bun docs/scripts/find-docs.mjs --type contract   # query docs by frontmatter
+bun install
+bun run lint          # biome check . — code only; markdown stays hand-shaped
+bun run spell         # cspell over the prose
+bun run check:docs    # frontmatter, unique names, status vocabulary, links, anchors, reachability
+bun run check:catalog # every behavioral-catalog T-number implemented xor deferred
+bun run check:gates   # proves the two checks above still fire on synthetic violations
+bun run typecheck     # tsc -p per project: kernel, store-plainfile, cli, tests
+bun test
+bun run build && ./packages/cli/dist/lor --version
 ```
 
-The workspace scaffold — `package.json`, the `packages/` tree, `tests/`, and the root `test`/`typecheck`/`lint`/`build` scripts — lands with Phase A of the repo-setup tracker (issue #9); this section gains those commands then. Until it exists, the checks above are the whole suite, and `ci-required` fails deliberately if a root `package.json` appears before its suite is wired.
+The corpus checks are zero-dependency, so `bun docs/scripts/check-docs.mjs` and friends also run under bare `node` before any install — which is how the docs-only CI suite runs them.
+
+The kernel's purity is a compiler fact, not a convention: `tsconfig.base.json` sets `"types": []`, adapters opt in with `"types": ["bun"]`, and `packages/kernel` never does — so `process`, `Bun.*`, `Buffer`, `__dirname`, and `node:*` fail `bun run typecheck` inside the kernel (`docs/decisions/0016-workspace-scaffold-and-kernel-type-isolation.md`).
 
 Boundaries that will be enforced once code exists (see ADRs 0011 and 0012): the kernel takes zero runtime dependencies and no `node:*`/`bun:*` imports or ambient Bun/Node globals; the package DAG is one-way (kernel ← store-plainfile ← cli); a T-number is either covered by an executable test or explicitly deferred, never both, and never faked with a placeholder test.
 

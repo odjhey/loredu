@@ -5,11 +5,10 @@
     // Code only. Markdown is hand-authored — contract tables and prose stay
     // hand-shaped (ADR 0012) — and Biome does not format it anyway.
     //
-    // `docs/**` is excluded wholesale: the scripts under `docs/scripts/` are the
-    // docs gate's own zero-dependency Node tooling, carrying their own style, and
-    // they run before this workspace exists. Bringing them under Biome is a
-    // follow-up, not a scaffold decision.
-    "includes": ["**", "!**/*.md", "!docs", "!**/dist", "!**/node_modules", "!bun.lock"]
+    // `docs/scripts/**` IS included: those are the docs gate's own tooling, and
+    // code gets linted wherever it lives. They stay zero-dependency so they run
+    // under bare node before `bun install`; Biome only shapes them.
+    "includes": ["**", "!**/*.md", "!**/dist", "!**/node_modules", "!bun.lock"]
   },
   "formatter": {
     "enabled": true,
