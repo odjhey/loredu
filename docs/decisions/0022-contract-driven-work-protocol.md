@@ -27,7 +27,7 @@ Choose option 3. Any work touching a domain contract follows the twelve-step [Co
 
 The work item must identify governing contracts, ADRs, and catalog rows; enumerate and classify every normative invariant in a Contract Matrix; and eventually attach implementation and suitable test/review evidence to every in-scope invariant. Broader-than-contract behavior is a bug, and narrower behavior is a bug unless the contract explicitly permits it. Helpers may not erase contract-required semantic distinctions.
 
-A new public semantic, API, persisted-shape, or ownership choice is reported as `NEEDS_DECISION`, not silently implemented. A decomposition mismatch is reported as `NEEDS_REPLAN`. Green CI is evidence only for its actual assertions, and findings return to Watchtower rather than implicitly authorizing successor work.
+A new public semantic, API, persisted-shape, or ownership choice is reported as `NEEDS_DECISION`, not silently implemented. A decomposition mismatch is reported as `NEEDS_REPLAN`. Green CI is evidence only for its actual assertions, and findings return to Watchtower — the external Rozoro orchestrator that dispatched the work and owns routing and next-step decisions, not a Loredu runtime component — rather than implicitly authorizing successor work.
 
 The human-readable policy contains the authoritative wording. Its YAML companion mirrors the mandatory obligations in the established structured style, and `AGENTS.md` points fresh workers to the full protocol.
 

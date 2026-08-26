@@ -69,7 +69,7 @@ contract_driven_work:
     - id: interpret_ci_narrowly
       requirement: Green CI proves only what its checks assert.
     - id: return_to_watchtower
-      requirement: Return findings and evidence to Watchtower; do not assume the next step.
+      requirement: Return findings and evidence to Watchtower (the external Rozoro orchestrator that dispatched the work and owns routing/next-step decisions — not a Loredu runtime component); do not assume the next step.
 
 operator_required:
   - id: production_release
