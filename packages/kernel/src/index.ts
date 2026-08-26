@@ -1,3 +1,11 @@
+export type {
+  AppendRecordResult,
+  ApplicationCapabilities,
+  LoreduApplication,
+} from "./application/append";
+export { appendRecord, createApplication } from "./application/append";
+export type { BasisBearing, BasisIdentity } from "./application/basis";
+export { basisIdentitiesEqual, basisIdentityOf } from "./application/basis";
 export type { ClaimKey, ClaimKeyInput, ScopePair } from "./domain/claim-key";
 export {
   canonicalizeScope,
@@ -73,8 +81,10 @@ export {
 } from "./domain/records";
 export { RecordValidationError } from "./domain/validation-error";
 export type {
-  AppendResult,
-  RecordRef,
-  RecordStore,
-  StreamPosition,
-} from "./ports/record-store";
+  ClaimPolicy,
+  ClaimSemantics,
+  MechanicalAdvisory,
+} from "./policy/claim-policy";
+export { DEFAULT_CLAIM_POLICY } from "./policy/claim-policy";
+export type { Clock, RandomSource } from "./ports/capabilities";
+export type { PositionedRecord, RecordStore, StreamPosition } from "./ports/record-store";
