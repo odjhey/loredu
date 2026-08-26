@@ -19,6 +19,7 @@ created_at: 2026-08-26T12:10:00+08:00
 | [Contracts](./architecture/contracts/README.md) | Published core contract index |
 | [Record contract](./architecture/contracts/records.md) | Immutable Entry, Claim, Relation, Resolution, and Verification records |
 | [Store port](./architecture/contracts/store.md) | Provider-neutral append/read/scan persistence boundary |
+| [Clock and identity ports](./architecture/contracts/clock-and-identity.md) | Capability ports for `recorded_at` and record id entropy, and the single stamping point in the append path |
 | [Projection contract](./architecture/contracts/projection.md) | Current and historical temporal views |
 | [Working Lore contract](./architecture/contracts/working-lore.md) | Bounded progressive-disclosure context for an activity |
 
@@ -43,6 +44,7 @@ created_at: 2026-08-26T12:10:00+08:00
 | [0014: Minimal frontmatter](./decisions/0014-minimal-frontmatter.md) | Git owns last-changed time; `status` gets a vocabulary with real signal and no draft-by-default |
 | [0015: Catalog accounting and the docs gate](./decisions/0015-catalog-accounting-and-docs-gate.md) | Every T-number implemented via `@covers` or deferred in `catalog-status.json`; structural gate over the corpus; both gates self-tested |
 | [0016: Workspace scaffold and kernel type isolation](./decisions/0016-workspace-scaffold-and-kernel-type-isolation.md) | Bun workspaces with TypeScript sources as exports; kernel purity enforced as a typecheck error |
+| [0018: Capability ports for time and identity](./decisions/0018-capability-ports.md) | `Clock` and `RandomSource` injected; the application stamps `id`/`recorded_at`, the store assigns only the position |
 | [0017: Branch protection posture](./decisions/0017-branch-protection-posture.md) | `ci-required` the only required status, zero reviews, squash-only, no bypass actors, up-to-date-before-merge on |
 
 ## Agents and process

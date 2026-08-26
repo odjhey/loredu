@@ -34,6 +34,9 @@ created_at: 2026-08-26T12:10:00+08:00
 | **valid_from / valid_until** | When the claim is believed to apply in the external world. Either may be unknown. |
 | **as_of** | Query boundary limiting knowledge to records available at that time. |
 | **valid_at** | Query asking what a projection believes applied at that external-world time. |
+| **Capability port** | Collaborator the kernel needs but cannot reach for itself, injected when the application is assembled: `Clock` and `RandomSource`. Distinct from `RecordStore`, which is a persistence boundary rather than an environment capability. |
+| **Clock** | Injected source of the instant stamped as `recorded_at`. A fixed clock in tests makes `as_of` behavior reproducible. |
+| **RandomSource** | Injected source of entropy for record ids. Supplies bytes only — the kernel owns id format, so no adapter can substitute an id scheme. |
 | **Stream position** | Monotonic position in the canonical record stream, returned by `append` and exposed as the store head. |
 | **Basis** | Stamp on a derived view recording the stream position, ruleset version, and query it was computed from; enables deterministic staleness checks. |
 | **Handle** | Stable, runnable reference embedded in a response — an identifier plus the command that expands it. The unit of progressive disclosure. |

@@ -67,7 +67,7 @@ Loredu owns:
 - explicit resolution records;
 - current and historical projections;
 - bounded Working Lore and progressive-disclosure contracts;
-- storage/application ports required to preserve those semantics.
+- storage/application ports required to preserve those semantics, including the capability ports the kernel is assembled with (`Clock`, `RandomSource` — [clock and identity](./contracts/clock-and-identity.md)).
 
 Loredu does not own:
 

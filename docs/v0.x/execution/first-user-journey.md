@@ -213,6 +213,7 @@ Grouped by milestone; **AC n** = acceptance criterion in [goal and scope](../sco
 | T06 | unknown namespaced metadata round-trips through serialize/parse | ADR 0005 |
 | T07 | same logical input twice → distinct record ids (append, never replace) | store contract |
 | T08 | generated ids carry the three-letter kind prefix (`ent_`/`clm_`/`rel_`/`res_`/`ver_`); a record whose id prefix disagrees with its `kind` is rejected | record contract |
+| T84 | capability determinism without content-addressing: two freshly assembled applications given the same draft, same fixed clock value, and random sources initialized to the same deterministic state produce the same first stamped record (id and `recorded_at` included); two sequential appends of that same draft through one running application consume new entropy and produce distinct ids; caller-supplied `recorded_at` is refused | ADR 0018, clock-and-identity contract |
 
 ### M1 — plain-file store
 
@@ -299,10 +300,10 @@ Grouped by milestone; **AC n** = acceptance criterion in [goal and scope](../sco
 
 | # | Given / When / Then | Covers |
 |---|---|---|
-| T80 | `recorded_at` is stamped by `append` at commit; a caller-supplied `recorded_at` is ignored or rejected by the application API — canonical history cannot be backdated | records contract, time ownership |
+| T80 | `recorded_at` is sampled by the application append path immediately before the durable store append attempt; it becomes canonical only when that append succeeds; a caller-supplied `recorded_at` is rejected — canonical history cannot be backdated | records contract, time ownership |
 | T81 | `computed_at` is outside basis identity: two computations of the same basis at different wall times compare equal and reproduce identical content | ADR 0006 |
 | T82 | default ClaimPolicy: identity = declared key, all values exclusive, no custom advisories — M1.5 behavior byte-identical with the policy layer in place; the active policy version appears in the basis `ruleset` | ADR 0010 |
-| T83 | draft/record split: draft types expose no `id` or `recorded_at` (compile-time), and the append API rejects objects carrying them (runtime) — both are kernel-assigned at commit | records contract |
+| T83 | draft/record split: draft types expose no `id` or `recorded_at` (compile-time), and the application append API rejects objects carrying them (runtime) — both values are kernel/application-stamped before the store receives a complete record | records contract |
 
 ### Deliberately not tested yet
 

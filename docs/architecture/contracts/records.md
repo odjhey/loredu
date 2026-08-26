@@ -32,29 +32,31 @@ ent_…  entry      clm_…  claim      rel_…  relation
 res_…  resolution ver_…  verification
 ```
 
-The suffix is random, identifier-safe, and carries no meaning (ordering comes from `recorded_at` and stream positions, and sharding is a non-concern). Validation asserts that the prefix agrees with `kind`; beyond that, no logic may parse or derive meaning from an id. Suffix length and alphabet are an M0 implementation decision.
+The suffix is random, identifier-safe, and carries no meaning (ordering comes from `recorded_at` and stream positions, and sharding is a non-concern). Validation asserts that the prefix agrees with `kind`; beyond that, no logic may parse or derive meaning from an id. Suffix length and alphabet are fixed by the [clock and identity contract](./clock-and-identity.md): 16 symbols of lowercase Crockford base32.
 
 ### Draft vs persisted record
 
-Callers never construct a complete record — they construct a **draft**: the caller-owned fields only (kind payload, actor, scope, sources, metadata). The append/commit path assigns what only the kernel may assign:
+Callers never construct a complete record — they construct a **draft**: the caller-owned fields only (kind payload, actor, scope, sources, metadata). The application append path assigns what only the kernel may assign before handing a complete record to storage:
 
 ```text
-EntryDraft ── RecordStore.append() ──► Entry
-                                        + id           (kernel-generated, kind-prefixed)
-                                        + recorded_at  (kernel clock at commit)
-                                        (+ stream position, associated by the store —
-                                           returned alongside, not an envelope field)
+EntryDraft ── application append ──► Entry ── RecordStore.append() ──► + stream position
+                 + id          (kernel format over the injected random source)
+                 + recorded_at (sampled from the injected clock immediately
+                                before the durable append attempt)
+
+                 the store assigns the position and nothing else; it never
+                 fabricates or rewrites id or recorded_at
 ```
 
 The type model must make history backdating **unrepresentable**: a draft has no `id` or `recorded_at` field to fill in, rather than having ones that are validated away. This split also reinforces reference-before-referrer ordering by construction — a referrer cannot be drafted until its referent has been appended and has an id.
 
 ### Time ownership
 
-`recorded_at` is **assigned by the kernel at successful append**, never caller-authoritative — `as_of` only has a stable meaning if Loredu owns when a record entered canonical history. The distinct time concepts:
+`recorded_at` is **assigned by the kernel/application append path**, never caller-authoritative — `as_of` only has a stable meaning if Loredu owns the timestamp attached to canonical history. The distinct time concepts:
 
-- `recorded_at` — when Loredu durably learned it (kernel-assigned at commit);
+- `recorded_at` — the kernel timestamp sampled immediately before attempting the durable append. It becomes part of canonical history only if the store append succeeds; it is not defined as the exact durability instant ([clock and identity](./clock-and-identity.md));
 - `valid_from` / `valid_until` — when a claim applies in the external world (caller-declared);
-- stream position — canonical append ordering (store-assigned);
+- stream position — canonical append ordering and the store-level fact that the append committed successfully;
 - an actor's own observation time, if ever needed, is a separate future field (`observed_at`) or consumer metadata — it is not `recorded_at`.
 
 Unknown namespaced metadata should be preserved by storage adapters when practical and ignored by readers that do not understand it.
@@ -161,4 +163,4 @@ result: confirmed | contradicted | unchanged | needs_revalidation
 7. The complete projection must be reconstructable from canonical records.
 8. Every claim declares a well-formed claim key; deterministic reconciliation never crosses key boundaries.
 9. Every persisted record schema version remains replayable; schema evolution is additive or versioned, never breaking ([decision 0005](../../decisions/0005-embedded-kernel-compatibility.md)).
-10. `id` and `recorded_at` are assigned by the kernel at append; callers submit drafts and cannot backdate canonical history — the draft type has no such fields to supply.
+10. `id` and `recorded_at` are assigned by the kernel/application append path; callers submit drafts and cannot backdate canonical history — the draft type has no such fields to supply.

@@ -22,14 +22,15 @@ Scaffold the workspace per [decision 0011](../../decisions/0011-repo-package-arc
 - claim-key declaration and **shape validation only** ([decision 0004](../../decisions/0004-claim-identity-key.md)): identifier-safe subject/predicate/perspective fields, with vocabulary and namespacing left to consumers/policy rather than normalized by the kernel;
 - the versioned `ClaimPolicy` port and built-in default policy ([decision 0010](../../decisions/0010-claim-policy-seam.md)): identity = declared key, value semantics = `exclusive`, no custom advisories beyond built-in generic mechanics;
 - the `RecordStore` port shape required by the append application path, without any durable provider assumptions;
-- application append/commit orchestration: kernel-owned clock and ID generation, validation, reference-before-referrer checks, and returning persisted record identity/position;
-- test-only `InMemoryStore` under `@loredu/kernel/testing` so the append path is exercised without filesystem/storage-provider dependencies;
+- the `Clock` and `RandomSource` capability ports ([decision 0018](../../decisions/0018-capability-ports.md), [clock and identity contract](../../architecture/contracts/clock-and-identity.md)): injected at application assembly, deterministic substitutes in tests, kernel-owned id format over supplied entropy; `RandomSource` supplies qualified bytes rather than ids, and production code may not substitute `Math.random()` for the id contract;
+- application append orchestration: the single stamping point for `id` and `recorded_at`, validation, reference-before-referrer checks, and returning persisted record identity/position — `recorded_at` is sampled immediately before the store append attempt, while the store receives a complete record and assigns only the stream position;
+- test-only `InMemoryStore`, `FixedClock`, and `SeededRandomSource` support under `@loredu/kernel/testing` so the application path is exercised without filesystem/storage-provider dependencies;
 - optional validity fields, scope, actor, provenance/source references, namespaced metadata preservation rules, and schema replay compatibility ([decision 0005](../../decisions/0005-embedded-kernel-compatibility.md));
-- kernel boundary enforcement from [decision 0011](../../decisions/0011-repo-package-architecture.md): zero external runtime dependencies, no environment-specific imports, and a kernel TypeScript environment that does not expose Bun/Node ambient globals.
+- kernel boundary enforcement from [decision 0011](../../decisions/0011-repo-package-architecture.md): zero external runtime dependencies, no environment-specific imports, a kernel TypeScript environment that does not expose Bun/Node ambient globals, and a structural capability-bypass check rejecting ambient wall-time/randomness access (`Date.now()`, zero-argument `new Date()`, `Math.random()`) in production kernel sources.
 
-Supervised bootstrap/M0 work may proceed while the repository-readiness tracker proves its guardrails. **Unattended fleet fan-out waits for that tracker to demonstrate every required gate both green and red.** Dependency-cruiser remains a spike until its Bun-workspace/TypeScript behavior is demonstrated; the architectural boundary survives even if another checker is selected.
+Supervised bootstrap/M0 work may proceed while the repository-readiness tracker proves its guardrails. **Unattended fleet fan-out waits for that tracker to demonstrate every required gate both green and red.** Dependency-cruiser remains a spike until its Bun-workspace/TypeScript behavior is demonstrated; capability-bypass checks do not wait for it because import-graph tooling cannot see ambient calls with no import.
 
-Exit: through public kernel APIs, drafts can be validated and appended into the in-memory test store; returned records have kernel-assigned IDs and `recorded_at`; malformed keys/references fail with actionable errors; the default ClaimPolicy reproduces the declared-key/exclusive behavior; attempts to introduce environment-specific kernel APIs fail the configured boundary/type checks.
+Exit: through public kernel APIs, drafts can be validated and appended into the in-memory test store; returned records have kernel-assigned IDs and `recorded_at`; malformed keys/references fail with actionable errors; the default ClaimPolicy reproduces the declared-key/exclusive behavior; deterministic capability substitutes reproduce the same first stamped record across fresh assemblies while repeated appends consume fresh entropy; attempts to introduce environment-specific or ambient time/randomness kernel APIs fail the configured boundary/type checks.
 
 ## M1 — Durable plain-file persistence
 
@@ -58,6 +59,7 @@ Pulled ahead of full reconciliation ([decision 0008](../../decisions/0008-cli-fi
 - cursor pagination on every list command (`--limit`/`--cursor`, basis-pinned, explicit `returned`/`total`, continuation affordance/advice) and disclosure handles on every printed id;
 - the mechanical key-overlap slice through the **default ClaimPolicy**: same exact key + same value → corroboration feedback; same exact key + different value under `exclusive` semantics → conflict candidate + advice; unresolved same-key groups, dangling refs, and malformed records surfaced by `status` as health failures, plus generic non-blocking key-divergence advisories;
 - namespacing stays consumer-imposed: the kernel/default policy validates shape and exact identity, while examples and agent guidance encourage discovering existing vocabulary before inventing keys;
+- the CLI composition root supplies the production `Clock` and secure `RandomSource` implementations when assembling the application; no dedicated clock/random package is introduced;
 - embedded agent guide printed by `lor skill` ([draft](./agent-skill.md));
 - compiled single-file binary via `bun build --compile`.
 
@@ -100,7 +102,7 @@ Exit: the acceptance activity receives useful context that remains bounded as hi
 
 ## M4 — First real consumer
 
-Embed the kernel in one consumer from [candidate consumers](../../reports/candidate-consumers.md) — real writers, real corpus, no hand-tuned fixtures. Introduce the first custom ClaimPolicy only if that consumer actually needs semantics beyond the built-in default.
+Embed the kernel in one consumer from [candidate consumers](../../reports/candidate-consumers.md) — real writers, real corpus, no hand-tuned fixtures. Introduce the first custom ClaimPolicy only if that consumer actually needs semantics beyond the built-in default. The consumer supplies its own `Clock`/`RandomSource` implementations at its composition boundary rather than depending on a kernel-owned host adapter.
 
 Exit: the consumer records and retrieves knowledge through the published contracts alone; friction found here (key vocabulary, ergonomics, missing disclosure handles/policy needs) feeds contract revisions before anything is marked `status: current`.
 
