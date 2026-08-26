@@ -1,0 +1,44 @@
+{
+  "$schema": "./node_modules/@biomejs/biome/configuration_schema.json",
+  "vcs": { "enabled": true, "clientKind": "git", "useIgnoreFile": true },
+  "files": {
+    // Code only. Markdown is hand-authored — contract tables and prose stay
+    // hand-shaped (ADR 0012) — and Biome does not format it anyway.
+    //
+    // `docs/**` is excluded wholesale: the scripts under `docs/scripts/` are the
+    // docs gate's own zero-dependency Node tooling, carrying their own style, and
+    // they run before this workspace exists. Bringing them under Biome is a
+    // follow-up, not a scaffold decision.
+    "includes": ["**", "!**/*.md", "!docs", "!**/dist", "!**/node_modules", "!bun.lock"]
+  },
+  "formatter": {
+    "enabled": true,
+    "indentStyle": "space",
+    "indentWidth": 2,
+    "lineWidth": 110
+  },
+  "linter": {
+    "enabled": true,
+    "rules": {
+      "preset": "recommended",
+      "correctness": {
+        "noUnusedImports": "error",
+        "noUnusedVariables": "error"
+      },
+      "style": {
+        "useImportType": "error",
+        "noParameterAssign": "error"
+      }
+    }
+  },
+  "javascript": {
+    "formatter": {
+      "quoteStyle": "double",
+      "semicolons": "always",
+      "trailingCommas": "all"
+    }
+  },
+  "json": {
+    "formatter": { "enabled": true }
+  }
+}

@@ -1,0 +1,16 @@
+{
+  "name": "@loredu/store-plainfile",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Plain-file RecordStore adapter for Loredu: Markdown + YAML frontmatter on disk.",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc -p ."
+  },
+  "dependencies": {
+    "@loredu/kernel": "workspace:*"
+  }
+}

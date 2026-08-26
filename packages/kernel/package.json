@@ -1,0 +1,14 @@
+{
+  "name": "@loredu/kernel",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Loredu application kernel: records, ports, and application semantics. Zero runtime dependencies, no environment-specific APIs.",
+  "exports": {
+    ".": "./src/index.ts",
+    "./testing": "./testing/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc -p ."
+  }
+}

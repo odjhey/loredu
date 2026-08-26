@@ -1,0 +1,21 @@
+{
+  "name": "@loredu/cli",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "The lor binary: argv in, rendered affordances out.",
+  "bin": {
+    "lor": "./bin/lor.ts"
+  },
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc -p .",
+    "build": "bun build --compile --outfile ./dist/lor ./bin/lor.ts"
+  },
+  "dependencies": {
+    "@loredu/kernel": "workspace:*",
+    "@loredu/store-plainfile": "workspace:*"
+  }
+}
