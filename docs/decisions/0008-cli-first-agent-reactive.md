@@ -1,6 +1,6 @@
 ---
 name: decision_cli_first_agent_reactive
-description: "Ship the lor CLI right after M1 with mechanical key-overlap feedback; every response carries deterministic next-step advice so agents chain calls until healthy."
+description: "Ship the lor CLI right after M1 with mechanical key-overlap feedback; every response carries deterministic advice so agents chain calls until healthy."
 type: decision
 tags: [decisions, cli, sequencing, agents]
 status: draft
@@ -25,7 +25,7 @@ The original sequence (M0 → M1 → M2 → M3 → CLI) delays real usage until 
 
 Insert an **agent-operable CLI milestone (M1.5)** between M1 and M2. The binary is `lor`.
 
-**Agent-reactive response envelope.** Every command returns `{ok, result, reconciliation, next, basis}` in text and `--json`. `next` is a list of runnable follow-up commands with reasons, derived **only from deterministic checks** — key overlap, dangling references, unresolved same-key groups, malformed records. The envelope never speculates and is byte-stable for the same store state. Its shape is fixed now; from M2 onward the full ruleset fills `reconciliation` instead of the key-overlap slice, and the advice gets richer without the shape changing.
+**Agent-reactive response envelope.** Every command returns `{ok, result, reconciliation, next, basis}` in text and `--json`. `advice` is a list of runnable follow-up commands with reasons, derived **only from deterministic checks** — key overlap, dangling references, unresolved same-key groups, malformed records. The envelope never speculates and is byte-stable for the same store state. Its shape is fixed now; from M2 onward the full ruleset fills `reconciliation` instead of the key-overlap slice, and the advice gets richer without the shape changing.
 
 **Chain until healthy.** `lor status` defines health mechanically (no unresolved same-key groups, no malformed records, no dangling refs) and terminates the agent's action loop; `--check` exits nonzero for scripts. An agent adds a record, reads the advice, inspects, verifies, resolves — all in one session — until status is healthy.
 
@@ -43,4 +43,4 @@ Insert an **agent-operable CLI milestone (M1.5)** between M1 and M2. The binary 
 
 ## Rule or follow-up
 
-The `next` field must remain deterministic and non-speculative — model-generated advice is banned from the envelope. When M2 lands, a conformance test diffs deterministic reconciliation output against the manual-phase relation corpus and flags disagreements for review rather than silently preferring either.
+The `advice` field must remain deterministic and non-speculative — model-generated advice is banned from the envelope. When M2 lands, a conformance test diffs deterministic reconciliation output against the manual-phase relation corpus and flags disagreements for review rather than silently preferring either.

@@ -22,17 +22,26 @@ Every command returns the same envelope shape in text and `--json`:
 ```json
 {
   "ok": true,
-  "result": { "id": "c_0003", "kind": "claim" },
-  "reconciliation": { "state": "conflict-candidate", "key": "(repo=rozoro code-area command-registration).location", "related": ["c_0001"] },
-  "next": [
-    { "why": "another claim exists under this key with a different value", "run": "lor show c_0001" },
-    { "why": "record your judgment once verified against the source", "run": "lor resolve --targets c_0001,c_0003 --decision prefer --replacement c_0003 --reason \"...\"" }
+  "result": { "id": "clm_x4x8", "kind": "claim" },
+  "reconciliation": { "state": "conflict-candidate", "key": "(repo=rozoro code-area command-registration).location", "related": ["clm_7f3k"] },
+  "advice": [
+    { "why": "another claim exists under this key with a different value", "run": "lor show clm_7f3k" },
+    { "why": "record your judgment once verified against the source", "run": "lor resolve --targets clm_7f3k,clm_x4x8 --decision prefer --replacement clm_x4x8 --reason \"...\"" }
   ],
   "basis": { "position": 6 }
 }
 ```
 
-Rules: `next` is derived only from deterministic checks (key overlap, dangling references, unresolved groups) — the envelope never speculates. Its shape is stable across milestones; only who computes `reconciliation` changes (mechanical key-overlap in the early CLI, the full ruleset from M2). Text mode mirrors it compactly as `next:` lines.
+Rules: `advice` is derived only from deterministic checks (key overlap, dangling references, unresolved groups) — the envelope never speculates. Its shape is stable across milestones; only who computes `reconciliation` changes (mechanical key-overlap in the early CLI, the full ruleset from M2). Text mode mirrors it compactly as `advice:` lines.
+
+List-returning commands add a `page` object and a navigational entry in `advice` ([decision 0009](../../decisions/0009-hypermedia-pagination.md)):
+
+```json
+"page": { "returned": 20, "total": 143, "cursor": "eyJwb3MiOjQyLCJpZCI6ImNsbV8wMTIwIn0" },
+"advice": [ { "why": "123 more claims under this filter", "run": "lor claims --scope repo=rozoro --cursor eyJwb3MiOjQyLCJpZCI6ImNsbV8wMTIwIn0" } ]
+```
+
+Cursors are opaque and pinned to the basis position: a page chain is a consistent snapshot even while writers append; a cursorless query picks up the new head. Truncation is never silent (`returned`/`total` always present when a bound applies), ordering is deterministic (position/timestamp, id tiebreak), and every id printed anywhere is a handle — the response embeds or implies the command that expands it, so an agent navigates disclosure levels 0→4 by following links, never by memorizing the surface.
 
 Two suites automate the same journeys:
 
@@ -42,11 +51,13 @@ Two suites automate the same journeys:
 ## Journey 0 — install and init
 
 ```text
-$ lor init
-initialized plain-file store at ./lore
+$ lor init rozoro-investigation
+initialized store at ~/.loredu/stores/rozoro-investigation
 ```
 
-One directory, human-inspectable, Git-friendly ([decision 0003](../../decisions/0003-plain-files-first.md)). No daemon, no config required to start.
+One directory per store, human-inspectable, Git-friendly ([decision 0003](../../decisions/0003-plain-files-first.md)). No daemon, no config required to start.
+
+Store resolution is predictable, never cwd-dependent: `--store <path>` (used as-is) or `--store <name>` (resolved to `$LOREDU_HOME/stores/<name>`, `LOREDU_HOME` defaulting to `~/.loredu`); with no flag, the default store `$LOREDU_HOME/stores/default`. If the resolved store does not exist, the command fails with an actionable error suggesting `lor init` — no upward discovery, no silent creation. Stores live under `stores/` so the home root stays free for configuration and other concerns; multiple named stores coexist under one relocatable home, and tests isolate by pointing `LOREDU_HOME` at a temp directory.
 
 ## Journey 1 — first activity on an empty store
 
@@ -67,7 +78,7 @@ $ echo "Command registration is concentrated in src/commands, but plugins
   can register commands dynamically elsewhere." | lor add entry \
     --type finding --title "command registration" \
     --source repo=rozoro --locator src/commands --snapshot 3a1d8b7 --body -
-e_0001
+ent_a1b2
 ```
 
 Then the structured claim, keyed ([decision 0004](../../decisions/0004-claim-identity-key.md)):
@@ -76,8 +87,8 @@ Then the structured claim, keyed ([decision 0004](../../decisions/0004-claim-ide
 $ lor add claim --scope repo=rozoro \
     --subject-type code-area --subject command-registration \
     --predicate location --value src/commands \
-    --derived-from e_0001 --confidence observed
-c_0001  new claim (no prior claims under this key)
+    --derived-from ent_a1b2 --confidence observed
+clm_7f3k  new claim (no prior claims under this key)
 ```
 
 The write-time feedback line is part of the contract: it is how writers learn whether their key vocabulary is landing.
@@ -88,16 +99,16 @@ A second actor (an agent, different phrasing, same declared key):
 
 ```text
 $ lor add claim ... --predicate location --value src/commands ...
-c_0002  corroborates c_0001
+clm_9d2q  corroborates clm_7f3k
 ```
 
 A later run finds the world changed:
 
 ```text
 $ lor add claim ... --predicate location --value src/cli/commands ...
-c_0003  conflict candidate under key with c_0001
-next: lor show c_0001
-next: lor resolve --targets c_0001,c_0003 --decision prefer --replacement c_0003 --reason "..."
+clm_x4x8  conflict candidate under key with clm_7f3k
+advice: lor show clm_7f3k
+advice: lor resolve --targets clm_7f3k,clm_x4x8 --decision prefer --replacement clm_x4x8 --reason "..."
 ```
 
 Nothing is deleted or overwritten; the conflict is now visible knowledge, and the advice tells the same agent how to close it.
@@ -136,9 +147,9 @@ The shell is the rest of the query engine; lor does not need to grow one.
 ```text
 $ lor lore --activity investigate --scope repo=rozoro
 current:
-  (code-area command-registration) location = src/commands   [c_0001, corroborated]
+  (code-area command-registration) location = src/commands   [clm_7f3k, corroborated]
 attention:
-  conflict: location = src/commands vs src/cli/commands      [c_0001 ~ c_0003]
+  conflict: location = src/commands vs src/cli/commands      [clm_7f3k ~ clm_x4x8]
 basis: position=4 ruleset=r1
 ```
 
@@ -147,11 +158,11 @@ Bounded, ranked, with stable handles — not a record dump.
 ## Journey 5 — resolve
 
 ```text
-$ lor resolve --targets c_0001,c_0003 --decision prefer --replacement c_0003 \
+$ lor resolve --targets clm_7f3k,clm_x4x8 --decision prefer --replacement clm_x4x8 \
     --reason "verified against snapshot 9f21c44; registration moved"
-r_0001
+res_5m1p
 $ lor current --scope repo=rozoro
-(code-area command-registration) location = src/cli/commands  [c_0003, resolved]
+(code-area command-registration) location = src/cli/commands  [clm_x4x8, resolved]
 ```
 
 ## Journey 6 — time travel
@@ -166,9 +177,9 @@ $ lor current --scope repo=rozoro --as-of 2026-08-26T12:00:00Z
 ## Journey 7 — drill down
 
 ```text
-$ lor show c_0003        # claim detail + provenance refs
-$ lor history c_0003     # relations, resolution, verifications
-$ lor show e_0001        # the original free text
+$ lor show clm_x4x8        # claim detail + provenance refs
+$ lor history clm_x4x8     # relations, resolution, verifications
+$ lor show ent_a1b2        # the original free text
 ```
 
 Every id printed anywhere is resolvable — the progressive-disclosure promise.
@@ -184,7 +195,7 @@ A cached lore packet with `basis.position=4` is stale the moment `head` moves pa
 
 ## Journey 9 — teach the agents
 
-The skill ships **inside the binary**: `lor skill` prints the agent guide, so distributing the executable distributes the integration — no separate file to install. The guide ([agent skill draft](./agent-skill.md)) instructs agents: orient with `lor status` (later `lor lore`); record findings as entries as you go; write a claim whenever a finding is stable enough to key; follow every `next:` line until `lor status` reports healthy; never fight a conflict — record it, verify, resolve with a reason. A repo-level `.agents/skills` wrapper can simply defer to `lor skill`.
+The skill ships **inside the binary**: `lor skill` prints the agent guide, so distributing the executable distributes the integration — no separate file to install. The guide ([agent skill draft](./agent-skill.md)) instructs agents: orient with `lor status` (later `lor lore`); record findings as entries as you go; write a claim whenever a finding is stable enough to key; follow every `advice:` line until `lor status` reports healthy; never fight a conflict — record it, verify, resolve with a reason. A repo-level `.agents/skills` wrapper can simply defer to `lor skill`.
 
 ## Behavioral test catalog
 
@@ -201,6 +212,7 @@ Grouped by milestone; **AC n** = acceptance criterion in [goal and scope](../sco
 | T05 | records are value-immutable: no API mutates a created record | invariant 1 |
 | T06 | unknown namespaced metadata round-trips through serialize/parse | ADR 0005 |
 | T07 | same logical input twice → distinct record ids (append, never replace) | store contract |
+| T08 | generated ids carry the three-letter kind prefix (`ent_`/`clm_`/`rel_`/`res_`/`ver_`); a record whose id prefix disagrees with its `kind` is rejected | record contract |
 
 ### M1 — plain-file store
 
@@ -212,6 +224,10 @@ Grouped by milestone; **AC n** = acceptance criterion in [goal and scope](../sco
 | T13 | `append` with an existing id → error, original untouched | store contract |
 | T14 | store files are hand-inspectable Markdown + frontmatter; hand-added valid record is picked up on replay | ADR 0003 |
 | T15 | domain layer compiles/tests with a pure in-memory store (no Bun/fs import in core) | ADR 0001/0007 |
+| T16 | concurrent-writer safety: a second writer against a locked store fails loudly with no corruption; the store replays clean afterward | store contract |
+| T17 | store resolution: path flag as-is > name under `$LOREDU_HOME/stores/` > default store; nonexistent resolved store → actionable error (never created implicitly, never discovered from cwd); two named stores under one home are fully isolated (no reads or writes outside the resolved root) | journey 0 |
+| T18 | append is the commit point: a returned position implies the record survives a simulated crash (kill between staging and completion leaves either no record or a whole one, never a torn file); replay stays clean | store contract |
+| T19 | reference-before-referrer: a claim citing a nonexistent `derived_from` (or relation/resolution citing missing targets) is rejected at write time with an actionable error | store contract, ADR 0004 |
 
 ### M2 — reconciliation, resolution, projections
 
@@ -257,15 +273,26 @@ Grouped by milestone; **AC n** = acceptance criterion in [goal and scope](../sco
 
 | # | Given / When / Then | Covers |
 |---|---|---|
-| T60 | every mutation response (`--json`) contains `result`, `reconciliation`, `next`, `basis`; every `next` entry is a runnable command | ADR 0008 |
+| T60 | every mutation response (`--json`) contains `result`, `reconciliation`, `advice`, `basis`; every `advice` entry is a runnable command | ADR 0008 |
 | T61 | second claim, same key + same value → corroboration feedback, no attention raised | journey 3 |
-| T62 | second claim, same key + different value → conflict-candidate feedback with `next` advice naming both ids | journey 3 |
-| T63 | agent chain: execute the `next` commands from T62 (show → resolve) → `lor status` reports healthy, `--check` exits 0 | journey 3b |
+| T62 | second claim, same key + different value → conflict-candidate feedback with `advice` advice naming both ids | journey 3 |
+| T63 | agent chain: execute the `advice` commands from T62 (show → resolve) → `lor status` reports healthy, `--check` exits 0 | journey 3b |
 | T64 | `lor status` flags dangling `derived_from`, malformed records, and same-key groups with no relation/resolution among them | journey 3b |
 | T65 | `lor skill` prints the agent guide; a fresh store + only the guide's commands completes journeys 1–5 | journey 9 |
-| T66 | `next` advice is deterministic: same store state → byte-identical advice; no advice on healthy state | ADR 0008 |
+| T66 | `advice` advice is deterministic: same store state → byte-identical advice; no advice on healthy state | ADR 0008 |
 | T67 | `lor claims` filters compose across fields (scope + predicate + value, etc.) and return stable ordering with `--json` | key hygiene |
 | T68 | same value recorded under two different keys in one scope → `status` advisory (non-blocking); `--check` still exits 0 | key hygiene |
+
+### Pagination and link-following (ADR 0009)
+
+| # | Given / When / Then | Covers |
+|---|---|---|
+| T70 | any list over the default limit → `page` with `returned`/`total`/`cursor` plus a runnable continuation in `advice`; under the limit → counts, no cursor | ADR 0009 |
+| T71 | append records mid-pagination → the cursor chain yields no duplicates or skips (basis-pinned); a fresh query reflects the new head | ADR 0009 + 0006 |
+| T72 | invalid or foreign `--cursor` → actionable error, distinct exit code, never a silent restart | ADR 0009 |
+| T73 | link-following: starting from a `lor lore` packet, disclosure levels 0→4 (packet → claim → evidence/history → entry → source ref) are reachable using only commands embedded in responses | ADR 0009, journey 7 |
+| T74 | no dead ends: every id printed by any command resolves via `show`/`history` (generalizes T44 to all output) | ADR 0009 |
+| T75 | a Working Lore section hitting its budget states its full count and carries a continuation handle | working-lore contract |
 
 ### Deliberately not tested yet
 
