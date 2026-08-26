@@ -431,7 +431,7 @@ export function canonicalClaimKey(input: ClaimKeyInput): ValidationResult<ClaimK
   if (!result.ok) return result;
   const key: ClaimKey = {
     scope: Object.entries(input.scope ?? {}).sort(([a], [b]) => a.localeCompare(b)),
-    subject: input.subject,
+    subject: { type: input.subject.type, id: input.subject.id },
     predicate: input.predicate,
     ...(input.perspective === undefined ? {} : { perspective: input.perspective }),
   };

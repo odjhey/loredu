@@ -212,4 +212,16 @@ describe("record foundation", () => {
     const unscoped = canonicalClaimKey({ subject: { type: "repo", id: "loredu" }, predicate: "status" });
     expect(perspective.ok && unscoped.ok && claimKeysEqual(perspective.value, unscoped.value)).toBe(false);
   });
+
+  test("claim key equality is insensitive to subject property declaration order", () => {
+    const typeFirst = canonicalClaimKey({
+      subject: { type: "repo", id: "loredu" },
+      predicate: "status",
+    });
+    const idFirst = canonicalClaimKey({
+      subject: { id: "loredu", type: "repo" },
+      predicate: "status",
+    });
+    expect(typeFirst.ok && idFirst.ok && claimKeysEqual(typeFirst.value, idFirst.value)).toBe(true);
+  });
 });
