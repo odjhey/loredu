@@ -24,8 +24,23 @@ interface Manifest {
   readonly exports?: Record<string, string>;
 }
 
+interface TypeConfig {
+  readonly compilerOptions?: {
+    readonly lib?: readonly string[];
+    readonly types?: readonly string[];
+  };
+}
+
+function readJson<T>(path: string): T {
+  return JSON.parse(readFileSync(path, "utf8")) as T;
+}
+
 function manifest(pkgDir: string): Manifest {
-  return JSON.parse(readFileSync(join(PACKAGES, pkgDir, "package.json"), "utf8")) as Manifest;
+  return readJson<Manifest>(join(PACKAGES, pkgDir, "package.json"));
+}
+
+function typeConfig(path: string): TypeConfig {
+  return readJson<TypeConfig>(path);
 }
 
 function runtimeDeps(m: Manifest): string[] {
@@ -67,9 +82,28 @@ describe("package manifests", () => {
     expect(runtimeDeps(manifest("cli"))).toEqual(["@loredu/kernel", "@loredu/store-plainfile"]);
   });
 
-  test("the kernel publishes the test-only /testing subpath separately from its runtime export", () => {
-    const exports = manifest("kernel").exports ?? {};
-    expect(Object.keys(exports).sort()).toEqual([".", "./testing"]);
+  test("package exports are TypeScript sources and kernel testing is a separate subpath", () => {
+    expect(manifest("kernel").exports).toEqual({
+      ".": "./src/index.ts",
+      "./testing": "./testing/index.ts",
+    });
+    expect(manifest("store-plainfile").exports).toEqual({ ".": "./src/index.ts" });
+    expect(manifest("cli").exports).toEqual({ ".": "./src/index.ts" });
+  });
+
+  test("the kernel type environment stays default-deny while adapters opt in explicitly", () => {
+    expect(typeConfig(join(REPO_ROOT, "tsconfig.base.json")).compilerOptions).toMatchObject({
+      lib: ["ES2023"],
+      types: [],
+    });
+    expect(typeConfig(join(PACKAGES, "kernel", "tsconfig.json")).compilerOptions).toMatchObject({
+      lib: ["ES2023"],
+      types: [],
+    });
+    expect(typeConfig(join(PACKAGES, "store-plainfile", "tsconfig.json")).compilerOptions?.types).toEqual([
+      "bun",
+    ]);
+    expect(typeConfig(join(PACKAGES, "cli", "tsconfig.json")).compilerOptions?.types).toEqual(["bun"]);
   });
 });
 
