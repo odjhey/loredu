@@ -36,6 +36,7 @@ updated_at: 2026-08-26T12:10:00+08:00
 | [0005: Embedded kernel, not a standalone product](./decisions/0005-embedded-kernel-compatibility.md) | Consumer-driven stabilization and the record compatibility policy |
 | [0006: Versioning is explicit at every layer](./decisions/0006-explicit-version-basis.md) | Stream positions, ruleset versions, and basis stamps on derived views |
 | [0007: TypeScript on Bun](./decisions/0007-typescript-bun.md) | Strict TypeScript core, bun:test suites, CLI compiled to a single binary |
+| [0008: CLI first, agent-reactive](./decisions/0008-cli-first-agent-reactive.md) | Ship `lor` after M1 with deterministic next-step advice; agents chain until healthy |
 
 ## Reports
 
@@ -56,3 +57,4 @@ updated_at: 2026-08-26T12:10:00+08:00
 | [Execution](./v0.x/execution/README.md) | v0.x execution index |
 | [Implementation plan](./v0.x/execution/implementation-plan.md) | M0–M4 delivery sequence and acceptance scenarios |
 | [First user journey](./v0.x/execution/first-user-journey.md) | Expected CLI usage journeys and the automated behavioral test catalog |
+| [Agent skill draft](./v0.x/execution/agent-skill.md) | The guide embedded in the binary and printed by `lor skill` |

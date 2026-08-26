@@ -11,7 +11,28 @@ updated_at: 2026-08-26T00:00:00+08:00
 
 # First user journey and behavioral test cases
 
-The first user is the project owner plus their agents, driving Loredu through the CLI ([decision 0007](../../decisions/0007-typescript-bun.md)). This document describes how usage is expected to work, step by step, and derives the behavioral tests that must be automated. The behavior is the contract; command spellings are provisional adapter surface.
+The first user is the project owner plus their agents, driving Loredu through the CLI ([decision 0007](../../decisions/0007-typescript-bun.md)). The binary is `lor` — short enough for agents to type constantly. This document describes how usage is expected to work, step by step, and derives the behavioral tests that must be automated. The behavior is the contract; command spellings are provisional adapter surface.
+
+The CLI arrives early — right after M1, before full reconciliation — and every response is **agent-reactive** ([decision 0008](../../decisions/0008-cli-first-agent-reactive.md)): each call returns the result plus deterministic next-step advice, so an agent can chain calls until the store is healthy.
+
+## Response envelope
+
+Every command returns the same envelope shape in text and `--json`:
+
+```json
+{
+  "ok": true,
+  "result": { "id": "c_0003", "kind": "claim" },
+  "reconciliation": { "state": "conflict-candidate", "key": "(repo=rozoro code-area command-registration).location", "related": ["c_0001"] },
+  "next": [
+    { "why": "another claim exists under this key with a different value", "run": "lor show c_0001" },
+    { "why": "record your judgment once verified against the source", "run": "lor resolve --targets c_0001,c_0003 --decision prefer --replacement c_0003 --reason \"...\"" }
+  ],
+  "basis": { "position": 6 }
+}
+```
+
+Rules: `next` is derived only from deterministic checks (key overlap, dangling references, unresolved groups) — the envelope never speculates. Its shape is stable across milestones; only who computes `reconciliation` changes (mechanical key-overlap in the early CLI, the full ruleset from M2). Text mode mirrors it compactly as `next:` lines.
 
 Two suites automate the same journeys:
 
@@ -21,7 +42,7 @@ Two suites automate the same journeys:
 ## Journey 0 — install and init
 
 ```text
-$ loredu init
+$ lor init
 initialized plain-file store at ./lore
 ```
 
@@ -30,7 +51,7 @@ One directory, human-inspectable, Git-friendly ([decision 0003](../../decisions/
 ## Journey 1 — first activity on an empty store
 
 ```text
-$ loredu lore --activity investigate --scope repo=rozoro
+$ lor lore --activity investigate --scope repo=rozoro
 no knowledge yet for this scope
 basis: position=0 ruleset=r1
 ```
@@ -43,7 +64,7 @@ Free text first, always cheap:
 
 ```text
 $ echo "Command registration is concentrated in src/commands, but plugins
-  can register commands dynamically elsewhere." | loredu add entry \
+  can register commands dynamically elsewhere." | lor add entry \
     --type finding --title "command registration" \
     --source repo=rozoro --locator src/commands --snapshot 3a1d8b7 --body -
 e_0001
@@ -52,7 +73,7 @@ e_0001
 Then the structured claim, keyed ([decision 0004](../../decisions/0004-claim-identity-key.md)):
 
 ```text
-$ loredu add claim --scope repo=rozoro \
+$ lor add claim --scope repo=rozoro \
     --subject-type code-area --subject command-registration \
     --predicate location --value src/commands \
     --derived-from e_0001 --confidence observed
@@ -66,23 +87,37 @@ The write-time feedback line is part of the contract: it is how writers learn wh
 A second actor (an agent, different phrasing, same declared key):
 
 ```text
-$ loredu add claim ... --predicate location --value src/commands ...
+$ lor add claim ... --predicate location --value src/commands ...
 c_0002  corroborates c_0001
 ```
 
 A later run finds the world changed:
 
 ```text
-$ loredu add claim ... --predicate location --value src/cli/commands ...
-c_0003  conflicts with c_0001 (attention item created)
+$ lor add claim ... --predicate location --value src/cli/commands ...
+c_0003  conflict candidate under key with c_0001
+next: lor show c_0001
+next: lor resolve --targets c_0001,c_0003 --decision prefer --replacement c_0003 --reason "..."
 ```
 
-Nothing is deleted or overwritten; the conflict is now visible knowledge.
+Nothing is deleted or overwritten; the conflict is now visible knowledge, and the advice tells the same agent how to close it.
+
+## Journey 3b — chain until healthy
+
+The agent follows the advice in the same session: inspect, verify against the source, resolve, then check overall health:
+
+```text
+$ lor status
+open attention: 0    malformed: 0    dangling refs: 0
+healthy
+```
+
+`lor status` is the "am I done?" check that terminates the chain. It reports unresolved same-key groups, malformed records, and dangling `derived_from` references — all mechanical checks, available even before full reconciliation exists. `lor status --check` exits nonzero when unhealthy, for scripts and CI.
 
 ## Journey 4 — working lore reflects it
 
 ```text
-$ loredu lore --activity investigate --scope repo=rozoro
+$ lor lore --activity investigate --scope repo=rozoro
 current:
   (code-area command-registration) location = src/commands   [c_0001, corroborated]
 attention:
@@ -95,17 +130,17 @@ Bounded, ranked, with stable handles — not a record dump.
 ## Journey 5 — resolve
 
 ```text
-$ loredu resolve --targets c_0001,c_0003 --decision prefer --replacement c_0003 \
+$ lor resolve --targets c_0001,c_0003 --decision prefer --replacement c_0003 \
     --reason "verified against snapshot 9f21c44; registration moved"
 r_0001
-$ loredu current --scope repo=rozoro
+$ lor current --scope repo=rozoro
 (code-area command-registration) location = src/cli/commands  [c_0003, resolved]
 ```
 
 ## Journey 6 — time travel
 
 ```text
-$ loredu current --scope repo=rozoro --as-of 2026-08-26T12:00:00Z
+$ lor current --scope repo=rozoro --as-of 2026-08-26T12:00:00Z
 (code-area command-registration) location = src/commands
 ```
 
@@ -114,9 +149,9 @@ $ loredu current --scope repo=rozoro --as-of 2026-08-26T12:00:00Z
 ## Journey 7 — drill down
 
 ```text
-$ loredu show c_0003        # claim detail + provenance refs
-$ loredu history c_0003     # relations, resolution, verifications
-$ loredu show e_0001        # the original free text
+$ lor show c_0003        # claim detail + provenance refs
+$ lor history c_0003     # relations, resolution, verifications
+$ lor show e_0001        # the original free text
 ```
 
 Every id printed anywhere is resolvable — the progressive-disclosure promise.
@@ -124,7 +159,7 @@ Every id printed anywhere is resolvable — the progressive-disclosure promise.
 ## Journey 8 — staleness and replay
 
 ```text
-$ loredu head
+$ lor head
 position=6
 ```
 
@@ -132,7 +167,7 @@ A cached lore packet with `basis.position=4` is stale the moment `head` moves pa
 
 ## Journey 9 — teach the agents
 
-A skill file (same pattern as the existing `.agents/skills`) instructs agents: start every activity with `loredu lore`; record findings as entries as you go; write a claim whenever a finding is stable enough to key; read the feedback line; never fight a conflict — record it and move on. This document's journeys are the skill file's source material.
+The skill ships **inside the binary**: `lor skill` prints the agent guide, so distributing the executable distributes the integration — no separate file to install. The guide ([agent skill draft](./agent-skill.md)) instructs agents: orient with `lor status` (later `lor lore`); record findings as entries as you go; write a claim whenever a finding is stable enough to key; follow every `next:` line until `lor status` reports healthy; never fight a conflict — record it, verify, resolve with a reason. A repo-level `.agents/skills` wrapper can simply defer to `lor skill`.
 
 ## Behavioral test catalog
 
@@ -143,7 +178,7 @@ Grouped by milestone; **AC n** = acceptance criterion in [goal and scope](../sco
 | # | Given / When / Then | Covers |
 |---|---|---|
 | T01 | valid entry (free text only, no claim) → accepted, id returned | AC 1, invariant 3 |
-| T02 | entry/claim carries `schema: loredu.record/v1`, `recorded_at`, actor | AC 1 |
+| T02 | entry/claim carries `schema: lor.record/v1`, `recorded_at`, actor | AC 1 |
 | T03 | claim missing `predicate` (or any key field) → rejected with an actionable message naming the field | AC 11, ADR 0004 |
 | T04 | claim with free prose in `subject.id` (violates normalization) → rejected | ADR 0004 |
 | T05 | records are value-immutable: no API mutates a created record | invariant 1 |
@@ -195,11 +230,23 @@ Grouped by milestone; **AC n** = acceptance criterion in [goal and scope](../sco
 | T50 | every command supports `--json`; output parses and matches the application-suite result | agent ergonomics |
 | T51 | exit codes: 0 success, distinct nonzero for validation error vs not-found vs store error | agent ergonomics |
 | T52 | `add entry --body -` reads stdin; body round-trips byte-exact through store and `show` | journey 2 |
-| T53 | `add claim` prints the reconciliation feedback line (new / corroborates / conflicts) | journey 2–3 |
+| T53 | `add claim` prints the reconciliation feedback line (new / corroborates / conflict candidate) | journey 2–3 |
 | T54 | end-to-end scenario A (three runs, revalidation surfaced) through the binary | S A |
 | T55 | end-to-end scenario B (30→60-day amendment, all four temporal queries) through the binary | S B |
 | T56 | end-to-end journey 0→8 as one scripted session on a fresh temp dir | AC 12 (ergonomics) |
 | T57 | AC 12 measured: journey 2 (entry + claim) is ≤ 2 commands; journey 1 (lore) is 1 command | AC 12 |
+
+### Agent-reactive envelope (ships with the early CLI)
+
+| # | Given / When / Then | Covers |
+|---|---|---|
+| T60 | every mutation response (`--json`) contains `result`, `reconciliation`, `next`, `basis`; every `next` entry is a runnable command | ADR 0008 |
+| T61 | second claim, same key + same value → corroboration feedback, no attention raised | journey 3 |
+| T62 | second claim, same key + different value → conflict-candidate feedback with `next` advice naming both ids | journey 3 |
+| T63 | agent chain: execute the `next` commands from T62 (show → resolve) → `lor status` reports healthy, `--check` exits 0 | journey 3b |
+| T64 | `lor status` flags dangling `derived_from`, malformed records, and same-key groups with no relation/resolution among them | journey 3b |
+| T65 | `lor skill` prints the agent guide; a fresh store + only the guide's commands completes journeys 1–5 | journey 9 |
+| T66 | `next` advice is deterministic: same store state → byte-identical advice; no advice on healthy state | ADR 0008 |
 
 ### Deliberately not tested yet
 

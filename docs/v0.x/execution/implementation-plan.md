@@ -42,6 +42,20 @@ Optional only if useful: a generated human-readable index. Do not make the index
 
 Exit: deleting all derived state and replaying the Markdown records reconstructs the same record stream.
 
+## M1.5 — Agent-operable CLI (`lor`)
+
+Pulled ahead of full reconciliation ([decision 0008](../../decisions/0008-cli-first-agent-reactive.md)) so real usage and dogfooding start as early as possible. Implement:
+
+- commands: `init`, `add entry`, `add claim`, `relate`, `resolve`, `add verification`, `show`, `history`, `claims` (list/filter by scope and key), `head`, `status` (`--check`), `skill`;
+- the agent-reactive response envelope (`result`, `reconciliation`, `next`, `basis`) in text and `--json`, with stable exit codes;
+- the mechanical key-overlap slice of reconciliation: same key + same value → corroboration feedback; same key + different value → conflict candidate + advice; unresolved same-key groups, dangling refs, and malformed records surfaced by `status`;
+- embedded agent guide printed by `lor skill` ([draft](./agent-skill.md));
+- compiled single-file binary via `bun build --compile`.
+
+During this phase the agent performs reconciliation judgment manually: it records explicit Relations and Resolutions through the CLI. Those canonical records become the fixture corpus that M2's deterministic ruleset is validated against.
+
+Exit: an agent given only the binary and `lor skill` completes journeys 1–5 and 3b of the [first user journey](./first-user-journey.md) on a fresh store, ending with `lor status --check` passing; acceptance scenario A is executable manually end to end.
+
 ## M2 — Reconciliation and projection
 
 Implement deterministic baseline rules, all scoped within a claim key:
@@ -55,7 +69,9 @@ Implement deterministic baseline rules, all scoped within a claim key:
 - a versioned ruleset identifier and `basis` stamping on every projection;
 - evidence/history lookup by record identity.
 
-Exit: projections are deterministic and rebuildable from canonical records and the same versioned ruleset; a stale cached projection is detectable by comparing its `basis.stream_position` to the store head.
+The CLI's feedback upgrades in place: the envelope shape is unchanged, but `reconciliation` is now filled by the full ruleset instead of the key-overlap slice, and `current`/`--as-of` queries appear.
+
+Exit: projections are deterministic and rebuildable from canonical records and the same versioned ruleset; a stale cached projection is detectable by comparing its `basis.stream_position` to the store head; deterministic reconciliation is diffed against the manual-phase relation corpus and disagreements are reviewed, not silently overridden.
 
 ## M3 — Working Lore
 

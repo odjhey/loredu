@@ -1,0 +1,76 @@
+---
+name: agent_skill_draft
+description: "Draft of the agent guide shipped inside the lor binary (printed by `lor skill`), v1 for the manual-reconciliation era."
+type: plan
+tags: [v0.x, execution, agents, skill]
+status: draft
+generated: "Claude Fable 5 (Claude Code), 2026-08-26"
+created_at: 2026-08-26T00:00:00+08:00
+updated_at: 2026-08-26T00:00:00+08:00
+---
+
+# Agent skill (draft v1)
+
+This is the source draft of the guide embedded in the `lor` binary and printed by `lor skill`. Version 1 targets the M1.5 manual-reconciliation era; it is revised when M2 (computed reconciliation) and M3 (`lor lore`) land. A repo-level `.agents/skills` wrapper should defer to `lor skill` rather than duplicating this text.
+
+---
+
+## SKILL: recording operational knowledge with lor
+
+lor is an append-only knowledge store. You record what you learn as you work;
+lor keeps provenance and history and tells you when knowledge needs your
+judgment. Nothing is ever edited or deleted — new understanding is appended.
+
+### When to use
+
+Use lor whenever you are investigating something that will be investigated
+again: a codebase, a process, a policy set. Future runs (yours or another
+agent's) start from what you record now.
+
+### The loop
+
+1. **Orient.** `lor status --json` — see open attention items before starting.
+   List what is already known in your scope: `lor claims --scope <scope>`.
+2. **Record entries as you go.** Every finding worth keeping:
+   `echo "<free text>" | lor add entry --type finding --title "..." --source <ref> --snapshot <version> --body -`
+   Entries are cheap. When in doubt, record.
+3. **Claim when stable.** When a finding is solid enough to key, add a claim:
+   `lor add claim --scope <scope> --subject-type <type> --subject <id> --predicate <pred> --value <val> --derived-from <entry-id> --confidence observed`
+   Keys are identifiers, not prose: lowercase, hyphenated, no sentences.
+   Reuse existing subjects/predicates from `lor claims --scope <scope>` before
+   inventing new ones — reconciliation only works when keys converge.
+4. **Follow the advice.** Every response includes `next:` commands. Run them.
+   They are deterministic — lor only points at real, mechanical issues
+   (same-key overlap, dangling references), never guesses.
+5. **Judge conflicts yourself.** When lor reports a conflict candidate:
+   verify against the current source, then record your judgment:
+   `lor resolve --targets <old>,<new> --decision prefer --replacement <new> --reason "<what you checked>"`
+   If you cannot verify, use `--decision leave_disputed` — a recorded open
+   question beats a guessed answer. Never try to delete the losing claim.
+6. **Relate what you notice.** If two claims support or contradict each other
+   and lor has not linked them, record it:
+   `lor relate <a> --supports|--contradicts|--duplicates|--supersedes <b>`
+7. **Finish healthy.** Before ending the activity: `lor status --check`.
+   If it exits nonzero, work the `next:` list until it passes. Do not leave
+   attention items you created unhandled — resolve them or mark them disputed
+   with a reason.
+
+### Rules
+
+- Different perspectives are not conflicts: record documented vs observed
+  process as `--perspective documented` / `--perspective observed`. Both stay.
+- Provenance always: `--source`/`--snapshot` on entries, `--derived-from` on
+  claims. A claim you cannot trace is a claim nobody can trust later.
+- Reasons on resolutions state what you verified, not your reasoning chain.
+- Use `--json` when you need to parse; exit code 0 means the command
+  succeeded (check the `reconciliation` field for attention), nonzero means
+  it failed.
+
+---
+
+## Revision triggers
+
+- **M2:** feedback lines change from candidates to computed relations; add
+  `lor current` / `--as-of` to the orientation step.
+- **M3:** orientation step becomes `lor lore --activity <kind> --scope <scope>`;
+  drill-down guidance for handles.

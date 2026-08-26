@@ -13,5 +13,6 @@ updated_at: 2026-08-26T12:10:00+08:00
 
 - [Implementation plan](./implementation-plan.md) — M0–M4 sequence plus technical, policy/legal, and process-perspective acceptance scenarios.
 - [First user journey](./first-user-journey.md) — how CLI-driven usage is expected to work and the behavioral test catalog automated against it.
+- [Agent skill draft](./agent-skill.md) — the guide embedded in the `lor` binary (printed by `lor skill`), v1 for the manual-reconciliation era.
 
 Back to [v0.x](../README.md).
