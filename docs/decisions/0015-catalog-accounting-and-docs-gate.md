@@ -37,6 +37,8 @@ Both gaps share a failure mode: a rule that lives only in prose is a rule agents
 
 **Both gates are self-tested by `docs/scripts/check-selftest.mjs`, in CI.** It copies the corpus to a temp directory, injects one synthetic violation at a time, and asserts the checker fails for the expected reason — then asserts the unmutated copy is clean. A guardrail that has never fired is not a guardrail, and this keeps the red proofs repeatable instead of spending a throwaway PR per rule and never running them again.
 
+**Path classification: code is code, wherever it lives.** `docs/scripts/**` selects the full suite even though it sits under `docs/` — those scripts are the gate's own code, and a change to them should not be checked by the lightweight suite they implement. The classifier counts paths explicitly rather than relying on `grep -qv`, whose exit status differs across grep implementations; the disagreement lands on the unsafe side, reading a mixed change as docs-only and skipping real checks.
+
 ## Consequences
 
 - Deferred debt is visible and counted: 63 entries today, each naming the milestone that clears it. Moving a T-number to implemented means deleting its entry and claiming it from a real test — the accounting check enforces that both happen together.
@@ -44,6 +46,7 @@ Both gaps share a failure mode: a rule that lives only in prose is a rule agents
 - The gates run on every change, not only docs-only ones, so the corpus cannot be broken by a code PR.
 - If a checker's parser breaks such that it stops finding violations, the self-test fails. That is the intended tripwire.
 - The annotation convention is enforced only where a test claims a T-number; a test with no claim is free-form.
+- `docs/scripts/**` is not yet linted: Biome arrives with the workspace scaffold (issue #9 Phase A) and excludes `docs/**` for now. Bringing those scripts under the repo's Biome style is a follow-up, and reformatting them needs the real config rather than a guess at it.
 
 ## Rule / follow-up
 

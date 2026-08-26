@@ -6,7 +6,8 @@ protection should require (ADR 0012).
 
 - **selector** — classifies the changed paths. Anything it cannot classify with
   confidence selects the full suite; a wrong "docs-only" answer would skip real
-  checks, while a wrong "full" answer only costs time.
+  checks, while a wrong "full" answer only costs time. `docs/scripts/**` counts
+  as code, so a change there selects the full suite despite living under `docs/`.
 - **docs suite** — changes confined to `docs/**`: spelling, docs structure,
   catalog integrity, and the self-test that proves those gates still fire.
 - **workspace suite** — every other change: the same corpus checks, plus the

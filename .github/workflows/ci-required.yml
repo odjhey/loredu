@@ -59,12 +59,22 @@ jobs:
           fi
 
           echo "changed paths:"; echo "$changed" | sed 's/^/  /'
-          if echo "$changed" | grep -qvE '^docs/'; then
-            echo "→ full workspace suite"
-            echo "docs_only=false" >> "$GITHUB_OUTPUT"
-          else
+          # Counted explicitly rather than with `grep -qv`: that combination exits
+          # differently across grep implementations, and the disagreement lands on
+          # the unsafe side (a mixed change read as docs-only skips real checks).
+          total=$(printf '%s\n' "$changed" | grep -c '' || true)
+          prose=$(printf '%s\n' "$changed" | grep -cE '^docs/' || true)
+          code_in_docs=$(printf '%s\n' "$changed" | grep -cE '^docs/scripts/' || true)
+          echo "paths: total=$total under-docs=$prose docs-scripts=$code_in_docs"
+
+          # docs/scripts/** is the gate's own code, not prose: code gets the full
+          # suite even when it lives under docs/.
+          if [ "$total" -gt 0 ] && [ "$prose" -eq "$total" ] && [ "$code_in_docs" -eq 0 ]; then
             echo "→ docs-only suite"
             echo "docs_only=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "→ full workspace suite"
+            echo "docs_only=false" >> "$GITHUB_OUTPUT"
           fi
 
   docs-suite:
