@@ -31,12 +31,13 @@ loredu/
 ├── docs/                          contracts and decisions; code links back
 ├── packages/
 │   ├── kernel/                    @loredu/kernel
-│   │   └── src/
-│   │       ├── domain/            records, ids, claim keys, validation
-│   │       ├── application/       append path (recorded_at stamping), health,
-│   │       │                      envelope + affordances, basis, default ClaimPolicy
-│   │       └── ports/             RecordStore, ClaimPolicy, Extractor, Resolver, Ranker
-│   │                              + InMemoryStore reference adapter + port conformance kit
+│   │   ├── src/
+│   │   │   ├── domain/            records, ids, claim keys, validation
+│   │   │   ├── application/       append path (recorded_at stamping), health,
+│   │   │   │                      envelope + affordances, basis, default ClaimPolicy
+│   │   │   └── ports/             RecordStore, ClaimPolicy, Extractor, Resolver, Ranker
+│   │   └── testing/               test-only InMemoryStore + port conformance kit
+│   │                              exposed only as @loredu/kernel/testing
 │   ├── store-plainfile/           @loredu/store-plainfile
 │   └── cli/                       lor — argv parsing, affordance→command rendering,
 │                                  embedded skill, bun build --compile
@@ -44,26 +45,35 @@ loredu/
 └── package.json                   workspace root: test / typecheck / build
 ```
 
-**Dependency law.** Arrows point one way: `cli → store-plainfile → kernel`. Enforced by `package.json` dependencies, so a violation (a Bun or fs import in kernel, a kernel import of an adapter) fails structurally rather than in review. `@loredu/kernel` has zero runtime dependencies.
+**Dependency law.** Runtime dependencies form a one-way DAG:
 
-**Port conformance kit lives in kernel.** The store contract's guarantees (append-is-commit, monotonic positions, torn-read safety) are an exported test suite; `store-plainfile` — and any future SQLite/Postgres store — runs the same suite. The `InMemoryStore` reference adapter also ships in kernel, making "kernel tests with no filesystem" (T15) natural rather than mocked. This is how "the port owns the guarantees" becomes executable.
+```text
+cli ───────────────► kernel
+ │                    ▲
+ └──► store-plainfile ─┘
+```
 
-**The cli package is the rendering adapter.** Kernel/application emit affordances (`{rel, action, params}`); cli's whole identity is argv in, rendered commands out, skill embedded. A future HTTP or library surface is a sibling package consuming the same application API, with no kernel change.
+`store-plainfile` depends on `kernel`; `cli` depends on both the application API and the concrete plain-file adapter. `kernel` depends on neither adapter. Workspace/package dependencies make cross-package direction explicit, but they cannot by themselves forbid runtime-specific built-ins such as `node:fs` or Bun globals. CI therefore includes a small architecture-boundary check that rejects Bun/Node filesystem/runtime imports from `kernel` and rejects kernel dependencies on adapter packages. `@loredu/kernel` has zero runtime dependencies.
 
-**Central catalog-shaped test tree.** `tests/` mirrors the [behavioral test catalog](../v0.x/execution/first-user-journey.md), not the code layout — the catalog is the contract, so the tree is organized by its groups (records, store, reconciliation, working lore, CLI conformance, acceptance scenarios). Drift mitigations: every test file names the T-numbers it covers, and the whole tree typechecks against the packages. The application suite drives package APIs; the CLI conformance suite and acceptance scenarios drive the compiled binary.
+**Test support is not product surface.** The store contract's guarantees (append-is-commit, monotonic positions, torn-read safety) become an exported conformance suite under an explicit test-only subpath, `@loredu/kernel/testing`. The same subpath provides an `InMemoryStore` reference adapter for application/kernel tests. Neither belongs to the default `@loredu/kernel` runtime export. `store-plainfile` — and any future SQLite/Postgres store — runs the same conformance suite. This makes "the port owns the guarantees" executable without making a concrete store part of the kernel's normal API.
+
+**The cli package is the rendering adapter.** Kernel/application emit affordances (`{rel, action, params}`); cli's whole identity is argv in, rendered commands out, skill embedded. A future HTTP surface is a sibling adapter consuming the same application API. Embedded TypeScript consumers use `@loredu/kernel` directly rather than a separate "library adapter" package.
+
+**Central catalog-shaped test tree.** `tests/` mirrors the [behavioral test catalog](../v0.x/execution/first-user-journey.md), not the code layout — the catalog is the contract, so the tree is organized by its groups (records, store, reconciliation, working lore, CLI conformance, acceptance scenarios). Drift mitigations: every test file names the T-numbers it covers, and the whole tree typechecks against the packages. Behavioral/application tests exercise public package exports; CLI conformance and acceptance scenarios drive the compiled binary. Low-level package-local tests may still be colocated when they test implementation details rather than published behavior.
 
 **Skill text: docs are the source.** The cli build embeds `docs/v0.x/execution/agent-skill.md` at compile time; `lor skill` prints it. One source of truth, at the cost of a build-time coupling to the docs tree — accepted deliberately.
 
-**Deferred by rule-of-two.** No `contracts` package until a second in-repo consumer of the types alone exists. Lockstep versions across packages (independent semver is ceremony an internal kernel does not need). Publishing to a registry remains a later, separate decision ([0007](./0007-typescript-bun.md)).
+**Deferred by rule-of-two.** No `contracts` package until a second in-repo consumer of the types alone exists. Lockstep versions across packages are also deferred; independent package semver is ceremony an internal kernel does not yet need. Publishing to a registry remains a later, separate decision ([0007](./0007-typescript-bun.md)).
 
 ## Consequences
 
-- hexagonal boundaries are compile-time facts: the kernel cannot acquire an adapter dependency silently;
-- `@loredu/kernel` is the embedding surface from day one — the M4 consumer imports it, and publishing becomes a flag flip, not a refactor;
+- cross-package hexagonal direction is a workspace dependency fact, while runtime-specific import bans are enforced by an explicit architecture check;
+- `@loredu/kernel` is the embedding surface from day one without exposing concrete stores in its normal runtime API;
+- reusable store conformance and the in-memory reference adapter remain available through a clearly test-only subpath;
 - new store adapters start from a ready conformance suite instead of re-deriving the guarantees;
 - the test tree reads like the catalog, so coverage gaps are visible by comparing directories to tables;
 - the docs→binary skill coupling means editing the skill doc changes the next build's `lor skill` output — intended.
 
 ## Rule or follow-up
 
-CI runs, per commit: typecheck across the workspace, the full `tests/` tree, and a compile smoke of the `lor` binary. A package may be added only when a decision record names the boundary it enforces or the second consumer that forces it.
+CI runs, per commit: typecheck across the workspace, the full behavioral test tree, the kernel boundary check, and a compile smoke of the `lor` binary. A package may be added only when a decision record names the boundary it enforces or the second consumer that forces it.
