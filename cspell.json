@@ -1,0 +1,55 @@
+{
+  "version": "0.2",
+  "language": "en",
+  "files": [
+    "**/*.md",
+    "**/*.mjs",
+    "**/*.json",
+    "**/*.yml",
+    "**/*.yaml"
+  ],
+  "ignorePaths": [
+    "node_modules/**",
+    ".git/**",
+    ".worktrees/**",
+    "bun.lock",
+    "cspell.json"
+  ],
+  "dictionaries": [
+    "typescript",
+    "node",
+    "softwareTerms"
+  ],
+  "words": [
+    "affordances",
+    "bitemporal",
+    "bunx",
+    "cspell",
+    "cursorless",
+    "dogfooding",
+    "formedness",
+    "frontmatter",
+    "fsyncs",
+    "grepability",
+    "inspectable",
+    "loredu",
+    "odjhey",
+    "plainfile",
+    "rebuildable",
+    "reconstructable",
+    "replayable",
+    "replayed",
+    "reranker",
+    "reranking",
+    "rozoro",
+    "selftest",
+    "toon",
+    "unkeyed",
+    "unmutated",
+    "unreviewed",
+    "upserted",
+    "worktree",
+    "worktrees",
+    "xatu"
+  ]
+}
