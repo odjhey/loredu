@@ -10,3 +10,5 @@ export type {
   RecordStore,
   StreamPosition,
 } from "./ports/record-store";
+
+export const   BAD_FORMATTING   =    "biome should reject this";
