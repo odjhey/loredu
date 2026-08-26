@@ -13,7 +13,7 @@ created_at: 2026-08-26T00:00:00+08:00
 
 [ADR 0011](./0011-repo-package-architecture.md) fixed the package dependency law and required both an architecture/import check and kernel type isolation, but left checker selection to a dependency-cruiser-first spike with a purpose-built scanner as a possible fallback. [ADR 0016](./0016-workspace-scaffold-and-kernel-type-isolation.md) described its original structural scanning as interim and deferred the Phase C selection.
 
-M0 W0 requires each finite manifest, import, testing-subpath, and ambient-capability rule to have synthetic RED-then-GREEN evidence. Import graph tools do not detect no-import ambient calls such as `Date.now()` or `Math.random()`, so dependency-cruiser would still need a separate capability guard. W0 now has one tested checker entry point in `tests/workspace-boundary.ts`; `tests/workspace-structure.test.ts` drives it against synthetic workspaces and the actual production paths.
+M0 W0 requires each finite manifest, import, testing-subpath, and ambient-capability rule to have synthetic RED-then-GREEN evidence. Import graph tools do not detect no-import ambient calls such as `Date.now` and `Math.random`, including calls with supplied arguments, so dependency-cruiser would still need a separate capability guard. W0 now has one tested checker entry point in `tests/workspace-boundary.ts`; `tests/workspace-structure.test.ts` drives it against synthetic workspaces and the actual production paths.
 
 This record supersedes only ADR 0011's dependency-cruiser-first checker-selection sequence and resolves ADR 0016's deferred Phase C checker-selection follow-up. All other choices in ADRs 0011 and 0016 remain in force.
 
