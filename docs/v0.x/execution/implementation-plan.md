@@ -15,7 +15,7 @@ The implementation sequence starts from the application contracts. The `lor` CLI
 
 ## M0 — Domain and application kernel
 
-Scaffold the workspace per [decision 0011](../../decisions/0011-repo-package-architecture.md) (`packages/kernel`, `packages/store-plainfile`, `packages/cli`, central catalog-shaped `tests/`), then implement and test the kernel only:
+Scaffold the workspace per [decision 0011](../../decisions/0011-repo-package-architecture.md) (`packages/kernel`, `packages/store-plainfile`, `packages/cli`, central catalog-shaped `tests/`) and establish the repository guardrails from [decision 0012](../../decisions/0012-dx-and-ci-gating.md), then implement and test the kernel only:
 
 - immutable record envelope with explicit schema version;
 - the draft/record split: callers construct drafts with no `id` or `recorded_at`; the append application path assigns both — the type model makes canonical-history backdating unrepresentable;
@@ -27,9 +27,11 @@ Scaffold the workspace per [decision 0011](../../decisions/0011-repo-package-arc
 - application append/commit orchestration: kernel-owned clock and ID generation, validation, reference-before-referrer checks, and returning persisted record identity/position;
 - test-only `InMemoryStore` under `@loredu/kernel/testing` so the append path is exercised without filesystem/storage-provider dependencies;
 - optional validity fields, scope, actor, provenance/source references, namespaced metadata preservation rules, and schema replay compatibility ([decision 0005](../../decisions/0005-embedded-kernel-compatibility.md));
-- the architecture-boundary check from [decision 0011](../../decisions/0011-repo-package-architecture.md), preventing runtime-specific Bun/Node filesystem imports and adapter dependencies from entering the kernel.
+- kernel boundary enforcement from [decision 0011](../../decisions/0011-repo-package-architecture.md): zero external runtime dependencies, no environment-specific imports, and a kernel TypeScript environment that does not expose Bun/Node ambient globals.
 
-Exit: through public kernel APIs, drafts can be validated and appended into the in-memory test store; returned records have kernel-assigned IDs and `recorded_at`; malformed keys/references fail with actionable errors; the default ClaimPolicy reproduces the declared-key/exclusive behavior; no filesystem, CLI, model, or provider dependency is required.
+Supervised bootstrap/M0 work may proceed while the repository-readiness tracker proves its guardrails. **Unattended fleet fan-out waits for that tracker to demonstrate every required gate both green and red.** Dependency-cruiser remains a spike until its Bun-workspace/TypeScript behavior is demonstrated; the architectural boundary survives even if another checker is selected.
+
+Exit: through public kernel APIs, drafts can be validated and appended into the in-memory test store; returned records have kernel-assigned IDs and `recorded_at`; malformed keys/references fail with actionable errors; the default ClaimPolicy reproduces the declared-key/exclusive behavior; attempts to introduce environment-specific kernel APIs fail the configured boundary/type checks.
 
 ## M1 — Durable plain-file persistence
 
