@@ -27,3 +27,4 @@ Initial decisions:
 - [0012: Developer experience and CI gating](./0012-dx-and-ci-gating.md)
 - [0013: Agent decision authority and the record obligation](./0013-agent-decision-authority.md)
 - [0014: Minimal frontmatter — git owns time, status carries signal](./0014-minimal-frontmatter.md)
+- [0015: Catalog accounting, the docs gate, and proving both fire](./0015-catalog-accounting-and-docs-gate.md)

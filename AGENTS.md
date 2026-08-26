@@ -19,16 +19,23 @@ The repo is agent-first and design-first, and currently holds **no source tree**
 - Who decides, and the record you owe when you do: `docs/ai/agent-policy.md#who-decides` (`docs/decisions/0013-agent-decision-authority.md`)
 - Frontmatter schema and `status` vocabulary: `docs/decisions/0014-minimal-frontmatter.md`
 - Repo and package architecture (dependency law, test catalog shape): `docs/decisions/0011-repo-package-architecture.md`
-- Toolchain, lint, and CI gating: `docs/decisions/0012-dx-and-ci-gating.md`
+- Toolchain, lint, and CI gating: `docs/decisions/0012-dx-and-ci-gating.md`, and `.github/workflows/README.md` for the gate itself
+- Catalog accounting and the docs gate: `docs/decisions/0015-catalog-accounting-and-docs-gate.md`
 - Behavioral test catalog (T-numbers) and expected CLI journeys: `docs/v0.x/execution/first-user-journey.md`
 
 ## Commands
 
-There is no workspace scaffold yet — `package.json`, the `packages/` tree, `tests/`, and the root `test`/`typecheck`/`lint`/`build` scripts land with Phase A of the repo-setup tracker (issue #9), and this section gains the paste-able verify sequence then. Until then the only repo tooling is the docs query:
+Everything the `ci-required` gate runs, runnable locally (node also works in place of bun):
 
 ```sh
-bun docs/scripts/find-docs.mjs --type contract   # query docs by frontmatter (node also works)
+bun docs/scripts/check-docs.mjs        # frontmatter, unique names, status vocabulary, links, anchors, reachability
+bun docs/scripts/check-catalog.mjs     # every behavioral-catalog T-number implemented xor deferred
+bun docs/scripts/check-selftest.mjs    # proves both gates still fire on synthetic violations
+bunx cspell --no-progress "docs/**/*.md" "*.md" ".agents/**/*.md"
+bun docs/scripts/find-docs.mjs --type contract   # query docs by frontmatter
 ```
+
+The workspace scaffold — `package.json`, the `packages/` tree, `tests/`, and the root `test`/`typecheck`/`lint`/`build` scripts — lands with Phase A of the repo-setup tracker (issue #9); this section gains those commands then. Until it exists, the checks above are the whole suite, and `ci-required` fails deliberately if a root `package.json` appears before its suite is wired.
 
 Boundaries that will be enforced once code exists (see ADRs 0011 and 0012): the kernel takes zero runtime dependencies and no `node:*`/`bun:*` imports or ambient Bun/Node globals; the package DAG is one-way (kernel ← store-plainfile ← cli); a T-number is either covered by an executable test or explicitly deferred, never both, and never faked with a placeholder test.
 
@@ -76,6 +83,7 @@ Still the operator's call: production release, anything reaching outside the rep
 - Use `docs/playbooks/domain-doc-update.md` when domain documentation may be impacted.
 - If domain behavior, terminology, or boundaries changed, update the relevant docs under `docs/architecture/` (start with the ubiquitous language and contracts); otherwise record why no domain-doc update was needed.
 - Link every new doc from its directory index and `docs/INDEX.md`; record any durable choice you made along the way.
+- Run the checks above before pushing; a T-number is either claimed by a real test via `@covers` or deferred in `docs/v0.x/execution/catalog-status.json`, never both.
 
 ## Documentation conventions
 
