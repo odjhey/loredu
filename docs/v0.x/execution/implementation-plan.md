@@ -11,36 +11,44 @@ updated_at: 2026-08-26T12:10:00+08:00
 
 # v0.x implementation plan
 
-The implementation sequence starts from the application contracts and deliberately postpones product surfaces.
+The implementation sequence starts from the application contracts. The `lor` CLI is an early adapter milestone, but the kernel remains independently testable and usable through its application API.
 
-## M0 — Domain kernel
+## M0 — Domain and application kernel
 
-Implement and test:
+Scaffold the workspace per [decision 0011](../../decisions/0011-repo-package-architecture.md) (`packages/kernel`, `packages/store-plainfile`, `packages/cli`, central catalog-shaped `tests/`) and establish the repository guardrails from [decision 0012](../../decisions/0012-dx-and-ci-gating.md), then implement and test the kernel only:
 
 - immutable record envelope with explicit schema version;
-- Entry, Claim, Relation, Resolution, Verification shapes;
-- claim key declaration and well-formedness validation (subject/predicate/perspective normalization rules, [decision 0004](../../decisions/0004-claim-identity-key.md));
-- opaque ID generation/validation;
-- `recorded_at` and optional validity fields;
-- scope, actor, and provenance/reference structures;
-- record validation and compatibility rules (any shipped schema version stays replayable, [decision 0005](../../decisions/0005-embedded-kernel-compatibility.md)).
+- the draft/record split: callers construct drafts with no `id` or `recorded_at`; the append application path assigns both — the type model makes canonical-history backdating unrepresentable;
+- Entry, Claim, Relation, Resolution, Verification shapes in draft and persisted forms;
+- opaque, kind-prefixed ID generation/validation;
+- claim-key declaration and **shape validation only** ([decision 0004](../../decisions/0004-claim-identity-key.md)): identifier-safe subject/predicate/perspective fields, with vocabulary and namespacing left to consumers/policy rather than normalized by the kernel;
+- the versioned `ClaimPolicy` port and built-in default policy ([decision 0010](../../decisions/0010-claim-policy-seam.md)): identity = declared key, value semantics = `exclusive`, no custom advisories beyond built-in generic mechanics;
+- the `RecordStore` port shape required by the append application path, without any durable provider assumptions;
+- application append/commit orchestration: kernel-owned clock and ID generation, validation, reference-before-referrer checks, and returning persisted record identity/position;
+- test-only `InMemoryStore` under `@loredu/kernel/testing` so the append path is exercised without filesystem/storage-provider dependencies;
+- optional validity fields, scope, actor, provenance/source references, namespaced metadata preservation rules, and schema replay compatibility ([decision 0005](../../decisions/0005-embedded-kernel-compatibility.md));
+- kernel boundary enforcement from [decision 0011](../../decisions/0011-repo-package-architecture.md): zero external runtime dependencies, no environment-specific imports, and a kernel TypeScript environment that does not expose Bun/Node ambient globals.
 
-Exit: records can be created, validated, serialized, and compared without any storage or UI dependency, and malformed claim keys are rejected with actionable errors.
+Supervised bootstrap/M0 work may proceed while the repository-readiness tracker proves its guardrails. **Unattended fleet fan-out waits for that tracker to demonstrate every required gate both green and red.** Dependency-cruiser remains a spike until its Bun-workspace/TypeScript behavior is demonstrated; the architectural boundary survives even if another checker is selected.
 
-## M1 — Plain-file persistence
+Exit: through public kernel APIs, drafts can be validated and appended into the in-memory test store; returned records have kernel-assigned IDs and `recorded_at`; malformed keys/references fail with actionable errors; the default ClaimPolicy reproduces the declared-key/exclusive behavior; attempts to introduce environment-specific kernel APIs fail the configured boundary/type checks.
+
+## M1 — Durable plain-file persistence
 
 Implement:
 
-- `RecordStore` port;
-- `PlainFileStore` adapter;
-- Markdown/frontmatter codec for records with free-text Entry bodies;
-- append/get/scan/replay semantics;
-- monotonic stream positions (`append` returns one, `head` exposes the latest) stable across replays ([decision 0006](../../decisions/0006-explicit-version-basis.md));
-- deterministic filesystem layout that is not exposed as a domain contract.
+- the reusable `RecordStore` conformance kit under `@loredu/kernel/testing` from the published store guarantees;
+- `@loredu/store-plainfile` implementing the already-defined `RecordStore` port;
+- Markdown/frontmatter codec for canonical records with free-text Entry bodies;
+- append/get/scan/stream/head/replay semantics;
+- single-writer locking, atomic record visibility, durable-before-return/fsync behavior, and prefix-valid crash behavior;
+- monotonic stream positions stable across replays ([decision 0006](../../decisions/0006-explicit-version-basis.md));
+- deterministic filesystem layout and named-store resolution that do not leak into kernel/domain contracts;
+- conformance runs against both the in-memory reference store and `PlainFileStore`.
 
 Optional only if useful: a generated human-readable index. Do not make the index canonical.
 
-Exit: deleting all derived state and replaying the Markdown records reconstructs the same record stream.
+Exit: `PlainFileStore` passes the shared store conformance suite; deleting all derived state and replaying Markdown records reconstructs the same canonical record stream; crash/locking tests demonstrate the v0.x durability and single-writer guarantees.
 
 ## M1.5 — Agent-operable CLI (`lor`)
 
@@ -48,32 +56,34 @@ Pulled ahead of full reconciliation ([decision 0008](../../decisions/0008-cli-fi
 
 - commands: `init`, `add entry`, `add claim`, `relate`, `resolve`, `add verification`, `show`, `history`, `claims` (query engine: composable filters over any key/envelope field — scope, subject-type, subject, predicate, value, actor, since), `head`, `status` (`--check`), `skill`;
 - the agent-reactive response envelope (`ok`, `result`, `reconciliation`, `advice`, `basis`) in text and `--json`, with stable exit codes;
-- cursor pagination on every list command (`--limit`/`--cursor`, basis-pinned, explicit `returned`/`total`, runnable continuation in `advice`) and link-following handles on every printed id ([decision 0009](../../decisions/0009-hypermedia-pagination.md));
-- the mechanical key-overlap slice of reconciliation: same key + same value → corroboration feedback; same key + different value → conflict candidate + advice; unresolved same-key groups, dangling refs, and malformed records surfaced by `status` as health failures, plus non-blocking advisories (same value under different keys in one scope → possible key divergence);
-- namespacing stays consumer-imposed: the kernel validates key shape only; examples and CLI output model healthy conventions without mandating them;
+- surface-neutral affordances from the application layer rendered by the CLI as runnable commands; literal `lor ...` strings remain CLI-adapter behavior ([decision 0009](../../decisions/0009-hypermedia-pagination.md));
+- cursor pagination on every list command (`--limit`/`--cursor`, basis-pinned, explicit `returned`/`total`, continuation affordance/advice) and disclosure handles on every printed id;
+- the mechanical key-overlap slice through the **default ClaimPolicy**: same exact key + same value → corroboration feedback; same exact key + different value under `exclusive` semantics → conflict candidate + advice; unresolved same-key groups, dangling refs, and malformed records surfaced by `status` as health failures, plus generic non-blocking key-divergence advisories;
+- namespacing stays consumer-imposed: the kernel/default policy validates shape and exact identity, while examples and agent guidance encourage discovering existing vocabulary before inventing keys;
 - embedded agent guide printed by `lor skill` ([draft](./agent-skill.md));
 - compiled single-file binary via `bun build --compile`.
 
-During this phase the agent performs reconciliation judgment manually: it records explicit Relations and Resolutions through the CLI. Those canonical records become the fixture corpus that M2's deterministic ruleset is validated against.
+During this phase the agent performs judgment manually: it records explicit Relations and Resolutions through the CLI. Those canonical records become the fixture corpus that M2's deterministic ruleset is validated against.
 
 Exit: an agent given only the binary and `lor skill` completes journeys 1–5 and 3b of the [first user journey](./first-user-journey.md) on a fresh store, ending with `lor status --check` passing; acceptance scenario A is executable manually end to end.
 
 ## M2 — Reconciliation and projection
 
-Implement deterministic baseline rules, all scoped within a claim key:
+Implement deterministic baseline rules, mediated by the active versioned ClaimPolicy:
 
-- duplicate detection where identity/value/source makes it unambiguous;
+- exact-key duplicate detection where identity/value/source makes it unambiguous;
 - same-value corroboration/support;
-- candidate conflict detection for overlapping property-like claims;
+- differing-value handling according to policy semantics (`exclusive` → candidate conflict, `coexisting` → coexist without conflict);
+- optional policy-produced deterministic advisories across related claims without crossing exact-key reconciliation boundaries;
 - mechanical temporal precedence where inputs are sufficient;
 - explicit Resolution application;
 - current, `as_of`, `valid_at`, and combined temporal projections;
-- a versioned ruleset identifier and `basis` stamping on every projection;
+- a versioned ruleset identity that includes the active ClaimPolicy version and stamps every projection `basis`;
 - evidence/history lookup by record identity.
 
-The CLI's feedback upgrades in place: the envelope shape is unchanged, but `reconciliation` is now filled by the full ruleset instead of the key-overlap slice, and `current`/`--as-of` queries appear.
+The CLI's feedback upgrades in place: the envelope shape is unchanged, but `reconciliation` is now filled by the full deterministic ruleset instead of the early key-overlap slice, and `current`/`--as-of` queries appear.
 
-Exit: projections are deterministic and rebuildable from canonical records and the same versioned ruleset; a stale cached projection is detectable by comparing its `basis.stream_position` to the store head; deterministic reconciliation is diffed against the manual-phase relation corpus and disagreements are reviewed, not silently overridden.
+Exit: projections are deterministic and rebuildable from canonical records using the same core-ruleset + ClaimPolicy version; a stale cached projection is detectable by comparing its store-wide `basis.stream_position` to `head()`; deterministic reconciliation is diffed against the manual-phase relation corpus and disagreements are reviewed, not silently overridden.
 
 ## M3 — Working Lore
 
@@ -83,18 +93,18 @@ Implement:
 - bounded Working Lore output;
 - deterministic baseline ranking/filtering;
 - separate current, patterns, candidates/conflicts, and revalidation sections;
-- stable handles for drilling into claims, evidence, and entries;
-- item/character budgets.
+- stable semantic handles/affordances for drilling into claims, evidence, and entries;
+- item/character budgets and explicit continuation when sections truncate.
 
-Do not require embeddings or a model reranker. Ranking sits behind a `Ranker` port with a deterministic baseline, so a consumer can substitute its own without core changes.
+Do not require embeddings or a model reranker. Ranking sits behind a `Ranker` port with a deterministic baseline, so a consumer can substitute its own without core changes. Any deterministic extension that changes Working Lore output must be represented in the versioned basis/ruleset as required by ADR 0010.
 
-Exit: the acceptance activity receives useful context that remains bounded as historical records accumulate.
+Exit: the acceptance activity receives useful context that remains bounded as historical records accumulate, with reproducible basis-stamped output and progressive disclosure to deeper evidence.
 
 ## M4 — First real consumer
 
-Embed the kernel in one consumer from [candidate consumers](../../reports/candidate-consumers.md) — real writers, real corpus, no hand-tuned fixtures.
+Embed the kernel in one consumer from [candidate consumers](../../reports/candidate-consumers.md) — real writers, real corpus, no hand-tuned fixtures. Introduce the first custom ClaimPolicy only if that consumer actually needs semantics beyond the built-in default.
 
-Exit: the consumer records and retrieves knowledge through the published contracts alone; friction found here (key vocabulary, ergonomics, missing disclosure handles) feeds contract revisions before anything is marked `status: current`.
+Exit: the consumer records and retrieves knowledge through the published contracts alone; friction found here (key vocabulary, ergonomics, missing disclosure handles/policy needs) feeds contract revisions before anything is marked `status: current`.
 
 ## Acceptance scenario A — repeated technical investigation
 
@@ -117,7 +127,7 @@ Verify:
 
 Verify:
 
-- current projection prefers the amended value;
+- current projection prefers the amended value after an explicit or mechanically justified supersession/resolution path;
 - `as_of` before discovery returns the earlier belief;
 - current `valid_at` after the amendment effective date returns the amended value;
 - combined `as_of` + `valid_at` distinguishes historical knowledge from later correction;
@@ -125,20 +135,20 @@ Verify:
 
 ## Acceptance scenario C — cross-actor claim keying
 
-1. Actor A (human) records a claim with free text "notice period is 30 days" under key `(scope, policy, agreement-x, notice_period_days)`.
-2. Actor B (program) records the same fact with different phrasing and provenance under the same declared key.
-3. Actor C records `observed_process` and `documented_process` variants of another fact as distinct perspectives.
+1. Actor A (human) records a claim with free text `notice period is 30 days` under a declared key for the agreement/notice-period proposition.
+2. Actor B (program) records the same fact with different phrasing and provenance under the same declared/default-policy identity.
+3. Actor C records `observed_process` and `documented_process` variants of another fact as distinct perspectives/keys.
 
 Verify:
 
-- A and B reconcile as corroboration; a differing value under the same key surfaces as a candidate conflict;
-- the perspective variants coexist without destructive conflict and appear as an attention item;
-- a claim with a malformed or missing key is rejected at validation, not silently stored.
+- A and B reconcile as corroboration; a differing value under the same exact key with default `exclusive` semantics surfaces as a candidate conflict;
+- the perspective variants coexist without destructive reconciliation; a consumer ClaimPolicy may later add a deterministic cross-perspective advisory without changing core;
+- a claim with a malformed or missing required key is rejected at validation, not silently stored.
 
 ## Guardrail scenario — business-process perspectives
 
-Record different documented and observed process sequences. Verify that perspective prevents an automatic destructive contradiction and allows the projection to surface a process gap/attention item.
+Record different documented and observed process sequences. Verify that distinct perspectives prevent automatic destructive contradiction. With the built-in policy they simply coexist; when a process consumer later supplies a custom policy, it may additionally surface a deterministic process-gap advisory.
 
 ## After v0.x
 
-Only after these contracts prove useful should the project decide which inbound surface to build first and whether SQLite indexing, source adapters, agent extraction, model-assisted resolution, or Rozoro integration are justified.
+Only after these contracts prove useful should the project decide whether SQLite indexing, source adapters, agent extraction, model-assisted resolution, additional surfaces, or deeper Rozoro integration are justified.

@@ -14,6 +14,7 @@ updated_at: 2026-08-26T12:10:00+08:00
 | Term | Meaning |
 |---|---|
 | **Record** | Immutable persisted Loredu object. |
+| **Draft** | Caller-constructed precursor of a record: the caller-owned fields only. `id` and `recorded_at` do not exist on a draft — the kernel assigns them at append. |
 | **Entry** | Canonical free-form record of something observed, learned, decided, questioned, or worth retaining. |
 | **Claim** | Structured proposition supported by one or more entries or explicit evidence. A claim is not assumed to be absolute truth. |
 | **Relation** | Durable or rebuildable statement connecting records, such as `supports`, `contradicts`, `duplicates`, or `supersedes`. |

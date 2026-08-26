@@ -16,7 +16,7 @@ The application core depends on record semantics, not a persistence technology.
 A minimal store provides equivalent capabilities to:
 
 ```text
-append(record) -> record id + stream position
+append(draft) -> record id + stream position
 get(id) -> record | not-found
 scan(filter) -> ordered records
 stream(after-position?) -> ordered records
@@ -40,7 +40,7 @@ Exact method names are language-specific and are not part of this contract.
 There is no separate commit/transaction verb on the port. The unit of atomicity and durability is the single record:
 
 - when `append` returns a position, the record is durable — it survives a crash (the plain-file adapter fsyncs before returning; a database adapter commits);
-- `append` stamps `recorded_at` at commit time — the caller submits a record draft without it, and the kernel's clock is authoritative (records contract, time ownership);
+- `append` takes a **draft** and assigns `id` and `recorded_at` at commit time — the draft type has neither field, so the kernel's id generation and clock are authoritative by construction (records contract, draft vs persisted record);
 - read-your-writes: after `append` returns, `get`, `scan`, and `head` reflect the record;
 - appends from a writer become visible in the order they were made.
 
