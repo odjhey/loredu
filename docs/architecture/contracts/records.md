@@ -84,7 +84,7 @@ The type model must make history backdating **unrepresentable**: a draft has no 
 - stream position — canonical append ordering and the store-level fact that the append committed successfully;
 - an actor's own observation time, if ever needed, is a separate future field (`observed_at`) or consumer metadata — it is not `recorded_at`.
 
-Unknown namespaced metadata should be preserved by storage adapters when practical and ignored by readers that do not understand it.
+Unknown namespaced metadata should be preserved by storage adapters when practical and ignored by readers that do not understand it. M0 validates and retains that metadata in kernel records; the serialize/parse round-trip is adapter-owned evidence deferred to the M1 Markdown/YAML codec (T06), not a kernel wire-format contract.
 
 ## Entry
 

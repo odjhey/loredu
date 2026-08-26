@@ -210,23 +210,26 @@ Grouped by milestone; **AC n** = acceptance criterion in [goal and scope](../sco
 | T03 | claim missing `predicate` (or any key field) → rejected with an actionable message naming the field | AC 11, ADR 0004 |
 | T04 | claim with free prose in `subject.id` (violates normalization) → rejected | ADR 0004 |
 | T05 | records are value-immutable: no API mutates a created record | invariant 1 |
-| T06 | unknown namespaced metadata round-trips through serialize/parse | ADR 0005 |
 | T07 | same logical input twice → distinct record ids (append, never replace) | store contract |
 | T08 | generated ids carry the three-letter kind prefix (`ent_`/`clm_`/`rel_`/`res_`/`ver_`); a record whose id prefix disagrees with its `kind` is rejected | record contract |
+| T15 | the domain/application layer compiles and tests with the pure in-memory `@loredu/kernel/testing` seam, without Bun/fs imports in kernel production code; this does not claim durable-provider behavior | ADR 0001, ADR 0020 |
 | T84 | capability determinism without content-addressing: two freshly assembled applications given the same draft, same fixed clock value, and random sources initialized to the same deterministic state produce the same first stamped record (id and `recorded_at` included); two sequential appends of that same draft through one running application consume new entropy and produce distinct ids; caller-supplied `recorded_at` is refused | ADR 0018, clock-and-identity contract |
 | T85 | scope identity is order-insensitive: two claims whose scope maps differ only in pair order share a key; adding a pair yields a different key; absent scope and `{}` are the same key | ADR 0019, ADR 0004 |
 | T86 | value equality is structural over a canonical form and never coerces types: object key order does not affect equality, while `1` and `"1"` under one key are distinct values (conflict candidate, not duplicate) | ADR 0019, ADR 0010 |
 
 ### M1 — plain-file store
 
+T06 is intentionally M1 adapter evidence: the provider's serialize/parse codec
+must preserve unknown namespaced metadata; M0 defines no wire format.
+
 | # | Given / When / Then | Covers |
 |---|---|---|
+| T06 | unknown namespaced metadata round-trips through the M1 Markdown/YAML serialize/parse codec | ADR 0005, ADR 0020 |
 | T10 | `append` returns monotonically increasing positions | ADR 0006 |
 | T11 | write records → new store instance on same directory replays the identical ordered stream | AC 9 |
 | T12 | positions are stable across replays | ADR 0006 |
 | T13 | `append` with an existing id → error, original untouched | store contract |
 | T14 | store files are hand-inspectable Markdown + frontmatter; hand-added valid record is picked up on replay | ADR 0003 |
-| T15 | domain layer compiles/tests with a pure in-memory store (no Bun/fs import in core) | ADR 0001/0007 |
 | T16 | concurrent-writer safety: a second writer against a locked store fails loudly with no corruption; the store replays clean afterward | store contract |
 | T17 | store resolution: path flag as-is > name under `$LOREDU_HOME/stores/` > default store; nonexistent resolved store → actionable error (never created implicitly, never discovered from cwd); two named stores under one home are fully isolated (no reads or writes outside the resolved root) | journey 0 |
 | T18 | append is the commit point: a returned position implies the record survives a simulated crash (kill between staging and completion leaves either no record or a whole one, never a torn file); replay stays clean | store contract |
