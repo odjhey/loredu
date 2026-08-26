@@ -48,9 +48,18 @@ file. The group directories and their READMEs say what belongs where; an empty
 `describe()` or a `test.todo` would say something false. As a milestone lands, its
 tests move T-numbers out of the status file and into this tree.
 
-Structural tests that guard the scaffold itself (the package DAG, the kernel
+Structural tests that guard the scaffold itself (the package DAG, TypeScript-source
+exports, the kernel's default-deny type environment, and its import/capability
 boundary) live at the root of this tree and claim no T-number — they test the
-repository, not the product's behavior.
+repository, not the product's behavior. The capability cases execute the real
+binding-aware checker against isolated synthetic sources and prove ambient aliases,
+destructuring, dynamic access, `Date.now()`, zero-argument `new Date()`, and
+`Math.random()` fail while explicit-value dates, comments, strings, and lexical/import
+shadows pass. Parameterized cases cover every supported TS/JS source extension and
+all fail-closed discovery/read/parse paths. Workspace-boundary cases resolve static
+imports, re-exports, and dynamic imports and prove relative testing leaks and reverse-DAG
+edges red. Type-isolation cases likewise prove ambient Node/Bun globals and
+`node:*`/`bun:*` imports fail in a copied kernel project, without mutating the checkout.
 
 T80–T83 are M0-owned kernel invariants even though their direct application tests
 remain under `reconciliation/` for the existing test-tree location. The
