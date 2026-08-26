@@ -1,4 +1,4 @@
-import { assertDenseDataArray, enumerableOwnDataKeys } from "./own-properties";
+import { copyDenseDataArray, enumerableOwnDataKeys } from "./own-properties";
 import { RecordValidationError } from "./validation-error";
 
 export type JsonPrimitive = null | boolean | number | string;
@@ -41,10 +41,10 @@ function canonicalize(value: unknown, path: string, ancestors: WeakSet<object>):
 
   try {
     if (Array.isArray(value)) {
-      assertDenseDataArray(value, path);
+      const items = copyDenseDataArray(value, path);
       const result: JsonValue[] = [];
-      for (let index = 0; index < value.length; index += 1) {
-        result.push(canonicalize(value[index], `${path}[${index}]`, ancestors));
+      for (let index = 0; index < items.length; index += 1) {
+        result[index] = canonicalize(items[index], `${path}[${index}]`, ancestors);
       }
       return Object.freeze(result);
     }

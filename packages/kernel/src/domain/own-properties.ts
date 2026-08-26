@@ -78,16 +78,17 @@ export function assertDenseDataArray(value: unknown, field: string): asserts val
     throw new RecordValidationError(field, "must be an array");
   }
 
+  const lengthPath = `${field}.length`;
+  const lengthDescriptor = descriptorOf(value, "length", lengthPath);
+  assertDataDescriptor(lengthDescriptor, lengthPath);
+  const length = lengthDescriptor.value as number;
   const seen = new Set<number>();
   for (const key of Reflect.ownKeys(value)) {
     if (typeof key === "symbol") {
       throw new RecordValidationError(field, "must not contain symbol-keyed properties");
     }
-    if (key === "length") {
-      assertDataDescriptor(descriptorOf(value, key, `${field}.length`), `${field}.length`);
-      continue;
-    }
-    const index = arrayIndexOf(key, value.length);
+    if (key === "length") continue;
+    const index = arrayIndexOf(key, length);
     if (index === undefined) {
       throw new RecordValidationError(`${field}.${key}`, "is an unsupported array property");
     }
@@ -96,9 +97,20 @@ export function assertDenseDataArray(value: unknown, field: string): asserts val
     seen.add(index);
   }
 
-  for (let index = 0; index < value.length; index += 1) {
+  for (let index = 0; index < length; index += 1) {
     if (!seen.has(index)) {
       throw new RecordValidationError(`${field}[${index}]`, "must not be a sparse array element");
     }
   }
+}
+
+/** Copy validated own index values without dispatching through the caller's prototype. */
+export function copyDenseDataArray(value: unknown, field: string): unknown[] {
+  assertDenseDataArray(value, field);
+  const length = descriptorOf(value, "length", `${field}.length`).value as number;
+  const copy: unknown[] = [];
+  for (let index = 0; index < length; index += 1) {
+    copy[index] = descriptorOf(value, String(index), `${field}[${index}]`).value;
+  }
+  return copy;
 }

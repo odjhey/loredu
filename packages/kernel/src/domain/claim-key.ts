@@ -1,4 +1,4 @@
-import { assertDenseDataArray, assertExactOwnDataProperties, enumerableOwnDataKeys } from "./own-properties";
+import { assertExactOwnDataProperties, copyDenseDataArray, enumerableOwnDataKeys } from "./own-properties";
 import type { Claim, ClaimDraft, Scope, Subject } from "./records";
 import { assertIdentifierSafeToken } from "./records";
 import { RecordValidationError } from "./validation-error";
@@ -96,11 +96,12 @@ export function claimKeyOf(claim: ClaimDraft | Claim): ClaimKey {
 }
 
 function canonicalizeClaimScopePairs(value: unknown, field: string): readonly ScopePair[] {
-  assertDenseDataArray(value, field);
+  const suppliedPairs = copyDenseDataArray(value, field);
   const keys = new Set<string>();
-  const pairs = value.map((pair, index): ScopePair => {
+  const pairs: ScopePair[] = [];
+  for (let index = 0; index < suppliedPairs.length; index += 1) {
     const path = `${field}[${index}]`;
-    assertDenseDataArray(pair, path);
+    const pair = copyDenseDataArray(suppliedPairs[index], path);
     if (pair.length !== 2) {
       throw new RecordValidationError(path, "must contain exactly one scope key and value");
     }
@@ -112,8 +113,8 @@ function canonicalizeClaimScopePairs(value: unknown, field: string): readonly Sc
       throw new RecordValidationError(`${path}[0]`, `duplicates scope key ${JSON.stringify(key)}`);
     }
     keys.add(key);
-    return Object.freeze([key, item]) as ScopePair;
-  });
+    pairs[index] = Object.freeze([key, item]) as ScopePair;
+  }
   pairs.sort(([left], [right]) => (left < right ? -1 : left > right ? 1 : 0));
   return Object.freeze(pairs);
 }

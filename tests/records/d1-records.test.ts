@@ -1,4 +1,5 @@
 import { describe, expect, test } from "bun:test";
+import { runInNewContext } from "node:vm";
 import {
   ACTOR_TYPES,
   CLAIM_CONFIDENCES,
@@ -48,6 +49,24 @@ function expectFieldError(run: () => unknown, field: string, message?: string): 
     expect((error as RecordValidationError).message).toContain(field);
     if (message !== undefined) expect((error as RecordValidationError).message).toContain(message);
   }
+}
+
+function inheritedMapArray<A extends unknown[]>(values: A, replacement: unknown[]) {
+  let getterCalls = 0;
+  let methodCalls = 0;
+  Object.setPrototypeOf(values, {
+    get map() {
+      getterCalls += 1;
+      return () => {
+        methodCalls += 1;
+        return replacement;
+      };
+    },
+  });
+  return {
+    values,
+    calls: () => ({ getterCalls, methodCalls }),
+  };
 }
 
 function persistedEnvelope<K extends keyof typeof IDS>(kind: K) {
@@ -343,6 +362,78 @@ describe("identifier-safe fields and semantic-specific strings", () => {
     expect(parseRecordDraft({ ...validEntryDraft(), sources: [{ ref: "normal" }] }).sources).toEqual([
       { ref: "normal" },
     ]);
+  });
+});
+
+describe("intrinsic untrusted collection copying", () => {
+  test("preserves provenance and JSON indices without inherited map dispatch", () => {
+    const sources = inheritedMapArray([{ ref: "must-retain" }], []);
+    const draft = parseRecordDraft({ ...validEntryDraft(), sources: sources.values });
+    expect(sources.calls()).toEqual({ getterCalls: 0, methodCalls: 0 });
+    expect(draft.sources).toEqual([{ ref: "must-retain" }]);
+
+    const json = inheritedMapArray([1, { retained: true }], ["replacement"]);
+    expect(canonicalizeJsonValue(json.values)).toEqual([1, { retained: true }]);
+    expect(json.calls()).toEqual({ getterCalls: 0, methodCalls: 0 });
+  });
+
+  test("validates each supplied reference id without inherited substitution", () => {
+    const derivedFrom = inheritedMapArray([IDS.claim], [IDS.entry]);
+    expectFieldError(
+      () => parseRecordDraft({ ...validClaimDraft(), derived_from: derivedFrom.values }),
+      "derived_from[0]",
+      "entry",
+    );
+    expect(derivedFrom.calls()).toEqual({ getterCalls: 0, methodCalls: 0 });
+
+    const resolutionTargets = inheritedMapArray([IDS.entry], [IDS.claim]);
+    expectFieldError(
+      () => parseRecordDraft({ ...validResolutionDraft(), targets: resolutionTargets.values }),
+      "targets[0]",
+      "claim or relation",
+    );
+    expect(resolutionTargets.calls()).toEqual({ getterCalls: 0, methodCalls: 0 });
+
+    const verificationTargets = inheritedMapArray([IDS.entry], [IDS.claim]);
+    expectFieldError(
+      () => parseRecordDraft({ ...validVerificationDraft(), targets: verificationTargets.values }),
+      "targets[0]",
+      "claim",
+    );
+    expect(verificationTargets.calls()).toEqual({ getterCalls: 0, methodCalls: 0 });
+  });
+
+  test("preserves Verification basis and ClaimKey added pairs without inherited dispatch", () => {
+    const targets = inheritedMapArray([IDS.claim], []);
+    const basis = inheritedMapArray([{ source: "must-retain" }], [{ source: "replacement" }]);
+    const verification = parseRecordDraft({
+      ...validVerificationDraft(),
+      targets: targets.values,
+      verified_against: basis.values,
+    });
+    expect(targets.calls()).toEqual({ getterCalls: 0, methodCalls: 0 });
+    expect(basis.calls()).toEqual({ getterCalls: 0, methodCalls: 0 });
+    expect(verification.kind === "verification" && verification.verified_against).toEqual([
+      { source: "must-retain" },
+    ]);
+
+    const pair = inheritedMapArray(["added", "pair"] as [string, string], []);
+    const scope = inheritedMapArray([pair.values] as [readonly [string, string]], []);
+    const common = { subject: { type: "x", id: "y" }, predicate: "p" } as const;
+    expect(claimKeysEqual({ ...common, scope: scope.values }, { ...common, scope: [] })).toBe(false);
+    expect(pair.calls()).toEqual({ getterCalls: 0, methodCalls: 0 });
+    expect(scope.calls()).toEqual({ getterCalls: 0, methodCalls: 0 });
+  });
+
+  test("continues to accept frozen and cross-realm ordinary arrays without mutating them", () => {
+    const frozen = Object.freeze([Object.freeze({ ref: "frozen" })]);
+    expect(parseRecordDraft({ ...validEntryDraft(), sources: frozen }).sources).toEqual([{ ref: "frozen" }]);
+
+    const crossRealm = runInNewContext("[]") as unknown[];
+    crossRealm[0] = { ref: "cross-realm" };
+    const parsed = parseRecordDraft({ ...validEntryDraft(), sources: crossRealm });
+    expect(parsed.sources).toEqual([{ ref: "cross-realm" }]);
+    expect(crossRealm).toEqual([{ ref: "cross-realm" }]);
   });
 });
 

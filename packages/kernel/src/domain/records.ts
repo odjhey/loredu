@@ -1,8 +1,8 @@
 import { canonicalizeJsonValue, type JsonValue } from "./json-value";
 import {
-  assertDenseDataArray,
   assertExactOwnDataProperties,
   assertOwnDataProperties,
+  copyDenseDataArray,
   enumerableOwnDataKeys,
 } from "./own-properties";
 import {
@@ -282,8 +282,12 @@ function parseSourceRef(value: unknown, field: string): SourceRef {
 }
 
 function parseSources(value: unknown, field: string): readonly SourceRef[] {
-  assertDenseDataArray(value, field);
-  return Object.freeze(value.map((source, index) => parseSourceRef(source, `${field}[${index}]`)));
+  const items = copyDenseDataArray(value, field);
+  const sources: SourceRef[] = [];
+  for (let index = 0; index < items.length; index += 1) {
+    sources[index] = parseSourceRef(items[index], `${field}[${index}]`);
+  }
+  return Object.freeze(sources);
 }
 
 function parseActor(value: unknown, field = "actor"): Actor {
@@ -464,22 +468,28 @@ function parseReferenceIds<K extends RecordKind>(
   field: string,
   nonEmpty: boolean,
 ): readonly RecordIdFor<K>[] {
-  assertDenseDataArray(value, field);
-  if (nonEmpty && value.length === 0) throw new RecordValidationError(field, "must be a non-empty array");
-  return Object.freeze(
-    value.map((id, index) => {
-      const path = `${field}[${index}]`;
-      for (const kind of allowedKinds) {
-        try {
-          assertRecordIdForKind(id, kind, path);
-          return id;
-        } catch (error) {
-          if (!(error instanceof RecordValidationError)) throw error;
-        }
+  const items = copyDenseDataArray(value, field);
+  if (nonEmpty && items.length === 0) throw new RecordValidationError(field, "must be a non-empty array");
+  const ids: RecordIdFor<K>[] = [];
+  for (let index = 0; index < items.length; index += 1) {
+    const id = items[index];
+    const path = `${field}[${index}]`;
+    let accepted = false;
+    for (const kind of allowedKinds) {
+      try {
+        assertRecordIdForKind(id, kind, path);
+        ids[index] = id as RecordIdFor<K>;
+        accepted = true;
+        break;
+      } catch (error) {
+        if (!(error instanceof RecordValidationError)) throw error;
       }
+    }
+    if (!accepted) {
       throw new RecordValidationError(path, `must be an id for kind: ${allowedKinds.join(" or ")}`);
-    }),
-  );
+    }
+  }
+  return Object.freeze(ids);
 }
 
 function parseEndpoint(value: unknown, field: string): RelationEndpoint {
@@ -683,16 +693,20 @@ function parseVerificationFields(object: {
     "targets",
     true,
   ) as readonly ClaimId[];
-  const basis = required(object, "verified_against", "verified_against");
-  assertDenseDataArray(basis, "verified_against");
+  const basis = copyDenseDataArray(
+    required(object, "verified_against", "verified_against"),
+    "verified_against",
+  );
   if (basis.length === 0) {
     throw new RecordValidationError("verified_against", "must be a non-empty array");
   }
+  const verifiedAgainst: VerificationBasis[] = [];
+  for (let index = 0; index < basis.length; index += 1) {
+    verifiedAgainst[index] = parseVerificationBasis(basis[index], `verified_against[${index}]`);
+  }
   return Object.freeze({
     targets,
-    verified_against: Object.freeze(
-      basis.map((item, index) => parseVerificationBasis(item, `verified_against[${index}]`)),
-    ),
+    verified_against: Object.freeze(verifiedAgainst),
     result: expectEnum(required(object, "result", "result"), VERIFICATION_RESULTS, "result"),
   });
 }
