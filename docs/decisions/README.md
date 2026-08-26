@@ -25,3 +25,4 @@ Initial decisions:
 - [0008: CLI before full reconciliation; agent-reactive responses](./0008-cli-first-agent-reactive.md)
 - [0009: Hypermedia responses and basis-pinned pagination](./0009-hypermedia-pagination.md)
 - [0010: The ClaimPolicy extension seam](./0010-claim-policy-seam.md)
+- [0011: Repository and package architecture](./0011-repo-package-architecture.md)

@@ -15,7 +15,7 @@ The implementation sequence starts from the application contracts and deliberate
 
 ## M0 — Domain kernel
 
-Implement and test:
+Scaffold the workspace per [decision 0011](../../decisions/0011-repo-package-architecture.md) (packages/kernel · store-plainfile · cli, central catalog-shaped `tests/`), then implement and test:
 
 - immutable record envelope with explicit schema version;
 - Entry, Claim, Relation, Resolution, Verification shapes;
