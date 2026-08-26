@@ -87,8 +87,12 @@ jobs:
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version-file: .bun-version
+      # The corpus checks are zero-dependency on purpose: this suite needs no
+      # install, which is the whole reason a docs-only path is worth having.
+      - name: install cspell only
+        run: bun add --global cspell@9
       - name: spelling
-        run: bunx cspell --no-progress --no-summary "docs/**/*.md" "*.md" ".agents/**/*.md"
+        run: cspell --no-progress --no-summary "docs/**/*.md" "*.md" ".agents/**/*.md" ".github/**/*.md"
       - name: docs structure
         run: bun docs/scripts/check-docs.mjs
       - name: catalog integrity
@@ -107,29 +111,37 @@ jobs:
         with:
           bun-version-file: .bun-version
 
-      # Everything the docs suite runs — the corpus is checked on every change,
-      # not only on docs-only changes.
-      - name: spelling
-        run: bunx cspell --no-progress --no-summary "docs/**/*.md" "*.md" ".agents/**/*.md"
-      - name: docs structure
-        run: bun docs/scripts/check-docs.mjs
-      - name: catalog integrity
-        run: bun docs/scripts/check-catalog.mjs
-      - name: gates fire on synthetic violations
-        run: bun docs/scripts/check-selftest.mjs
+      - name: install
+        run: bun install --frozen-lockfile
 
-      # Self-arming reminder: the moment the workspace scaffold lands, this job
-      # turns red until its suite is wired here (issue #9 Phase A/B). A missing
-      # gate should fail loudly, not pass quietly.
-      - name: workspace checks
+      # Order is cheapest-signal-first: lint and spelling fail in seconds, the
+      # compile smoke takes the longest.
+      - name: lint and format
+        run: bun run lint
+      - name: spelling
+        run: bun run spell
+
+      # Everything the docs suite runs — the corpus is checked on every change,
+      # not only on docs-only ones.
+      - name: docs structure
+        run: bun run check:docs
+      - name: catalog integrity
+        run: bun run check:catalog
+      - name: gates fire on synthetic violations
+        run: bun run check:gates
+
+      - name: typecheck
+        run: bun run typecheck
+      - name: tests
+        run: bun test
+
+      # `bun run build` compiles the CLI to a single binary; running it proves
+      # the artifact is executable, not merely that the bundler succeeded.
+      - name: compile smoke
         run: |
           set -euo pipefail
-          if [ -f package.json ]; then
-            echo "::error::Workspace scaffold present but the full suite is not wired here."
-            echo "Add to this job (ADR 0012): biome check → typecheck → bun test → kernel boundary check → lor compile smoke."
-            exit 1
-          fi
-          echo "No workspace scaffold yet (issue #9 Phase A); docs checks above are the whole suite."
+          bun run build
+          ./packages/cli/dist/lor --version
 
   ci-required:
     name: ci-required

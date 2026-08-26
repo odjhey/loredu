@@ -46,7 +46,7 @@ Both gaps share a failure mode: a rule that lives only in prose is a rule agents
 - The gates run on every change, not only docs-only ones, so the corpus cannot be broken by a code PR.
 - If a checker's parser breaks such that it stops finding violations, the self-test fails. That is the intended tripwire.
 - The annotation convention is enforced only where a test claims a T-number; a test with no claim is free-form.
-- `docs/scripts/**` is not yet linted: Biome arrives with the workspace scaffold (issue #9 Phase A) and excludes `docs/**` for now. Bringing those scripts under the repo's Biome style is a follow-up, and reformatting them needs the real config rather than a guess at it.
+- `docs/scripts/**` is linted by Biome like any other code, while staying zero-dependency so it runs under bare `node` before `bun install` — which is what lets the docs suite skip the install entirely.
 
 ## Rule / follow-up
 

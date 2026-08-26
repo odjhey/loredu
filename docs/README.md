@@ -75,10 +75,13 @@ docs/
 CI runs these on every change, and they are the fastest way to verify a docs edit locally ([ADR 0015](./decisions/0015-catalog-accounting-and-docs-gate.md)):
 
 ```sh
-bun docs/scripts/check-docs.mjs        # required frontmatter, unique names, status vocabulary, links, anchors, reachability
-bun docs/scripts/check-catalog.mjs     # every behavioral-catalog T-number implemented xor deferred
-bun docs/scripts/check-selftest.mjs    # proves both gates still fire on synthetic violations
+bun run check:docs     # required frontmatter, unique names, status vocabulary, links, anchors, reachability
+bun run check:catalog  # every behavioral-catalog T-number implemented xor deferred
+bun run check:gates    # proves both gates still fire on synthetic violations
+bun run spell
 ```
+
+Those scripts take no dependencies, so they also run under bare `node` before any install.
 
 ## Maintenance rules
 
