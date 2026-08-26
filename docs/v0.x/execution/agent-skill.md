@@ -41,7 +41,7 @@ agent's) start from what you record now.
    claimed under an existing key: `lor claims --scope <scope> --value <val>`,
    or narrow by `--subject-type` / `--predicate`. Reuse what you find —
    reconciliation only works when keys converge.
-4. **Follow the advice.** Every response includes `next:` commands. Run them.
+4. **Follow the advice.** Every response includes `advice:` commands. Run them.
    They are deterministic — lor only points at real, mechanical issues
    (same-key overlap, dangling references), never guesses.
    Responses are also your map: navigate by the embedded commands and ids
@@ -57,7 +57,7 @@ agent's) start from what you record now.
    and lor has not linked them, record it:
    `lor relate <a> --supports|--contradicts|--duplicates|--supersedes <b>`
 7. **Finish healthy.** Before ending the activity: `lor status --check`.
-   If it exits nonzero, work the `next:` list until it passes. Do not leave
+   If it exits nonzero, work the `advice:` list until it passes. Do not leave
    attention items you created unhandled — resolve them or mark them disputed
    with a reason.
 

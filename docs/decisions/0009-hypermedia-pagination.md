@@ -13,7 +13,7 @@ updated_at: 2026-08-26T00:00:00+08:00
 
 ## Context
 
-Bounded context is the kernel's core promise, and the progressive-disclosure levels (orientation → Working Lore → claim detail → evidence → raw source) already assume a caller can go deeper on demand. But two mechanisms were unspecified: how large result sets truncate (pagination), and how a caller knows the way deeper without memorizing the CLI surface. For an agent, the second is context management: if every response carries the exact runnable commands to continue, the agent's context holds one packet and a set of links — not a mental model of the tool. This is REST's "hypermedia as the engine of application state" adapted to a CLI. The watchtower ledger consumer already proved the pattern locally with opaque cursors, `--limit`, and `next:` tokens.
+Bounded context is the kernel's core promise, and the progressive-disclosure levels (orientation → Working Lore → claim detail → evidence → raw source) already assume a caller can go deeper on demand. But two mechanisms were unspecified: how large result sets truncate (pagination), and how a caller knows the way deeper without memorizing the CLI surface. For an agent, the second is context management: if every response carries the exact runnable commands to continue, the agent's context holds one packet and a set of links — not a mental model of the tool. This is REST's "hypermedia as the engine of application state" adapted to a CLI. The watchtower ledger consumer already proved the pattern locally with opaque cursors, `--limit`, and its `next:` continuation tokens.
 
 ## Options considered
 
@@ -23,7 +23,7 @@ Bounded context is the kernel's core promise, and the progressive-disclosure lev
 
 ## Choice
 
-**The response is the interface.** Every response embeds runnable follow-ups: corrective advice (`next`, per [0008](./0008-cli-first-agent-reactive.md)) and navigational affordances — continuation of a truncated list, expansion of any printed id. An agent starting from a Working Lore packet reaches raw source references purely by running embedded commands. No dead ends: every id a response prints is a handle resolvable by an embedded or well-known command.
+**The response is the interface.** Every response embeds runnable follow-ups: corrective advice (`advice`, per [0008](./0008-cli-first-agent-reactive.md)) and navigational affordances — continuation of a truncated list, expansion of any printed id. An agent starting from a Working Lore packet reaches raw source references purely by running embedded commands. No dead ends: every id a response prints is a handle resolvable by an embedded or well-known command.
 
 **Cursor pagination, basis-pinned.** Every list-returning command (`claims`, `history`, projections, Working Lore sections) accepts `--limit` and `--cursor` and returns:
 
@@ -31,7 +31,7 @@ Bounded context is the kernel's core promise, and the progressive-disclosure lev
 "page": { "returned": 20, "total": 143, "cursor": "opaque-token" }
 ```
 
-with a matching navigational entry in `next` (`"143 total; continue with:" → "lor claims ... --cursor <token>"`). Cursors are opaque and embed the basis position: continuation pages replay against the same stream position, so a chain of pages is consistent — no duplicates or skips — even while writers append. A fresh (cursorless) query picks up the new head.
+with a matching navigational entry in `advice` (`"143 total; continue with:" → "lor claims ... --cursor <token>"`). Cursors are opaque and embed the basis position: continuation pages replay against the same stream position, so a chain of pages is consistent — no duplicates or skips — even while writers append. A fresh (cursorless) query picks up the new head.
 
 **Truncation is always explicit.** `returned`/`total` counts appear whenever a bound applies; definitive empty states remain. Silent truncation is a contract violation — a bounded view that looks complete is worse than an unbounded one.
 

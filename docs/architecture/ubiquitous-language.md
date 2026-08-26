@@ -39,6 +39,15 @@ updated_at: 2026-08-26T12:10:00+08:00
 | **Basis** | Stamp on a derived view recording the stream position, ruleset version, and query it was computed from; enables deterministic staleness checks. |
 | **Handle** | Stable, runnable reference embedded in a response — an identifier plus the command that expands it. The unit of progressive disclosure. |
 | **Cursor** | Opaque continuation token for a paginated result, pinned to the basis position so a page chain stays consistent while records append. |
+| **Envelope** | The uniform response shape every surface returns: `result`, `reconciliation`, `advice`, `page`, `basis`. |
+| **Advice** | Deterministic, runnable follow-up entries in a response — corrective (close an attention item) or navigational (continue a list, expand a handle). Never speculative. |
+| **Page** | Bounded slice of a list result: returned count, total count, and a cursor when more exists. Truncation is never silent. |
+| **Health** | Mechanically checkable store condition that blocks a health check: unresolved same-key groups, malformed records, dangling references. |
+| **Advisory** | Non-blocking mechanical hint, e.g. the same value under different keys in one scope suggesting key divergence. |
+
+## Naming rule
+
+Interface field names — envelope fields, record fields, CLI output labels — use these terms verbatim. A surface that needs a name not in this table means the language gains the term first; fields never invent vocabulary of their own.
 
 ## Important distinctions
 

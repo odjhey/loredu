@@ -24,7 +24,7 @@ Every command returns the same envelope shape in text and `--json`:
   "ok": true,
   "result": { "id": "clm_x4x8", "kind": "claim" },
   "reconciliation": { "state": "conflict-candidate", "key": "(repo=rozoro code-area command-registration).location", "related": ["clm_7f3k"] },
-  "next": [
+  "advice": [
     { "why": "another claim exists under this key with a different value", "run": "lor show clm_7f3k" },
     { "why": "record your judgment once verified against the source", "run": "lor resolve --targets clm_7f3k,clm_x4x8 --decision prefer --replacement clm_x4x8 --reason \"...\"" }
   ],
@@ -32,13 +32,13 @@ Every command returns the same envelope shape in text and `--json`:
 }
 ```
 
-Rules: `next` is derived only from deterministic checks (key overlap, dangling references, unresolved groups) — the envelope never speculates. Its shape is stable across milestones; only who computes `reconciliation` changes (mechanical key-overlap in the early CLI, the full ruleset from M2). Text mode mirrors it compactly as `next:` lines.
+Rules: `advice` is derived only from deterministic checks (key overlap, dangling references, unresolved groups) — the envelope never speculates. Its shape is stable across milestones; only who computes `reconciliation` changes (mechanical key-overlap in the early CLI, the full ruleset from M2). Text mode mirrors it compactly as `advice:` lines.
 
-List-returning commands add a `page` object and a navigational entry in `next` ([decision 0009](../../decisions/0009-hypermedia-pagination.md)):
+List-returning commands add a `page` object and a navigational entry in `advice` ([decision 0009](../../decisions/0009-hypermedia-pagination.md)):
 
 ```json
 "page": { "returned": 20, "total": 143, "cursor": "eyJwb3MiOjQyLCJpZCI6ImNsbV8wMTIwIn0" },
-"next": [ { "why": "123 more claims under this filter", "run": "lor claims --scope repo=rozoro --cursor eyJwb3MiOjQyLCJpZCI6ImNsbV8wMTIwIn0" } ]
+"advice": [ { "why": "123 more claims under this filter", "run": "lor claims --scope repo=rozoro --cursor eyJwb3MiOjQyLCJpZCI6ImNsbV8wMTIwIn0" } ]
 ```
 
 Cursors are opaque and pinned to the basis position: a page chain is a consistent snapshot even while writers append; a cursorless query picks up the new head. Truncation is never silent (`returned`/`total` always present when a bound applies), ordering is deterministic (position/timestamp, id tiebreak), and every id printed anywhere is a handle — the response embeds or implies the command that expands it, so an agent navigates disclosure levels 0→4 by following links, never by memorizing the surface.
@@ -107,8 +107,8 @@ A later run finds the world changed:
 ```text
 $ lor add claim ... --predicate location --value src/cli/commands ...
 clm_x4x8  conflict candidate under key with clm_7f3k
-next: lor show clm_7f3k
-next: lor resolve --targets clm_7f3k,clm_x4x8 --decision prefer --replacement clm_x4x8 --reason "..."
+advice: lor show clm_7f3k
+advice: lor resolve --targets clm_7f3k,clm_x4x8 --decision prefer --replacement clm_x4x8 --reason "..."
 ```
 
 Nothing is deleted or overwritten; the conflict is now visible knowledge, and the advice tells the same agent how to close it.
@@ -195,7 +195,7 @@ A cached lore packet with `basis.position=4` is stale the moment `head` moves pa
 
 ## Journey 9 — teach the agents
 
-The skill ships **inside the binary**: `lor skill` prints the agent guide, so distributing the executable distributes the integration — no separate file to install. The guide ([agent skill draft](./agent-skill.md)) instructs agents: orient with `lor status` (later `lor lore`); record findings as entries as you go; write a claim whenever a finding is stable enough to key; follow every `next:` line until `lor status` reports healthy; never fight a conflict — record it, verify, resolve with a reason. A repo-level `.agents/skills` wrapper can simply defer to `lor skill`.
+The skill ships **inside the binary**: `lor skill` prints the agent guide, so distributing the executable distributes the integration — no separate file to install. The guide ([agent skill draft](./agent-skill.md)) instructs agents: orient with `lor status` (later `lor lore`); record findings as entries as you go; write a claim whenever a finding is stable enough to key; follow every `advice:` line until `lor status` reports healthy; never fight a conflict — record it, verify, resolve with a reason. A repo-level `.agents/skills` wrapper can simply defer to `lor skill`.
 
 ## Behavioral test catalog
 
@@ -273,13 +273,13 @@ Grouped by milestone; **AC n** = acceptance criterion in [goal and scope](../sco
 
 | # | Given / When / Then | Covers |
 |---|---|---|
-| T60 | every mutation response (`--json`) contains `result`, `reconciliation`, `next`, `basis`; every `next` entry is a runnable command | ADR 0008 |
+| T60 | every mutation response (`--json`) contains `result`, `reconciliation`, `advice`, `basis`; every `advice` entry is a runnable command | ADR 0008 |
 | T61 | second claim, same key + same value → corroboration feedback, no attention raised | journey 3 |
-| T62 | second claim, same key + different value → conflict-candidate feedback with `next` advice naming both ids | journey 3 |
-| T63 | agent chain: execute the `next` commands from T62 (show → resolve) → `lor status` reports healthy, `--check` exits 0 | journey 3b |
+| T62 | second claim, same key + different value → conflict-candidate feedback with `advice` advice naming both ids | journey 3 |
+| T63 | agent chain: execute the `advice` commands from T62 (show → resolve) → `lor status` reports healthy, `--check` exits 0 | journey 3b |
 | T64 | `lor status` flags dangling `derived_from`, malformed records, and same-key groups with no relation/resolution among them | journey 3b |
 | T65 | `lor skill` prints the agent guide; a fresh store + only the guide's commands completes journeys 1–5 | journey 9 |
-| T66 | `next` advice is deterministic: same store state → byte-identical advice; no advice on healthy state | ADR 0008 |
+| T66 | `advice` advice is deterministic: same store state → byte-identical advice; no advice on healthy state | ADR 0008 |
 | T67 | `lor claims` filters compose across fields (scope + predicate + value, etc.) and return stable ordering with `--json` | key hygiene |
 | T68 | same value recorded under two different keys in one scope → `status` advisory (non-blocking); `--check` still exits 0 | key hygiene |
 
@@ -287,7 +287,7 @@ Grouped by milestone; **AC n** = acceptance criterion in [goal and scope](../sco
 
 | # | Given / When / Then | Covers |
 |---|---|---|
-| T70 | any list over the default limit → `page` with `returned`/`total`/`cursor` plus a runnable continuation in `next`; under the limit → counts, no cursor | ADR 0009 |
+| T70 | any list over the default limit → `page` with `returned`/`total`/`cursor` plus a runnable continuation in `advice`; under the limit → counts, no cursor | ADR 0009 |
 | T71 | append records mid-pagination → the cursor chain yields no duplicates or skips (basis-pinned); a fresh query reflects the new head | ADR 0009 + 0006 |
 | T72 | invalid or foreign `--cursor` → actionable error, distinct exit code, never a silent restart | ADR 0009 |
 | T73 | link-following: starting from a `lor lore` packet, disclosure levels 0→4 (packet → claim → evidence/history → entry → source ref) are reachable using only commands embedded in responses | ADR 0009, journey 7 |
