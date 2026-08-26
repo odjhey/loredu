@@ -61,20 +61,66 @@ function sourceFiles(dir: string): string[] {
     .map((entry) => join(dir, entry));
 }
 
-function withoutComments(text: string): string {
-  return text.replace(/\/\*[\s\S]*?\*\//g, " ").replace(/\/\/[^\r\n]*/g, " ");
+function scanSource(text: string): { withoutComments: string; executableCode: string } {
+  let withoutComments = "";
+  let executableCode = "";
+  const n = text.length;
+  let i = 0;
+  while (i < n) {
+    const ch = text[i];
+    const next = text[i + 1];
+    if (ch === "/" && next === "/") {
+      let j = i + 2;
+      while (j < n && text[j] !== "\n" && text[j] !== "\r") j++;
+      withoutComments += " ";
+      executableCode += " ";
+      i = j;
+      continue;
+    }
+    if (ch === "/" && next === "*") {
+      let j = i + 2;
+      while (j < n && !(text[j] === "*" && text[j + 1] === "/")) j++;
+      j = Math.min(j + 2, n);
+      withoutComments += " ";
+      executableCode += " ";
+      i = j;
+      continue;
+    }
+    if (ch === '"' || ch === "'" || ch === "`") {
+      const quote = ch;
+      let raw = ch;
+      let j = i + 1;
+      while (j < n) {
+        if (text[j] === "\\") {
+          raw += text[j] + (text[j + 1] ?? "");
+          j += 2;
+          continue;
+        }
+        if (text[j] === quote) {
+          raw += text[j];
+          j++;
+          break;
+        }
+        raw += text[j];
+        j++;
+      }
+      withoutComments += raw;
+      executableCode += "VALUE";
+      i = j;
+      continue;
+    }
+    withoutComments += ch;
+    executableCode += ch;
+    i++;
+  }
+  return { withoutComments, executableCode };
 }
 
-function importSpecifiers(text: string): string[] {
-  const code = withoutComments(text);
+function importSpecifiers(code: string): string[] {
   return [
     ...code.matchAll(/\bfrom\s+["']([^"']+)["']/g),
     ...code.matchAll(/\bimport\s+["']([^"']+)["']/g),
   ].map((match) => match[1] as string);
-}
-
-function executableCode(text: string): string {
-  return withoutComments(text).replace(/"(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'|`(?:\\.|[^`\\])*`/g, "VALUE");
 }
 
 export function boundaryViolations(root: string): BoundaryViolation[] {
@@ -115,7 +161,8 @@ export function boundaryViolations(root: string): BoundaryViolation[] {
     for (const file of sourceFiles(join(root, "packages", dir))) {
       const text = readFileSync(file, "utf8");
       const display = relative(root, file);
-      for (const specifier of importSpecifiers(text)) {
+      const { withoutComments, executableCode: code } = scanSource(text);
+      for (const specifier of importSpecifiers(withoutComments)) {
         if (specifier === "@loredu/kernel/testing" || specifier.startsWith("@loredu/kernel/testing/")) {
           violations.push({ rule: "production-testing-import", detail: `${display} imports ${specifier}` });
         }
@@ -139,7 +186,6 @@ export function boundaryViolations(root: string): BoundaryViolation[] {
       }
 
       if (dir === "kernel/src") {
-        const code = executableCode(text);
         for (const [label, pattern] of [
           ["Date.now()", /\bDate\s*\.\s*now\s*\(\s*\)/g],
           ["new Date()", /\bnew\s+Date\s*\(\s*\)/g],
