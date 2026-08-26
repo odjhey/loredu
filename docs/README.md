@@ -35,7 +35,7 @@ tags: [topic]
 
 Optional fields: `status`, `generated`, `verified`, `sources`, `stale_after`, `created_at`.
 
-There is no `updated_at`. Last-changed time comes from git — `git log -1 --format=%cI -- <path>` — which cannot go stale, conflict between parallel agents, or be forgotten ([ADR 0014](./decisions/0014-minimal-frontmatter.md)).
+`created_at` is the only timestamp. Last-changed time comes from git — `git log -1 --format=%cI -- <path>` — where it cannot go stale, conflict between parallel agents, or be forgotten ([ADR 0014](./decisions/0014-minimal-frontmatter.md)).
 
 ### Status
 

@@ -53,7 +53,7 @@ operator_required:
 frontmatter:
   required: [name, description, type]
   optional: [status, tags, generated, verified, sources, stale_after, created_at]
-  removed: [updated_at]
+  only_timestamp: created_at
   last_changed_from: git log -1 --format=%cI -- <path>
 
 status_vocabulary:

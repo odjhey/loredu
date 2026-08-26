@@ -7,7 +7,7 @@ description: Find and filter Loredu design docs by querying their YAML frontmatt
 
 # Finding Loredu docs
 
-Every doc under `docs/` carries YAML frontmatter with at least `name` (snake_case id), `description`, and `type`. Optional: `tags`, `status`, `generated`, `verified`, `sources`, `stale_after`, `created_at`. There is no `updated_at` — git owns last-changed time. Schema details: `docs/README.md`.
+Every doc under `docs/` carries YAML frontmatter with at least `name` (snake_case id), `description`, and `type`. Optional: `tags`, `status`, `generated`, `verified`, `sources`, `stale_after`, `created_at`. Last-changed time comes from git, not frontmatter. Schema details: `docs/README.md`.
 
 ## Without scripts (progressive disclosure)
 

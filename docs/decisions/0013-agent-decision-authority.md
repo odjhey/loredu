@@ -11,9 +11,9 @@ created_at: 2026-08-26T16:30:00+08:00
 
 ## Context
 
-This is an agent-first codebase: one operator, agents sharing that identity, and design moving faster than any human review queue could clear. [ADR 0012](./0012-dx-and-ci-gating.md) already encodes the posture — *CI, not human review, is the supervisor* — but only for code gates. Nothing stated who may decide.
+This is an agent-first codebase: one operator, agents sharing that identity, and design moving faster than any human review queue could clear. [ADR 0012](./0012-dx-and-ci-gating.md) already encodes the posture — *CI, not human review, is the supervisor* — but only for code gates. Who may decide a design question was never stated.
 
-The first draft of [`docs/ai/agent-policy.md`](../ai/agent-policy.md) filled that gap by asserting operator sign-off on decision records, contract changes, scope changes, and merges. That was ported reflexively from a repo with different constraints and describes a review queue this project does not run. Left in place, it would make every agent either block on a human who is not waiting, or ignore the stated policy — both worse than saying plainly who decides.
+The gap matters because the plausible-looking answer is wrong here. A policy of operator sign-off on decisions, contracts, and scope describes a review queue this project does not run; stating it would leave every agent either blocking on a human who is not waiting, or ignoring the written policy. Both are worse than naming who decides.
 
 ## Options considered
 

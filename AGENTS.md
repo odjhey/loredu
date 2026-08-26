@@ -57,7 +57,7 @@ Still the operator's call: production release, anything reaching outside the rep
 - `draft` → deliberately unsettled. `current` → implemented in code and matching what ships.
 - `archived`/`superseded`, or a past `stale_after` → historical only; find the replacement.
 - `generated` marks model authorship — the norm here, not a caveat; `verified` is the operator's stamp.
-- There is no `updated_at`: last-changed time is `git log -1 --format=%cI -- <path>`.
+- Last-changed time comes from git, not frontmatter: `git log -1 --format=%cI -- <path>`.
 
 ## Harness adapters
 
