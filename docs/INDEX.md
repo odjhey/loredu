@@ -46,5 +46,7 @@ updated_at: 2026-08-26T12:10:00+08:00
 |---|---|
 | [v0.x](./v0.x/README.md) | Initial delivery index |
 | [Representative activities](./v0.x/use-cases.md) | Technical, project/process, and policy/legal scenarios |
+| [Scope](./v0.x/scope/README.md) | v0.x scope index |
 | [Goal and scope](./v0.x/scope/goal-and-scope.md) | What v0.x proves and explicitly does not build |
+| [Execution](./v0.x/execution/README.md) | v0.x execution index |
 | [Implementation plan](./v0.x/execution/implementation-plan.md) | M0–M3 delivery sequence and acceptance scenarios |
