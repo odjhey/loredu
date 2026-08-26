@@ -65,7 +65,7 @@ const headingSlugs = (text) => {
   const slugs = new Set();
   let fenced = false;
   for (const line of text.split("\n")) {
-    if (line.startsWith("```")) fenced = !fenced;
+    if (line.trimStart().startsWith("```")) fenced = !fenced;
     if (fenced) continue;
     const m = line.match(/^#{1,6}\s+(.*)$/);
     if (m) slugs.add(slugify(m[1]));
@@ -118,7 +118,7 @@ const linkedTo = new Set();
 for (const [file, doc] of docs) {
   let fenced = false;
   for (const rawLine of doc.text.split("\n")) {
-    if (rawLine.startsWith("```")) {
+    if (rawLine.trimStart().startsWith("```")) {
       fenced = !fenced;
       continue;
     }

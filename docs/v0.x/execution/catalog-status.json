@@ -322,6 +322,16 @@
       "milestone": "M0",
       "group": "M0 — records and validation",
       "reason": "capability ports and the append stamping path not implemented yet"
+    },
+    "T85": {
+      "milestone": "M0",
+      "group": "M0 — records and validation",
+      "reason": "claim key construction and scope canonicalization not implemented yet"
+    },
+    "T86": {
+      "milestone": "M2",
+      "group": "M2 — reconciliation, resolution, projections",
+      "reason": "value canonicalization lands with the kernel in M0; its use in conflict detection is M2"
     }
   }
 }
