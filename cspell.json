@@ -1,25 +1,9 @@
 {
   "version": "0.2",
   "language": "en",
-  "files": [
-    "**/*.md",
-    "**/*.mjs",
-    "**/*.json",
-    "**/*.yml",
-    "**/*.yaml"
-  ],
-  "ignorePaths": [
-    "node_modules/**",
-    ".git/**",
-    ".worktrees/**",
-    "bun.lock",
-    "cspell.json"
-  ],
-  "dictionaries": [
-    "typescript",
-    "node",
-    "softwareTerms"
-  ],
+  "files": ["**/*.md", "**/*.mjs", "**/*.json", "**/*.yml", "**/*.yaml"],
+  "ignorePaths": ["node_modules/**", ".git/**", ".worktrees/**", "bun.lock", "cspell.json"],
+  "dictionaries": ["typescript", "node", "softwareTerms"],
   "words": [
     "affordances",
     "bitemporal",
