@@ -213,6 +213,7 @@ Grouped by milestone; **AC n** = acceptance criterion in [goal and scope](../sco
 | T06 | unknown namespaced metadata round-trips through serialize/parse | ADR 0005 |
 | T07 | same logical input twice → distinct record ids (append, never replace) | store contract |
 | T08 | generated ids carry the three-letter kind prefix (`ent_`/`clm_`/`rel_`/`res_`/`ver_`); a record whose id prefix disagrees with its `kind` is rejected | record contract |
+| T84 | injected ports are the only route to time and identity: the same draft appended with a fixed clock and a seeded random source yields an identical record (id and `recorded_at` included), and a caller-supplied `recorded_at` is refused rather than overwritten | ADR 0018, clock-and-identity contract |
 
 ### M1 — plain-file store
 

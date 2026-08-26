@@ -30,3 +30,4 @@ Initial decisions:
 - [0015: Catalog accounting, the docs gate, and proving both fire](./0015-catalog-accounting-and-docs-gate.md)
 - [0016: Workspace scaffold — TS sources as exports, and kernel purity as a compiler error](./0016-workspace-scaffold-and-kernel-type-isolation.md)
 - [0017: Branch protection posture](./0017-branch-protection-posture.md)
+- [0018: Capability ports for time and identity](./0018-capability-ports.md)

@@ -32,18 +32,19 @@ ent_…  entry      clm_…  claim      rel_…  relation
 res_…  resolution ver_…  verification
 ```
 
-The suffix is random, identifier-safe, and carries no meaning (ordering comes from `recorded_at` and stream positions, and sharding is a non-concern). Validation asserts that the prefix agrees with `kind`; beyond that, no logic may parse or derive meaning from an id. Suffix length and alphabet are an M0 implementation decision.
+The suffix is random, identifier-safe, and carries no meaning (ordering comes from `recorded_at` and stream positions, and sharding is a non-concern). Validation asserts that the prefix agrees with `kind`; beyond that, no logic may parse or derive meaning from an id. Suffix length and alphabet are fixed by the [clock and identity contract](./clock-and-identity.md): 16 symbols of lowercase Crockford base32.
 
 ### Draft vs persisted record
 
 Callers never construct a complete record — they construct a **draft**: the caller-owned fields only (kind payload, actor, scope, sources, metadata). The append/commit path assigns what only the kernel may assign:
 
 ```text
-EntryDraft ── RecordStore.append() ──► Entry
-                                        + id           (kernel-generated, kind-prefixed)
-                                        + recorded_at  (kernel clock at commit)
-                                        (+ stream position, associated by the store —
-                                           returned alongside, not an envelope field)
+EntryDraft ── application append ──► Entry ── RecordStore.append() ──► + stream position
+                 + id          (kernel format over the injected random source)
+                 + recorded_at (injected clock, stamped at commit)
+
+                 the store assigns the position and nothing else; it never
+                 fabricates or rewrites id or recorded_at
 ```
 
 The type model must make history backdating **unrepresentable**: a draft has no `id` or `recorded_at` field to fill in, rather than having ones that are validated away. This split also reinforces reference-before-referrer ordering by construction — a referrer cannot be drafted until its referent has been appended and has an id.
@@ -52,7 +53,7 @@ The type model must make history backdating **unrepresentable**: a draft has no 
 
 `recorded_at` is **assigned by the kernel at successful append**, never caller-authoritative — `as_of` only has a stable meaning if Loredu owns when a record entered canonical history. The distinct time concepts:
 
-- `recorded_at` — when Loredu durably learned it (kernel-assigned at commit);
+- `recorded_at` — when Loredu durably learned it (kernel-assigned at commit, from the injected clock — see [clock and identity](./clock-and-identity.md));
 - `valid_from` / `valid_until` — when a claim applies in the external world (caller-declared);
 - stream position — canonical append ordering (store-assigned);
 - an actor's own observation time, if ever needed, is a separate future field (`observed_at`) or consumer metadata — it is not `recorded_at`.

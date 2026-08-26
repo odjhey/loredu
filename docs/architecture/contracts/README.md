@@ -13,6 +13,7 @@ The v0.x contracts are intentionally language-neutral and provider-neutral.
 
 - [Records](./records.md) — immutable record envelope and initial record families
 - [Store](./store.md) — persistence port
+- [Clock and identity](./clock-and-identity.md) — capability ports for `recorded_at` and record id entropy
 - [Projection](./projection.md) — current and historical temporal views
 - [Working Lore](./working-lore.md) — bounded progressive-disclosure context
 

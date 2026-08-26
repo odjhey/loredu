@@ -317,6 +317,11 @@
       "milestone": "M0",
       "group": "Kernel invariants and the policy seam (issue #6)",
       "reason": "kernel invariants and ClaimPolicy seam not implemented yet"
+    },
+    "T84": {
+      "milestone": "M0",
+      "group": "M0 — records and validation",
+      "reason": "capability ports and the append stamping path not implemented yet"
     }
   }
 }
