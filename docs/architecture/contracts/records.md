@@ -36,12 +36,13 @@ The suffix is random, identifier-safe, and carries no meaning (ordering comes fr
 
 ### Draft vs persisted record
 
-Callers never construct a complete record — they construct a **draft**: the caller-owned fields only (kind payload, actor, scope, sources, metadata). The append/commit path assigns what only the kernel may assign:
+Callers never construct a complete record — they construct a **draft**: the caller-owned fields only (kind payload, actor, scope, sources, metadata). The application append path assigns what only the kernel may assign before handing a complete record to storage:
 
 ```text
 EntryDraft ── application append ──► Entry ── RecordStore.append() ──► + stream position
                  + id          (kernel format over the injected random source)
-                 + recorded_at (injected clock, stamped at commit)
+                 + recorded_at (sampled from the injected clock immediately
+                                before the durable append attempt)
 
                  the store assigns the position and nothing else; it never
                  fabricates or rewrites id or recorded_at
@@ -51,11 +52,11 @@ The type model must make history backdating **unrepresentable**: a draft has no 
 
 ### Time ownership
 
-`recorded_at` is **assigned by the kernel at successful append**, never caller-authoritative — `as_of` only has a stable meaning if Loredu owns when a record entered canonical history. The distinct time concepts:
+`recorded_at` is **assigned by the kernel/application append path**, never caller-authoritative — `as_of` only has a stable meaning if Loredu owns the timestamp attached to canonical history. The distinct time concepts:
 
-- `recorded_at` — when Loredu durably learned it (kernel-assigned at commit, from the injected clock — see [clock and identity](./clock-and-identity.md));
+- `recorded_at` — the kernel timestamp sampled immediately before attempting the durable append. It becomes part of canonical history only if the store append succeeds; it is not defined as the exact durability instant ([clock and identity](./clock-and-identity.md));
 - `valid_from` / `valid_until` — when a claim applies in the external world (caller-declared);
-- stream position — canonical append ordering (store-assigned);
+- stream position — canonical append ordering and the store-level fact that the append committed successfully;
 - an actor's own observation time, if ever needed, is a separate future field (`observed_at`) or consumer metadata — it is not `recorded_at`.
 
 Unknown namespaced metadata should be preserved by storage adapters when practical and ignored by readers that do not understand it.
@@ -162,4 +163,4 @@ result: confirmed | contradicted | unchanged | needs_revalidation
 7. The complete projection must be reconstructable from canonical records.
 8. Every claim declares a well-formed claim key; deterministic reconciliation never crosses key boundaries.
 9. Every persisted record schema version remains replayable; schema evolution is additive or versioned, never breaking ([decision 0005](../../decisions/0005-embedded-kernel-compatibility.md)).
-10. `id` and `recorded_at` are assigned by the kernel at append; callers submit drafts and cannot backdate canonical history — the draft type has no such fields to supply.
+10. `id` and `recorded_at` are assigned by the kernel/application append path; callers submit drafts and cannot backdate canonical history — the draft type has no such fields to supply.
