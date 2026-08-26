@@ -36,6 +36,20 @@ res_…  resolution ver_…  verification
 
 The suffix is random, identifier-safe, and carries no meaning (ordering comes from `recorded_at` and stream positions, and sharding is a non-concern). Validation asserts that the prefix agrees with `kind`; beyond that, no logic may parse or derive meaning from an id. Suffix length and alphabet are an M0 implementation decision.
 
+### Draft vs persisted record
+
+Callers never construct a complete record — they construct a **draft**: the caller-owned fields only (kind payload, actor, scope, sources, metadata). The append/commit path assigns what only the kernel may assign:
+
+```text
+EntryDraft ── RecordStore.append() ──► Entry
+                                        + id           (kernel-generated, kind-prefixed)
+                                        + recorded_at  (kernel clock at commit)
+                                        (+ stream position, associated by the store —
+                                           returned alongside, not an envelope field)
+```
+
+The type model must make history backdating **unrepresentable**: a draft has no `id` or `recorded_at` field to fill in, rather than having ones that are validated away. This split also reinforces reference-before-referrer ordering by construction — a referrer cannot be drafted until its referent has been appended and has an id.
+
 ### Time ownership
 
 `recorded_at` is **assigned by the kernel at successful append**, never caller-authoritative — `as_of` only has a stable meaning if Loredu owns when a record entered canonical history. The distinct time concepts:
@@ -149,4 +163,4 @@ result: confirmed | contradicted | unchanged | needs_revalidation
 7. The complete projection must be reconstructable from canonical records.
 8. Every claim declares a well-formed claim key; deterministic reconciliation never crosses key boundaries.
 9. Every persisted record schema version remains replayable; schema evolution is additive or versioned, never breaking ([decision 0005](../../decisions/0005-embedded-kernel-compatibility.md)).
-10. `recorded_at` is assigned by the kernel at append; callers cannot backdate canonical history.
+10. `id` and `recorded_at` are assigned by the kernel at append; callers submit drafts and cannot backdate canonical history — the draft type has no such fields to supply.

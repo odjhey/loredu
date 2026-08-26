@@ -18,7 +18,8 @@ The implementation sequence starts from the application contracts and deliberate
 Scaffold the workspace per [decision 0011](../../decisions/0011-repo-package-architecture.md) (packages/kernel · store-plainfile · cli, central catalog-shaped `tests/`), then implement and test:
 
 - immutable record envelope with explicit schema version;
-- Entry, Claim, Relation, Resolution, Verification shapes;
+- the draft/record split: callers construct drafts with no `id` or `recorded_at` fields; the append path assigns both (records contract, draft vs persisted record) — the type model makes backdating unrepresentable;
+- Entry, Claim, Relation, Resolution, Verification shapes (draft and persisted forms);
 - claim key declaration and well-formedness validation (subject/predicate/perspective normalization rules, [decision 0004](../../decisions/0004-claim-identity-key.md));
 - the `ClaimPolicy` port type and the built-in default policy ([decision 0010](../../decisions/0010-claim-policy-seam.md)): identity = the declared key, all values `exclusive`, no custom advisories — carrying a version identity so it can participate in the basis `ruleset` from M2 onward;
 - opaque ID generation/validation;

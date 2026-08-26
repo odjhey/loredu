@@ -304,6 +304,7 @@ Grouped by milestone; **AC n** = acceptance criterion in [goal and scope](../sco
 | T80 | `recorded_at` is stamped by `append` at commit; a caller-supplied `recorded_at` is ignored or rejected by the application API — canonical history cannot be backdated | records contract, time ownership |
 | T81 | `computed_at` is outside basis identity: two computations of the same basis at different wall times compare equal and reproduce identical content | ADR 0006 |
 | T82 | default ClaimPolicy: identity = declared key, all values exclusive, no custom advisories — M1.5 behavior byte-identical with the policy layer in place; the active policy version appears in the basis `ruleset` | ADR 0010 |
+| T83 | draft/record split: draft types expose no `id` or `recorded_at` (compile-time), and the append API rejects objects carrying them (runtime) — both are kernel-assigned at commit | records contract |
 
 ### Deliberately not tested yet
 
