@@ -123,6 +123,14 @@ All checks are mechanical and available before full reconciliation exists. `lor 
 
 The kernel enforces key **shape** only (identifier-safe, no prose). Namespacing and vocabulary are the consumer's to impose — Loredu models healthy conventions in its examples and CLI output (e.g. `--scope repo=rozoro`, subjects like `code-area/command-registration`) without mandating them. The agent's duplicate-detection tool is the query engine, not a kernel rule: `lor claims` filters by any field (`--scope`, `--subject-type`, `--subject`, `--predicate`, `--value`, `--actor`, `--since`), so an agent checks for existing keys before inventing one, and `status` advisories catch what slips through.
 
+Because every command emits machine-readable artifacts (`--json`, line-oriented text), the built-in filters only need to cover the common paths — anything further composes through unix pipes:
+
+```text
+$ lor claims --scope repo=rozoro --json | jq -r '.result[] | select(.confidence == "candidate") | .id'
+```
+
+The shell is the rest of the query engine; lor does not need to grow one.
+
 ## Journey 4 — working lore reflects it
 
 ```text

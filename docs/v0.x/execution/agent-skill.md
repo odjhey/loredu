@@ -73,7 +73,8 @@ agent's) start from what you record now.
 - Reasons on resolutions state what you verified, not your reasoning chain.
 - Use `--json` when you need to parse; exit code 0 means the command
   succeeded (check the `reconciliation` field for attention), nonzero means
-  it failed.
+  it failed. Output is pipe-friendly — compose with jq/grep/sort for any
+  filtering the built-in flags do not cover.
 
 ---
 

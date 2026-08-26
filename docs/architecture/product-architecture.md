@@ -13,9 +13,15 @@ updated_at: 2026-08-26T12:10:00+08:00
 
 ## Thesis
 
-Loredu is an embedded operational knowledge kernel — a utility our own products build on, not a standalone product ([decision 0005](../decisions/0005-embedded-kernel-compatibility.md)). Activities record what they learn as durable entries; structured claims can be extracted by humans, agents, or deterministic software; Loredu preserves provenance and temporal history, performs deterministic reconciliation, records explicit resolutions, and exposes bounded working knowledge to later activities.
+Loredu is an embedded operational knowledge kernel — a utility our own products build on, not a standalone product ([decision 0005](../decisions/0005-embedded-kernel-compatibility.md)). Activities append what they learn as immutable, provenance-carrying records; structured claims declare identity keys ([decision 0004](../decisions/0004-claim-identity-key.md)) so knowledge about the same fact meets instead of piling up, and history is preserved along both recorded time and external validity time.
 
-Loredu is not the activity itself. Consumers own their writers, extraction quality, surfaces, and domain vocabulary; Loredu owns consistent record, reconciliation, and disclosure semantics across all of them. It should remain useful whether the caller is a human, a crawler, a review tool, an agent, an orchestrator, a future CLI, or another application. Concrete candidate consumers are catalogued in [candidate consumers](../reports/candidate-consumers.md).
+The kernel's dividing line is **mechanical versus judgment**. Loredu detects deterministically — duplicates, corroboration, conflict candidates, key divergence, dangling provenance, stale views — and never makes open-ended judgments. Humans, agents, and programs judge; their resolutions are appended as records with the same provenance discipline as everything else. This is why the kernel needs no model runtime: extraction and resolution are caller capabilities, not core assumptions.
+
+The kernel is **reactive** ([decision 0008](../decisions/0008-cli-first-agent-reactive.md)): every interaction answers with the resulting knowledge health and deterministic next actions, so a writer — especially an agent — can chain corrections in the same session until the store is healthy. Advice is derived only from mechanical checks; the kernel points, it never speculates.
+
+Every derived view is **bounded and versioned** ([decision 0006](../decisions/0006-explicit-version-basis.md)): stamped with the basis (stream position, ruleset, query) it was computed from, so consumers cache safely, detect staleness by comparison, and reproduce views exactly. Storage may grow without bound; a caller's context never has to.
+
+Loredu is not the activity itself. Consumers own their writers, extraction quality, surfaces, vocabulary, and namespacing; Loredu owns the consistent record, detection, resolution, and disclosure semantics underneath — machine-readable at every boundary so downstream filtering composes with ordinary tools. It should remain useful whether the caller is a human, a crawler, a review tool, an agent, an orchestrator, a future CLI, or another application. Concrete candidate consumers are catalogued in [candidate consumers](../reports/candidate-consumers.md).
 
 ## Core loop
 
