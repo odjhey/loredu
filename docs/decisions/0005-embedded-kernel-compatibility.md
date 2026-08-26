@@ -27,7 +27,7 @@ This framing changes what "success" and "stability" mean. A kernel's value is me
 
 Loredu is an embedded, vendor- and solution-agnostic kernel.
 
-**Consumer-driven stabilization.** Hand-written fixtures may drive M0–M3, but no contract is declared stable until at least two real consumers embed it. Generalize from real callers, not from imagined ones. The first consumer should be wired in during v0.x, before contracts freeze.
+**Consumer-driven stabilization.** Hand-written fixtures may drive the early milestones, but no contract is declared stable until at least two real consumers embed it. Generalize from real callers, not from imagined ones. The first consumer should be wired in during v0.x, before contracts freeze.
 
 **Record compatibility policy.**
 
