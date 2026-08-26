@@ -26,3 +26,4 @@ Initial decisions:
 - [0009: Hypermedia responses and basis-pinned pagination](./0009-hypermedia-pagination.md)
 - [0010: The ClaimPolicy extension seam](./0010-claim-policy-seam.md)
 - [0011: Repository and package architecture](./0011-repo-package-architecture.md)
+- [0012: Developer experience and CI gating](./0012-dx-and-ci-gating.md)
