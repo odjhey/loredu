@@ -36,7 +36,7 @@ claim_key = (scope, subject.type, subject.id, predicate, perspective?)
 - The key is declared at write time by the actor (human, agent, or program). Validation rejects claims whose key fields are missing or malformed.
 - Deterministic reconciliation (duplicate, corroboration, candidate conflict, temporal precedence) operates **only within a key**. Cross-key relationships require explicit Relations or a Resolution.
 - `perspective` is part of the key: `documented_process` and `observed_process` claims about the same subject/predicate are different keys, so they coexist rather than auto-conflicting (the guardrail scenario).
-- Subject IDs must be stable and deterministic for a given scope. Consumers own their subject vocabulary, but the core publishes normalization rules (casing, separators, no free prose in `subject.id` / `predicate`) so independent actors converge on the same key for the same fact.
+- Subject IDs must be stable and deterministic for a given scope. The kernel validates **shape only** (identifier-safe characters, no free prose in `subject.id` / `predicate`); vocabulary and namespacing conventions are imposed by the consumer, not by Loredu. Convergence on shared keys is supported by discovery — a query engine that filters claims by any key/envelope field — and by cheap health advisories (e.g. the same value appearing under different keys in one scope suggests key divergence), not by kernel-enforced naming.
 - Unkeyed knowledge is still welcome — as Entries. A claim without a valid key is not a claim.
 
 ## Consequences
