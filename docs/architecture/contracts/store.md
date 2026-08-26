@@ -57,7 +57,13 @@ v0.x assumes a single writer at a time. The plain-file adapter satisfies the gua
 
 ## Store roots
 
-A store is a self-contained directory; nothing about a store lives outside its root. Callers may operate any number of stores side by side. Surfaces resolve the root explicitly — flag, then environment, then upward discovery from the working directory — and never fall back to a global per-user location. This keeps multiple projects independent and makes test isolation a temp directory, not a mocking exercise.
+A store is a self-contained directory; nothing about a store lives outside its root. Callers operate any number of named stores side by side under a relocatable home:
+
+- an explicit path flag always wins;
+- otherwise a store name resolves under `$LOREDU_HOME` (default `~/.loredu`), one subdirectory per store;
+- if the resolved store does not exist, the call **fails with an actionable error** — no upward discovery from the working directory, no silent creation outside `init`.
+
+Predictability over magic: resolution never depends on where a command happens to be run from. Test isolation is pointing `LOREDU_HOME` at a temp directory, not a mocking exercise.
 - reads return the original canonical record, not a projected/mutated representation;
 - ordering/cursors are deterministic enough to replay projections;
 - store adapters preserve record data required by the published record schema;

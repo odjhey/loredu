@@ -51,13 +51,13 @@ Two suites automate the same journeys:
 ## Journey 0 — install and init
 
 ```text
-$ lor init
-initialized plain-file store at ./lore
+$ lor init rozoro-investigation
+initialized store at ~/.loredu/rozoro-investigation
 ```
 
-One directory, human-inspectable, Git-friendly ([decision 0003](../../decisions/0003-plain-files-first.md)). No daemon, no config required to start.
+One directory per store, human-inspectable, Git-friendly ([decision 0003](../../decisions/0003-plain-files-first.md)). No daemon, no config required to start.
 
-The store root is always explicit and project-local — never a global `~/.loredu`. Every command resolves it as: `--store <dir>` flag → `LOR_STORE` env var → nearest `lore/` walking up from the working directory (git-style) → actionable error suggesting `lor init`. Stores are self-contained directories, so multiple projects coexist and tests isolate in temp dirs with no ceremony.
+Store resolution is predictable, never cwd-dependent: `--store <path>` (used as-is) or `--store <name>` (resolved under `$LOREDU_HOME`, default `~/.loredu`); with no flag, the default store `$LOREDU_HOME/default`. If the resolved store does not exist, the command fails with an actionable error suggesting `lor init` — no upward discovery, no silent creation. Multiple named stores coexist under one relocatable home, and tests isolate by pointing `LOREDU_HOME` at a temp directory.
 
 ## Journey 1 — first activity on an empty store
 
@@ -224,7 +224,7 @@ Grouped by milestone; **AC n** = acceptance criterion in [goal and scope](../sco
 | T14 | store files are hand-inspectable Markdown + frontmatter; hand-added valid record is picked up on replay | ADR 0003 |
 | T15 | domain layer compiles/tests with a pure in-memory store (no Bun/fs import in core) | ADR 0001/0007 |
 | T16 | concurrent-writer safety: a second writer against a locked store fails loudly with no corruption; the store replays clean afterward | store contract |
-| T17 | store-root resolution honors flag > env > upward discovery, in that order; no resolved root → actionable error; two stores in sibling dirs are fully isolated (no reads or writes outside the resolved root) | journey 0 |
+| T17 | store resolution: path flag as-is > name under `$LOREDU_HOME` > default store; nonexistent resolved store → actionable error (never created implicitly, never discovered from cwd); two named stores under one home are fully isolated (no reads or writes outside the resolved root) | journey 0 |
 | T18 | append is the commit point: a returned position implies the record survives a simulated crash (kill between staging and completion leaves either no record or a whole one, never a torn file); replay stays clean | store contract |
 | T19 | reference-before-referrer: a claim citing a nonexistent `derived_from` (or relation/resolution citing missing targets) is rejected at write time with an actionable error | store contract, ADR 0004 |
 
