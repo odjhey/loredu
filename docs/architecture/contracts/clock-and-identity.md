@@ -1,6 +1,6 @@
 ---
 name: clock_and_identity_contract
-description: "Capability ports the kernel needs but cannot reach for itself: Clock for recorded_at and RandomSource for record id entropy. Fixes where in the append path each is called."
+description: "Capability ports for deterministic recorded_at stamping and production-grade record-id entropy. Fixes where in the append path each is called."
 type: contract
 tags: [architecture, contracts, ports, kernel]
 generated: "Claude Opus 5 (Claude Code), 2026-08-26"
@@ -9,7 +9,7 @@ created_at: 2026-08-26T21:00:00+08:00
 
 # Clock and identity ports
 
-Two values on every record are assigned by the kernel and by nothing else: `recorded_at` and `id` ([record contract](./records.md)). The kernel is a pure domain layer with no ambient environment — no `Bun.*`, no `process`, no `node:*`, and no host globals ([decision 0016](../../decisions/0016-workspace-scaffold-and-kernel-type-isolation.md)) — so it cannot read a clock or draw randomness on its own. Both arrive as **capability ports**, supplied by the caller assembling the application.
+Two values on every record are assigned by the kernel and by nothing else: `recorded_at` and `id` ([record contract](./records.md)). The kernel is isolated from host-specific capabilities — no `Bun.*`, no `process`, no `node:*`, and no host globals ([decision 0016](../../decisions/0016-workspace-scaffold-and-kernel-type-isolation.md)). Time and production-grade entropy therefore arrive as **capability ports**, supplied by the caller assembling the application.
 
 ```text
 Clock         now() -> Instant
@@ -22,15 +22,16 @@ Exact method names are language-specific and are not part of this contract.
 
 The two ports exist for different reasons, and conflating them causes implementations to drift:
 
-- **`RandomSource` is a necessity.** With no host types in scope, the kernel has no `crypto`, no secure random, nothing. Entropy must be handed in or record ids cannot exist.
-- **`Clock` is a discipline.** A language's own date facility is typically part of the standard library and would compile inside the kernel — so nothing stops a careless implementation from reading the wall clock directly. The port exists so that `recorded_at`, and therefore every `as_of` query, is reproducible under test rather than dependent on when the suite ran.
+- **`RandomSource` is required by the id contract.** ECMAScript does expose `Math.random()`, but Loredu does not accept it as a production identity source: it does not provide the entropy-quality guarantee the record-id contract relies on. Host cryptographic randomness is outside the kernel type environment, so a production assembly must inject a source that can supply sufficiently strong random bytes.
+- **`Clock` is a discipline.** A language's own date facility is available without a host-specific import, so a careless implementation could read wall time directly. The port exists so that `recorded_at`, and therefore every `as_of` query, is reproducible under test rather than dependent on when the suite ran.
 
 ## Guarantees
 
-- **The kernel owns id format; the port supplies only entropy.** `RandomSource` returns bytes and knows nothing about records. The kernel derives the id, including the three-letter kind prefix and the prefix-agrees-with-kind rule ([record contract](./records.md)). An adapter cannot substitute its own id scheme, because it is never asked for an id.
+- **The kernel owns id format; the port supplies only entropy.** `RandomSource` returns exactly the requested number of bytes or fails. It knows nothing about records. The kernel derives the id, including the three-letter kind prefix and the prefix-agrees-with-kind rule ([record contract](./records.md)). An adapter cannot substitute its own id scheme, because it is never asked for an id.
+- **Production entropy is an assembly responsibility.** A production `RandomSource` must provide cryptographically strong or equivalently qualified random bytes for record identity. Deterministic/seeded substitutes are for tests and controlled reproducibility, not a production default.
 - **`Clock` returns an instant, not a formatted record field.** Rendering `recorded_at` is kernel work, so a clock adapter cannot change the recorded shape.
-- **Both are injected once, at application assembly.** They are constructor/factory inputs to the application core, never global state, never re-read per call site.
-- **Deterministic substitutes are the same code path.** A fixed clock and a seeded random source produce byte-identical records for the same draft. Tests do not get a special append path; they get different ports.
+- **Both are injected once, at application assembly.** They are constructor/factory inputs to the application core, never global state, never looked up from ambient singletons.
+- **Deterministic substitutes use the same code path.** Two freshly assembled application instances given the same draft, the same fixed clock value, and random sources initialized to the same deterministic state produce the same first stamped record. Repeated appends in one running instance continue consuming entropy and therefore produce distinct ids; Loredu records are not content-addressed.
 - **Neither port is a storage concern.** A `RecordStore` adapter never receives, calls, or needs either one.
 
 ## Record id format
@@ -66,14 +67,28 @@ persisted record + stream position
 ```
 
 - The **application** layer stamps. The **store** receives a complete record and assigns only the stream position; it never fabricates or rewrites `id` or `recorded_at`, and reads return exactly what was appended.
-- `recorded_at` is stamped immediately before the record is handed to the store, so it reads as *when the kernel committed this to canonical history*. A record whose append does not return a position never entered history, and its stamped values are discarded with it.
+- `recorded_at` is the application timestamp sampled immediately before the durable append attempt. It becomes canonical only if `RecordStore.append` succeeds and returns a position. The timestamp is not the exact durability instant; the returned stream position is the canonical ordering/commit fact. A failed append leaves no canonical record, and the stamped values from that attempt are discarded.
 - A caller-supplied `recorded_at` is rejected by the application API rather than quietly overwritten — the draft type has no such field, and the runtime guard refuses objects carrying one anyway, because types erase.
+
+## Assembly and test placement
+
+Do not create dedicated clock/random packages for v0.x.
+
+- `@loredu/kernel/testing` may provide deterministic helpers such as `FixedClock` and `SeededRandomSource` for kernel/application tests.
+- The `lor` CLI composition root supplies host implementations for wall time and secure randomness when it assembles the application.
+- An embedded M4 consumer supplies its own implementations at its composition boundary.
+
+These are capability implementations around the kernel, not new runtime dependencies of `@loredu/kernel`.
+
+## Capability bypass guard
+
+The port contract is only meaningful if production kernel code cannot silently bypass it. The existing workspace structural guard should reject direct ambient time/randomness access such as `Date.now()`, zero-argument `new Date()`, and `Math.random()` in `packages/kernel` production sources. This is separate from dependency-cruiser issue #18: import-graph tooling cannot see calls that require no import. Temporal parsing/construction from an explicit value (for example `new Date(value)` if implementation needs it) is not the same as reading ambient wall time.
 
 ## Related
 
 - [Record contract](./records.md) — envelope, the draft/persisted split, time ownership
 - [Store port](./store.md) — what the store does and does not assign
 - [Decision 0018](../../decisions/0018-capability-ports.md) — why these are ports, and the boundary it fixes
-- [Decision 0016](../../decisions/0016-workspace-scaffold-and-kernel-type-isolation.md) — the kernel type environment that makes them necessary
+- [Decision 0016](../../decisions/0016-workspace-scaffold-and-kernel-type-isolation.md) — the kernel type environment
 
 Parent index: [contracts](./README.md)
