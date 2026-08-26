@@ -20,12 +20,13 @@ Scaffold the workspace per [decision 0011](../../decisions/0011-repo-package-arc
 - immutable record envelope with explicit schema version;
 - Entry, Claim, Relation, Resolution, Verification shapes;
 - claim key declaration and well-formedness validation (subject/predicate/perspective normalization rules, [decision 0004](../../decisions/0004-claim-identity-key.md));
+- the `ClaimPolicy` port type and the built-in default policy ([decision 0010](../../decisions/0010-claim-policy-seam.md)): identity = the declared key, all values `exclusive`, no custom advisories — carrying a version identity so it can participate in the basis `ruleset` from M2 onward;
 - opaque ID generation/validation;
 - `recorded_at` and optional validity fields;
 - scope, actor, and provenance/reference structures;
 - record validation and compatibility rules (any shipped schema version stays replayable, [decision 0005](../../decisions/0005-embedded-kernel-compatibility.md)).
 
-Exit: records can be created, validated, serialized, and compared without any storage or UI dependency, and malformed claim keys are rejected with actionable errors.
+Exit: records can be created, validated, serialized, and compared without any storage or UI dependency; malformed claim keys are rejected with actionable errors; the default policy derives identical keys to direct ADR 0004 validation.
 
 ## M1 — Plain-file persistence
 
