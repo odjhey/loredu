@@ -14,8 +14,9 @@ protection should require (ADR 0012).
   then lint and spelling (cheapest signal first), the same corpus checks, then
   typecheck, `bun test`, and a compile smoke that runs the built `lor` binary
   rather than just trusting the bundler. The test stage includes the package-DAG
-  assertions and synthetic red/green proofs for kernel type isolation and the
-  ambient time/randomness capability checker.
+  assertions and synthetic red/green proofs for kernel type isolation, binding-aware
+  ambient time/randomness checks, executable-source discovery, resolved package-DAG
+  edges, and exclusion of the test-only kernel subpath from production.
 - **aggregate** — runs with `if: always()` and asserts that the suite the
   selector chose actually succeeded, and that the other one was skipped rather
   than failed.
@@ -27,7 +28,8 @@ bun run lint          # biome check .
 bun run spell         # cspell over the prose
 bun run check:docs    # frontmatter, links, anchors, reachability
 bun run check:catalog # every T-number implemented xor deferred
-bun run check:gates   # proves both gates fire on violations
+bun run check:gates   # proves both corpus gates fire on violations
+bun run check:boundaries # kernel capabilities plus resolved workspace imports
 bun run typecheck     # tsc -p per project
 bun test
 bun run build && ./packages/cli/dist/lor --version

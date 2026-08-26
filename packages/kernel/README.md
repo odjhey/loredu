@@ -15,9 +15,12 @@ path, reconciliation, projections, and Working Lore.
   [ADR 0016](../../docs/decisions/0016-workspace-scaffold-and-kernel-type-isolation.md).
 - **No ambient time or randomness.** Production sources may not read `Date.now()`,
   construct a zero-argument `new Date()`, or read `Math.random()`. The
-  TypeScript-AST check (`bun run check:kernel-capabilities`) ignores comments and
-  strings and permits `new Date(value)`; its focused tests prove every forbidden
-  form red. Time and entropy arrive through the ports settled by
+  binding-aware TypeScript check (`bun run check:kernel-capabilities`) resolves
+  the actual ambient globals, rejects aliases/destructuring/dynamic member escapes,
+  ignores comments and strings, permits lexical/import shadows, and permits
+  `new Date(value)`. It discovers every supported TS/JS module extension and fails
+  closed on unknown production-source extensions. Focused tests prove the boundary
+  red and its deterministic uses green. Time and entropy arrive through the ports settled by
   [ADR 0018](../../docs/decisions/0018-capability-ports.md).
 
 Anything the kernel needs from its environment arrives through a port in
