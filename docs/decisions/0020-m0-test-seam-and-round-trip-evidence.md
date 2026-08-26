@@ -2,6 +2,7 @@
 name: m0_test_seam_and_round_trip_evidence
 description: "Settle M0 test-only store timing and keep serialization round-trip evidence with the M1 provider codec."
 type: decision
+status: superseded
 tags: [decisions, m0, testing, contracts]
 generated: "Pi coding agent"
 created_at: 2026-08-26T23:00:00+08:00
@@ -87,3 +88,5 @@ consumer needs a provider-neutral interchange format, record that as a new
 contract decision rather than inferring it from T06.
 
 Supersedes: the M0 test-support timing sentence in [ADR 0016](./0016-workspace-scaffold-and-kernel-type-isolation.md) and clarifies the T06 evidence timing in [ADR 0019](./0019-m0-validation-rules.md).
+
+This decision is superseded as the complete closure authority by [ADR 0021](./0021-m0-record-contract-closure.md), which retains its M0 seam/T15 and M1 codec/T06 positions while closing the five-family contract and the remaining test-boundary wording.

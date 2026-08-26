@@ -25,7 +25,7 @@ Both gaps share a failure mode: a rule that lives only in prose is a rule agents
 
 ## Choice
 
-**`docs/v0.x/execution/catalog-status.json` records deferred work.** Each entry is a catalog T-number mapped to the `milestone` that will implement it and a `reason`. It sits beside the catalog so a docs-only change carries both, and it is JSON so every runtime here parses it without a dependency. The file starts with all 63 catalog entries deferred and zero implemented, because that is the truth today.
+**`docs/v0.x/execution/catalog-status.json` records deferred work.** Each entry is a catalog T-number mapped to the `milestone` that will implement it and a `reason`. It sits beside the catalog so a docs-only change carries both, and it is JSON so every runtime here parses it without a dependency. The file starts with all 66 catalog entries deferred and zero implemented, because that is the truth today.
 
 **A test claims a catalog entry with `@covers`.** In a `*.test.ts` file under `tests/`, the annotation `@covers T01` (comma-separated for several) in the test title or a comment above it is what marks a T-number implemented. A grep-able convention, not a framework.
 
@@ -41,7 +41,7 @@ Both gaps share a failure mode: a rule that lives only in prose is a rule agents
 
 ## Consequences
 
-- Deferred debt is visible and counted: 63 entries today, each naming the milestone that clears it. Moving a T-number to implemented means deleting its entry and claiming it from a real test — the accounting check enforces that both happen together.
+- Deferred debt is visible and counted: 66 entries today, each naming the milestone that clears it. Moving a T-number to implemented means deleting its entry and claiming it from a real test — the accounting check enforces that both happen together.
 - `catalog-status.json` is verbose by design. Its size is the honest measure of remaining work.
 - The gates run on every change, not only docs-only ones, so the corpus cannot be broken by a code PR.
 - If a checker's parser breaks such that it stops finding violations, the self-test fails. That is the intended tripwire.

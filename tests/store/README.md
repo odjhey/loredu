@@ -10,12 +10,16 @@ reference-before-referrer rejection (**T19**). The pure in-memory application se
 is T15 and belongs to M0's records group; it does not establish durable-provider
 behavior.
 
-Two things belong here: the shared **store conformance suite** from
-`@loredu/kernel/testing`, run against both the in-memory reference store and
-`@loredu/store-plainfile` — a guarantee proven for one adapter and not the other is
-a guarantee the port does not own — and plain-file-specific tests (on-disk layout,
-locking, atomic rename).
+Two distinct things belong here. Portable logical RecordStore cases from the
+shared **store conformance suite** in `@loredu/kernel/testing` may run against
+both the in-memory reference store and `@loredu/store-plainfile`. Provider and
+durability conformance—on-disk layout, locking, atomic rename/visibility,
+fsync, crash survival, and replay across instances—runs against
+`@loredu/store-plainfile` and future durable adapters only. The in-memory seam
+is a logical reference, never durability evidence; a guarantee proven for one
+provider is not silently attributed to another.
 
 Isolate by pointing `LOREDU_HOME` at a temp directory; never write to a real home.
 
 Contract: [store](../../docs/architecture/contracts/store.md).
+Closure: [ADR 0021](../../docs/decisions/0021-m0-record-contract-closure.md).

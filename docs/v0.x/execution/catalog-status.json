@@ -300,22 +300,22 @@
     },
     "T80": {
       "milestone": "M0",
-      "group": "Kernel invariants and the policy seam (issue #6)",
+      "group": "M0 — kernel invariants and the policy seam (issue #6); tests located in reconciliation/",
       "reason": "kernel invariants and ClaimPolicy seam not implemented yet"
     },
     "T81": {
       "milestone": "M0",
-      "group": "Kernel invariants and the policy seam (issue #6)",
+      "group": "M0 — kernel invariants and the policy seam (issue #6); tests located in reconciliation/",
       "reason": "kernel invariants and ClaimPolicy seam not implemented yet"
     },
     "T82": {
       "milestone": "M0",
-      "group": "Kernel invariants and the policy seam (issue #6)",
+      "group": "M0 — kernel invariants and the policy seam (issue #6); tests located in reconciliation/",
       "reason": "kernel invariants and ClaimPolicy seam not implemented yet"
     },
     "T83": {
       "milestone": "M0",
-      "group": "Kernel invariants and the policy seam (issue #6)",
+      "group": "M0 — kernel invariants and the policy seam (issue #6); tests located in reconciliation/",
       "reason": "kernel invariants and ClaimPolicy seam not implemented yet"
     },
     "T84": {

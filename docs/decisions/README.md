@@ -32,4 +32,5 @@ Initial decisions:
 - [0017: Branch protection posture](./0017-branch-protection-posture.md)
 - [0018: Capability ports for time and identity](./0018-capability-ports.md)
 - [0019: M0 validation rules](./0019-m0-validation-rules.md)
-- [0020: M0 test seam and round-trip evidence](./0020-m0-test-seam-and-round-trip-evidence.md)
+- [0020: M0 test seam and round-trip evidence](./0020-m0-test-seam-and-round-trip-evidence.md) *(superseded)*
+- [0021: M0 record-contract closure](./0021-m0-record-contract-closure.md)

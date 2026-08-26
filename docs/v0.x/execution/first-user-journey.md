@@ -203,6 +203,8 @@ Grouped by milestone; **AC n** = acceptance criterion in [goal and scope](../sco
 
 ### M0 — records and validation
 
+M0 uses the closed record shape in [ADR 0021](../../decisions/0021-m0-record-contract-closure.md): a Relation has required `relation_type` and directed ordered singular `{id, kind}` `from`/`to` endpoints, with all five record kinds allowed; a Verification has required non-empty Claim-id `targets` and required non-empty `{source, snapshot?}` `verified_against` basis entries, distinct from common optional `sources: SourceRef[]`. Draft defaults and all field validation rules belong to the [record contract](../../architecture/contracts/records.md).
+
 | # | Given / When / Then | Covers |
 |---|---|---|
 | T01 | valid entry (free text only, no claim) → accepted, id returned | AC 1, invariant 3 |
@@ -224,7 +226,7 @@ must preserve unknown namespaced metadata; M0 defines no wire format.
 
 | # | Given / When / Then | Covers |
 |---|---|---|
-| T06 | unknown namespaced metadata round-trips through the M1 Markdown/YAML serialize/parse codec | ADR 0005, ADR 0020 |
+| T06 | unknown namespaced metadata round-trips through the M1 Markdown/YAML serialize/parse codec | ADR 0005, ADR 0021 (successor to ADR 0020) |
 | T10 | `append` returns monotonically increasing positions | ADR 0006 |
 | T11 | write records → new store instance on same directory replays the identical ordered stream | AC 9 |
 | T12 | positions are stable across replays | ADR 0006 |
@@ -233,7 +235,7 @@ must preserve unknown namespaced metadata; M0 defines no wire format.
 | T16 | concurrent-writer safety: a second writer against a locked store fails loudly with no corruption; the store replays clean afterward | store contract |
 | T17 | store resolution: path flag as-is > name under `$LOREDU_HOME/stores/` > default store; nonexistent resolved store → actionable error (never created implicitly, never discovered from cwd); two named stores under one home are fully isolated (no reads or writes outside the resolved root) | journey 0 |
 | T18 | append is the commit point: a returned position implies the record survives a simulated crash (kill between staging and completion leaves either no record or a whole one, never a torn file); replay stays clean | store contract |
-| T19 | reference-before-referrer: a claim citing a nonexistent `derived_from` (or relation/resolution citing missing targets) is rejected at write time with an actionable error | store contract, ADR 0004 |
+| T19 | reference-before-referrer: a claim citing a nonexistent `derived_from`, a Relation endpoint (`from`/`to`), or a Resolution/Verification target is rejected at write time with an actionable error | store contract, ADR 0004, ADR 0021 |
 
 ### M2 — reconciliation, resolution, projections
 
@@ -301,7 +303,9 @@ must preserve unknown namespaced metadata; M0 defines no wire format.
 | T74 | no dead ends: every id printed by any command resolves via `show`/`history` (generalizes T44 to all output) | ADR 0009 |
 | T75 | a Working Lore section hitting its budget states its full count and carries a continuation handle | working-lore contract |
 
-### Kernel invariants and the policy seam (issue #6)
+### M0 — kernel invariants and the policy seam (issue #6)
+
+These rows are M0 kernel-invariant ownership. Their current executable-test location under `tests/reconciliation/` is a documented location exception, not M2 reconciliation ownership.
 
 | # | Given / When / Then | Covers |
 |---|---|---|
