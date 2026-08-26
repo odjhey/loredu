@@ -37,6 +37,14 @@ with a matching navigational entry in `advice` (`"143 total; continue with:" →
 
 **Ordering is deterministic.** Every list has a stable sort (position or timestamp, record id as tiebreak) so pagination, pipes, and byte-reproducibility ([0006](./0006-explicit-version-basis.md)) all hold.
 
+**Semantic affordance vs rendered command.** The application layer emits affordances — structured, surface-neutral follow-ups:
+
+```json
+{ "rel": "continue", "action": "claims.list", "params": { "cursor": "…" } }
+```
+
+A surface adapter renders each affordance for its medium: the CLI as a runnable `lor claims … --cursor …` string, a future HTTP surface as a link/action, an embedded library as a method call. The determinism rule (advice derives only from mechanical state, never speculates) binds the *affordance* at the application layer; literal command strings are CLI-adapter rendering and are not part of the kernel contract.
+
 ## Consequences
 
 - agent context stays small by construction: hold the packet, follow links on demand, drop them after use;

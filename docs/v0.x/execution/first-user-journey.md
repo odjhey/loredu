@@ -297,6 +297,14 @@ Grouped by milestone; **AC n** = acceptance criterion in [goal and scope](../sco
 | T74 | no dead ends: every id printed by any command resolves via `show`/`history` (generalizes T44 to all output) | ADR 0009 |
 | T75 | a Working Lore section hitting its budget states its full count and carries a continuation handle | working-lore contract |
 
+### Kernel invariants and the policy seam (issue #6)
+
+| # | Given / When / Then | Covers |
+|---|---|---|
+| T80 | `recorded_at` is stamped by `append` at commit; a caller-supplied `recorded_at` is ignored or rejected by the application API — canonical history cannot be backdated | records contract, time ownership |
+| T81 | `computed_at` is outside basis identity: two computations of the same basis at different wall times compare equal and reproduce identical content | ADR 0006 |
+| T82 | default ClaimPolicy: identity = declared key, all values exclusive, no custom advisories — M1.5 behavior byte-identical with the policy layer in place; the active policy version appears in the basis `ruleset` | ADR 0010 |
+
 ### Deliberately not tested yet
 
 Ranking quality beyond determinism (Ranker port ships a baseline; quality is judged by the M4 consumer), concurrency beyond single-writer, performance at scale, and any model-assisted extraction — all deferred per [goal and scope](../scope/goal-and-scope.md).

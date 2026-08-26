@@ -38,6 +38,8 @@ A CRUD CLI over Markdown + frontmatter docs (`name`, `description`), with list/s
 
 **Stresses:** embedding ergonomics and disclosure handles. If the Loredu-backed version is more work than `file.write_text`, criterion 12 of the [v0.x scope](../v0.x/scope/goal-and-scope.md) fails.
 
+Boundary: this consumer reads projections; it does not make Loredu its document store. Unless a consumer explicitly adopts Loredu as its event store, Loredu must not silently become a general document CMS.
+
 ## 3. watchtower attention ledger (`rozoro`)
 
 A driver-private notebook of attention items: strict frontmatter schema (`rozoro.watchtower-attention-ledger/v1`), one file per item, status transitions with an appended handling log, supersession keyed on `(task, reason)`, and `prime` — a bounded re-orientation digest with counts, urgent/normal splits, budgets, and cursors.

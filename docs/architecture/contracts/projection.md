@@ -56,10 +56,12 @@ basis:
   stream_position: position of the last record included
   ruleset: reconciliation ruleset version
   query: { as_of: ..., valid_at: ..., scope: ... }
-  computed_at: timestamp
+computed_at: timestamp
 ```
 
-A consumer compares `basis.stream_position` against the store head to detect staleness without replaying history. Same basis + same query must reproduce the same projection.
+`computed_at` is informational and excluded from basis identity: two projections with identical basis are identical, whenever computed. The `ruleset` names the versioned rule bundle including any active claim policy version ([decision 0010](../../decisions/0010-claim-policy-seam.md)).
+
+A consumer compares `basis.stream_position` against the store head to detect staleness without replaying history. In v0.x this check is conservatively **store-wide** — the comparison is against the global `head()`, so a packet may be flagged stale by records outside its scope; scope-filtered watermarks are a future optimization, not a required new port. Same basis must reproduce the same projection.
 
 ## Changes since a point
 

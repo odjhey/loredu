@@ -30,7 +30,7 @@ basis:
   stream_position: position-of-last-record-included
   ruleset: ruleset-version
   query: activity-scope-and-temporal-bounds
-  computed_at: timestamp
+computed_at: timestamp
 orientation:
   current_count: 0
   candidate_count: 0

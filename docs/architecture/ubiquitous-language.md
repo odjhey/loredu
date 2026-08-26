@@ -31,7 +31,7 @@ updated_at: 2026-08-26T12:10:00+08:00
 | **Current Knowledge** | Projection representing the preferred interpretation using all currently available records. |
 | **Working Lore** | Bounded, ranked projection prepared for one activity, with handles for deeper disclosure. |
 | **Pattern** | Reusable operational knowledge that helps a future activity investigate more effectively. It is represented as a class/purpose of claim, not a separate storage engine. |
-| **recorded_at** | When Loredu learned or recorded something. |
+| **recorded_at** | When Loredu durably learned something — assigned by the kernel at successful append, never caller-authoritative. |
 | **valid_from / valid_until** | When the claim is believed to apply in the external world. Either may be unknown. |
 | **as_of** | Query boundary limiting knowledge to records available at that time. |
 | **valid_at** | Query asking what a projection believes applied at that external-world time. |
@@ -48,7 +48,9 @@ updated_at: 2026-08-26T12:10:00+08:00
 | **Scope** | Caller-declared namespace a claim key belongs to (e.g. `repo=rozoro`); the consumer owns its vocabulary. |
 | **Perspective** | Optional claim-key component distinguishing coexisting views of the same subject/predicate, e.g. `documented_process` vs `observed_process`. |
 | **Confidence** | Claim field grading evidential strength: `candidate`, `observed`, `corroborated`, `confirmed`, `authoritative`. |
-| **Ruleset** | Versioned bundle of deterministic reconciliation/resolution rules; its version is part of every basis. |
+| **Ruleset** | Versioned bundle of deterministic reconciliation/resolution rules, including any active claim policy version; its version is part of every basis. |
+| **ClaimPolicy** | Versioned consumer-supplied extension owning deterministic claim semantics: identity construction, value coexistence (`exclusive`/`coexisting`), optional mechanical advisories. Core ships a default. |
+| **Affordance** | Surface-neutral follow-up emitted by the application layer (`rel`, `action`, `params`); surface adapters render it as a CLI command, link, or call. Advice is a list of affordances. |
 
 ## Naming rule
 

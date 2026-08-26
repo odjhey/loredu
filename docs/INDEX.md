@@ -38,6 +38,7 @@ updated_at: 2026-08-26T12:10:00+08:00
 | [0007: TypeScript on Bun](./decisions/0007-typescript-bun.md) | Strict TypeScript core, bun:test suites, CLI compiled to a single binary |
 | [0008: CLI before full reconciliation; agent-reactive responses](./decisions/0008-cli-first-agent-reactive.md) | Ship `lor` after M1 with deterministic next-step advice; agents chain until healthy |
 | [0009: Hypermedia responses and basis-pinned pagination](./decisions/0009-hypermedia-pagination.md) | Responses embed runnable affordances; lists paginate by basis-pinned cursor with explicit counts |
+| [0010: The ClaimPolicy extension seam](./decisions/0010-claim-policy-seam.md) | One versioned seam for consumer claim semantics; kernel invariants stay in core |
 
 ## Reports
 

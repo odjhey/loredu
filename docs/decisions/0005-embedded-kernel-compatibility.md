@@ -42,7 +42,7 @@ Loredu is an embedded, vendor- and solution-agnostic kernel.
 
 - v0.x acceptance gains a developer-ergonomics criterion alongside the functional ones;
 - Working Lore ranking follows the existing port pattern (`Extractor`, `Resolver`): deterministic baseline in the core, consumer-supplied rankers behind a port;
-- the kernel resists consumer-specific accretion: a capability enters the core only when a second consumer needs it (the non-goals list in the product architecture is the constitution, this rule is the enforcement);
+- the kernel resists consumer-specific accretion: a *capability or generalization* enters the core only when a second consumer needs it (the non-goals list in the product architecture is the constitution, this rule is the enforcement). The two-consumer bar governs stabilization and generalization — fundamental kernel invariants (append-only, `recorded_at` ownership, basis determinism) may enter core before two consumers exist;
 - record schema versioning and replay tests are M0/M1 work, not later hardening.
 
 ## Rule or follow-up
