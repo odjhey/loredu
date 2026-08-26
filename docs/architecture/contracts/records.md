@@ -61,7 +61,7 @@ Shape rules the kernel validates, pinned by [decision 0019](../../decisions/0019
 
 ### Draft vs persisted record
 
-Callers never construct a complete record — they construct a **draft**: the caller-owned fields only (kind payload, actor, scope, sources, metadata). The application append path assigns what only the kernel may assign before handing a complete record to storage:
+Callers never construct a complete record — they construct a **draft**: the caller-owned fields only (kind payload, actor, scope, permitted sources, metadata). `schema` is absent from a draft alongside `id` and `recorded_at`; the application supplies the supported schema identity when it stamps the other persisted-envelope fields. The application append path assigns what only the kernel may assign before handing a complete record to storage:
 
 ```text
 EntryDraft ── application append ──► Entry ── RecordStore.append() ──► + stream position
@@ -140,7 +140,7 @@ claim_key = (scope, subject.type, subject.id, predicate, perspective?)
 
 ## Relation
 
-Relations connect records without mutating them. Initial vocabulary:
+Relations connect records without mutating them. They use a directed `from` record id, `to` record id, and `relation_type`. Either endpoint may identify any record family; the application requires both records to exist before append. Direction remains explicit even where a consumer interprets a relation symmetrically. Initial vocabulary:
 
 ```text
 supports
@@ -180,6 +180,14 @@ verified_against:
     snapshot: source-version
 result: confirmed | contradicted | unchanged | needs_revalidation
 ```
+
+## Validation and extension shape
+
+Entry, Claim, Relation, and Resolution may carry `sources`; Verification instead carries the required purpose-specific `verified_against` basis. Drafts, records, and their defined nested objects reject unknown fields. Consumers extend records only through foreign namespaced `metadata`, whose values may be any JSON value.
+
+Every timestamp is a preserved RFC 3339 date-time string with an explicit offset or `Z`; invalid calendar/time values are rejected, but the kernel neither normalizes accepted spellings nor invents temporal consistency rules.
+
+The TypeScript API returns accumulated structured validation errors (`path`, stable `code`, actionable `message`) rather than throwing for malformed input. Successful validation returns a recursively frozen snapshot detached from caller input. Exact names and result forms are fixed by [decision 0020](../../decisions/0020-record-api-shape.md).
 
 ## Invariants
 

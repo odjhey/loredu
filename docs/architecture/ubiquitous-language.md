@@ -19,7 +19,7 @@ created_at: 2026-08-26T12:10:00+08:00
 | **Resolution** | Explicit judgment that determines how competing or changing claims should be interpreted by a projection. |
 | **Verification** | Record that a claim, pattern, source, or projection was checked against a stated basis or snapshot. |
 | **Actor** | Human, agent, program, or system that created a record or resolution. |
-| **SourceRef** | Stable reference to external evidence, optionally with a locator and snapshot/version identity. |
+| **SourceRef** | Stable reference to external evidence, optionally with a locator and snapshot/version identity. Entries, Claims, Relations, and Resolutions may carry source refs; Verification uses its required `verified_against` basis instead. |
 | **Corpus** | Body of material an activity investigates. A corpus may be a repository, document set, website, process evidence set, or another source collection. |
 | **Snapshot** | Identifiable state of a corpus or source used as a verification basis. |
 | **Activity** | External investigation/review/run that consumes and may produce Loredu knowledge. Loredu does not execute the activity. |
@@ -30,7 +30,7 @@ created_at: 2026-08-26T12:10:00+08:00
 | **Current Knowledge** | Projection representing the preferred interpretation using all currently available records. |
 | **Working Lore** | Bounded, ranked projection prepared for one activity, with handles for deeper disclosure. |
 | **Pattern** | Reusable operational knowledge that helps a future activity investigate more effectively. It is represented as a class/purpose of claim, not a separate storage engine. |
-| **recorded_at** | Kernel timestamp sampled immediately before the durable append attempt, never caller-authoritative. It becomes part of canonical history only if that append succeeds, and is not the exact durability instant — stream position is the commit fact. |
+| **recorded_at** | Kernel-owned RFC 3339 timestamp with an explicit offset or `Z`, sampled immediately before the durable append attempt. It becomes part of canonical history only if that append succeeds, and is not the exact durability instant — stream position is the commit fact. |
 | **valid_from / valid_until** | When the claim is believed to apply in the external world. Either may be unknown. |
 | **as_of** | Query boundary limiting knowledge to records available at that time. |
 | **valid_at** | Query asking what a projection believes applied at that external-world time. |
