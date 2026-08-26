@@ -52,7 +52,11 @@ For any work touching a domain contract:
 9. If work requires a new public semantic/API/persisted-shape/ownership decision, report NEEDS_DECISION. Do not silently settle it in implementation.
 10. If the existing task decomposition no longer matches reality, report NEEDS_REPLAN.
 11. Green CI proves only what its checks assert.
-12. Return findings and evidence to Watchtower — the external Rozoro orchestrator that dispatched the work and owns routing and next-step decisions; it is not a Loredu runtime component, domain term, or persisted concept — and do not assume the next step.
+12. Return findings and evidence to Watchtower; do not assume the next step.
+
+### Watchtower
+
+Watchtower is the external Rozoro orchestrator that dispatched the work and owns routing and next-step decisions. It is not a Loredu runtime component, domain term, or persisted concept.
 
 ## Trust rules
 
