@@ -1,0 +1,75 @@
+# Machine-readable agent policy. Keep in sync with agent-policy.md.
+# Harnesses that cannot consume YAML fall back to agent-policy.md.
+version: 0
+status: draft
+
+entrypoint: AGENTS.md
+policy_doc: docs/ai/agent-policy.md
+
+indexes:
+  flat: docs/INDEX.md
+  guide: docs/README.md
+
+find_docs:
+  script: docs/scripts/find-docs.mjs
+  run: bun docs/scripts/find-docs.mjs
+  skill: .agents/skills/find-docs/SKILL.md
+
+sources_of_truth:
+  terminology: docs/architecture/ubiquitous-language.md
+  contracts: docs/architecture/contracts/README.md
+  decisions: docs/decisions/README.md
+  scope: docs/v0.x/scope/goal-and-scope.md
+  plan: docs/v0.x/execution/implementation-plan.md
+
+worktrees:
+  root: .worktrees
+  path_pattern: .worktrees/<name>
+  invent_other_paths: false
+
+# Agents decide; the record is the obligation, not a sign-off gate. See ADR 0013.
+decision_authority:
+  holder: agent
+  until: production_release
+  operator_signoff_required: false
+  record_required: true
+  record_location: docs/decisions
+  supersede_not_rewrite: true
+  always_record:
+    - published contract change
+    - scope or milestone change
+    - any choice a future agent would have to reverse-engineer
+  failure_mode: unrecorded decision
+
+operator_required:
+  - id: production_release
+    description: Production release and the compatibility promises that come with it.
+  - id: outside_repo
+    description: Publishing packages, external services, credentials, spend.
+  - id: irreversible
+    description: History rewrites, force-push to master, bulk deletion.
+
+# Frontmatter schema and status vocabulary: ADR 0014.
+frontmatter:
+  required: [name, description, type]
+  optional: [status, tags, generated, verified, sources, stale_after, created_at]
+  only_timestamp: created_at
+  last_changed_from: git log -1 --format=%cI -- <path>
+
+status_vocabulary:
+  absent: agreed and in force — the default
+  draft: deliberately unsettled, may change under you
+  current: implemented in code and matching what ships
+  superseded: replaced, links its replacement
+  archived: historical, no replacement
+
+trust:
+  generated: model authorship — the norm here, not a caveat
+  verified: operator stamp
+  do_not_rely_on: [archived, superseded, past stale_after]
+
+closure:
+  domain_doc_playbook: docs/playbooks/domain-doc-update.md
+  require_domain_doc_decision: true
+  require_index_links: true
+  require_decision_record_for_durable_choices: true

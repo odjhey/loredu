@@ -3,10 +3,8 @@ name: representative_activities
 description: "Three domain-agnostic activity scenarios used to keep Loredu useful across technical, project/process, and policy/legal knowledge work."
 type: plan
 tags: [v0.x, use-cases, activities]
-status: draft
 generated: "ChatGPT GPT-5.6 Sol, 2026-08-26"
 created_at: 2026-08-26T12:10:00+08:00
-updated_at: 2026-08-26T12:10:00+08:00
 ---
 
 # Representative activities

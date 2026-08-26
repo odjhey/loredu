@@ -3,10 +3,8 @@ name: candidate_consumers
 description: "Four real internal tools that are candidates to embed Loredu, mapped to its concepts, what each one stresses, and which should be embedded first."
 type: report
 tags: [reports, consumers, v0.x]
-status: draft
 generated: "Claude Fable 5 (Claude Code), 2026-08-26"
 created_at: 2026-08-26T00:00:00+08:00
-updated_at: 2026-08-26T00:00:00+08:00
 ---
 
 # Candidate consumers

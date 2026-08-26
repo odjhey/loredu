@@ -3,10 +3,8 @@ name: decision_embedded_kernel_compatibility
 description: "Frame Loredu as an embedded kernel for our own products, with a record compatibility policy and a two-consumer bar for calling contracts stable."
 type: decision
 tags: [decisions, framing, compatibility, consumers]
-status: draft
 generated: "Claude Fable 5 (Claude Code), 2026-08-26"
 created_at: 2026-08-26T00:00:00+08:00
-updated_at: 2026-08-26T00:00:00+08:00
 ---
 
 # 0005: Embedded kernel, not a standalone product

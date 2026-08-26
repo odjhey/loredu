@@ -3,10 +3,8 @@ name: product_architecture
 description: "Loredu product thesis, ownership boundaries, application ports, core flow, progressive-disclosure posture, and non-goals."
 type: architecture
 tags: [architecture, core, ports, progressive-disclosure]
-status: draft
 generated: "ChatGPT GPT-5.6 Sol, 2026-08-26"
 created_at: 2026-08-26T12:10:00+08:00
-updated_at: 2026-08-26T12:10:00+08:00
 ---
 
 # Product architecture

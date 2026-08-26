@@ -3,10 +3,8 @@ name: decision_claim_policy_seam
 description: "One versioned ClaimPolicy extension seam owns consumer claim semantics (identity, coexistence, advisories); its version participates in the basis; kernel invariants stay in core."
 type: decision
 tags: [decisions, extensions, claims, reconciliation, versioning]
-status: draft
 generated: "Claude Fable 5 (Claude Code), 2026-08-26"
 created_at: 2026-08-26T00:00:00+08:00
-updated_at: 2026-08-26T00:00:00+08:00
 ---
 
 # 0010: The ClaimPolicy extension seam

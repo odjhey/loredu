@@ -3,10 +3,8 @@ name: decision_append_only_records
 description: "Choose immutable canonical records with event-sourced projections and explicit supersession/resolution."
 type: decision
 tags: [decisions, records, event-sourcing, temporal]
-status: draft
 generated: "ChatGPT GPT-5.6 Sol, 2026-08-26"
 created_at: 2026-08-26T12:10:00+08:00
-updated_at: 2026-08-26T12:10:00+08:00
 ---
 
 # 0002: Append-only record model

@@ -3,10 +3,8 @@ name: v0x_goal_and_scope
 description: "v0.x outcomes, acceptance boundaries, included application capabilities, and explicit non-goals."
 type: plan
 tags: [v0.x, scope]
-status: draft
 generated: "ChatGPT GPT-5.6 Sol, 2026-08-26"
 created_at: 2026-08-26T12:10:00+08:00
-updated_at: 2026-08-26T12:10:00+08:00
 ---
 
 # v0.x goal and scope

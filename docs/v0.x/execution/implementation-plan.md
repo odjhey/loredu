@@ -3,10 +3,8 @@ name: v0x_implementation_plan
 description: "M0–M4 implementation sequence (including the M1.5 CLI milestone) for the Loredu domain kernel, plain-file store, projections, Working Lore, and the first real consumer."
 type: plan
 tags: [v0.x, execution]
-status: draft
 generated: "ChatGPT GPT-5.6 Sol, 2026-08-26"
 created_at: 2026-08-26T12:10:00+08:00
-updated_at: 2026-08-26T12:10:00+08:00
 ---
 
 # v0.x implementation plan

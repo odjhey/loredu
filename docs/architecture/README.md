@@ -3,10 +3,8 @@ name: architecture_index
 description: "Reading path for Loredu target-state architecture and contracts."
 type: index
 tags: [architecture]
-status: draft
 generated: "ChatGPT GPT-5.6 Sol, 2026-08-26"
 created_at: 2026-08-26T12:10:00+08:00
-updated_at: 2026-08-26T12:10:00+08:00
 ---
 
 # Architecture

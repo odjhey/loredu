@@ -3,10 +3,8 @@ name: decision_dx_and_ci_gating
 description: "Biome for lint+format, cspell gate, single required ci-required status with fail-safe path selection, catalog integrity check, AGENTS.md single entry with harness symlinks."
 type: decision
 tags: [decisions, dx, ci, lint, agents]
-status: draft
 generated: "Claude Fable 5 (Claude Code), 2026-08-26"
 created_at: 2026-08-26T00:00:00+08:00
-updated_at: 2026-08-26T00:00:00+08:00
 ---
 
 # 0012: Developer experience and CI gating

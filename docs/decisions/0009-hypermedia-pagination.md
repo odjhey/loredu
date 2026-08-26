@@ -3,10 +3,8 @@ name: decision_hypermedia_pagination
 description: "Responses embed runnable affordances (hypermedia for agents); all lists are cursor-paginated, basis-pinned, with explicit truncation counts."
 type: decision
 tags: [decisions, cli, pagination, disclosure, agents]
-status: draft
 generated: "Claude Fable 5 (Claude Code), 2026-08-26"
 created_at: 2026-08-26T00:00:00+08:00
-updated_at: 2026-08-26T00:00:00+08:00
 ---
 
 # 0009: Hypermedia responses and basis-pinned pagination

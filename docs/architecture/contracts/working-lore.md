@@ -3,10 +3,8 @@ name: working_lore_contract
 description: "Bounded Working Lore prepared for an activity, with progressive-disclosure levels and stable drill-down handles."
 type: contract
 tags: [contracts, context, progressive-disclosure]
-status: draft
 generated: "ChatGPT GPT-5.6 Sol, 2026-08-26"
 created_at: 2026-08-26T12:10:00+08:00
-updated_at: 2026-08-26T12:10:00+08:00
 ---
 
 # Working Lore contract
