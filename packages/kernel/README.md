@@ -32,13 +32,17 @@ any package must not import it.
 
 ## State
 
-Scaffold. `src/` currently holds the record-kind vocabulary and the `RecordStore`
-port declaration; no record is validated and no record is stored yet. M0 will add
-an `InMemoryStore`, `FixedClock`, and `SeededRandomSource` only under the testing
-subpath so public application tests can run without a provider. M1 adds separate
-portable logical conformance cases and durable-provider evidence; only the latter
-proves filesystem, locking, fsync, crash, or cross-instance replay guarantees,
-and the M0 seam does not claim durability or codec behavior. The exact boundary is
+The domain layer now exposes the readonly five-family draft/persisted record
+model, exact field validators, immutable parsing boundaries, opaque id format,
+declared claim keys, and structural JSON equality. It does not stamp or append:
+the application path, capability ports, policy/basis, `RecordStore` correction,
+and test-only capability/store helpers remain later M0 work.
+
+M1 adds separate portable logical conformance cases and durable-provider
+evidence; only the latter proves filesystem, locking, fsync, crash, or
+cross-instance replay guarantees, and the M0 seam does not claim durability or
+codec behavior. The exact boundary is
 [ADR 0021](../../docs/decisions/0021-m0-record-contract-closure.md). Behavior
 arrives against the [behavioral catalog](../../docs/v0.x/execution/first-user-journey.md)
-(M0 starts at T01).
+(M0 starts at T01); focused domain tests do not claim those catalog rows before
+the final public application suite exists.
