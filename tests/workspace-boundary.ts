@@ -61,14 +61,31 @@ function sourceFiles(dir: string): string[] {
     .map((entry) => join(dir, entry));
 }
 
-function scanSource(text: string): { withoutComments: string; executableCode: string } {
+interface ScanResult {
+  readonly i: number;
+  readonly withoutComments: string;
+  readonly executableCode: string;
+}
+
+function scanRegion(text: string, start: number, stopAtBrace: boolean): ScanResult {
   let withoutComments = "";
   let executableCode = "";
   const n = text.length;
-  let i = 0;
+  let i = start;
+  let depth = 0;
   while (i < n) {
     const ch = text[i];
     const next = text[i + 1];
+    if (stopAtBrace) {
+      if (ch === "{") depth++;
+      if (ch === "}") {
+        if (depth === 0) {
+          i++;
+          break;
+        }
+        depth--;
+      }
+    }
     if (ch === "/" && next === "/") {
       let j = i + 2;
       while (j < n && text[j] !== "\n" && text[j] !== "\r") j++;
@@ -86,7 +103,7 @@ function scanSource(text: string): { withoutComments: string; executableCode: st
       i = j;
       continue;
     }
-    if (ch === '"' || ch === "'" || ch === "`") {
+    if (ch === '"' || ch === "'") {
       const quote = ch;
       let raw = ch;
       let j = i + 1;
@@ -105,14 +122,57 @@ function scanSource(text: string): { withoutComments: string; executableCode: st
         j++;
       }
       withoutComments += raw;
-      executableCode += "VALUE";
+      executableCode += " VALUE ";
       i = j;
+      continue;
+    }
+    if (ch === "`") {
+      const template = scanTemplate(text, i);
+      withoutComments += template.withoutComments;
+      executableCode += template.executableCode;
+      i = template.i;
       continue;
     }
     withoutComments += ch;
     executableCode += ch;
     i++;
   }
+  return { i, withoutComments, executableCode };
+}
+
+function scanTemplate(text: string, start: number): ScanResult {
+  let withoutComments = "`";
+  let executableCode = " VALUE ";
+  const n = text.length;
+  let i = start + 1;
+  while (i < n) {
+    if (text[i] === "\\") {
+      withoutComments += text[i] + (text[i + 1] ?? "");
+      i += 2;
+      continue;
+    }
+    if (text[i] === "`") {
+      withoutComments += "`";
+      i++;
+      return { i, withoutComments, executableCode };
+    }
+    if (text[i] === "$" && text[i + 1] === "{") {
+      withoutComments += "${";
+      i += 2;
+      const inner = scanRegion(text, i, true);
+      withoutComments += `${inner.withoutComments}}`;
+      executableCode += `${inner.executableCode} VALUE `;
+      i = inner.i;
+      continue;
+    }
+    withoutComments += text[i];
+    i++;
+  }
+  return { i, withoutComments, executableCode };
+}
+
+function scanSource(text: string): { withoutComments: string; executableCode: string } {
+  const { withoutComments, executableCode } = scanRegion(text, 0, false);
   return { withoutComments, executableCode };
 }
 
