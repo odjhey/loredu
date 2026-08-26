@@ -25,12 +25,12 @@ Scaffold the workspace per [decision 0011](../../decisions/0011-repo-package-arc
 - the `Clock` and `RandomSource` capability ports ([decision 0018](../../decisions/0018-capability-ports.md), [clock and identity contract](../../architecture/contracts/clock-and-identity.md)): injected at application assembly, deterministic substitutes in tests, kernel-owned id format over supplied entropy; `RandomSource` supplies qualified bytes rather than ids, and production code may not substitute `Math.random()` for the id contract;
 - application append orchestration: the single stamping point for `id` and `recorded_at`, validation, reference-before-referrer checks, and returning persisted record identity/position — `recorded_at` is sampled immediately before the store append attempt, while the store receives a complete record and assigns only the stream position;
 - test-only `InMemoryStore`, `FixedClock`, and `SeededRandomSource` support under `@loredu/kernel/testing` so the application path is exercised without filesystem/storage-provider dependencies;
-- optional validity fields, scope, actor, provenance/source references, namespaced metadata preservation rules, and schema replay compatibility ([decision 0005](../../decisions/0005-embedded-kernel-compatibility.md));
+- optional validity fields, scope, actor, provenance/source references, namespaced metadata retention rules, and M0 schema acceptance ([decision 0005](../../decisions/0005-embedded-kernel-compatibility.md)); serialization/replay round-trip evidence is deliberately the M1 adapter concern (T06, [ADR 0020](../../decisions/0020-m0-test-seam-and-round-trip-evidence.md));
 - kernel boundary enforcement from [decision 0011](../../decisions/0011-repo-package-architecture.md): zero external runtime dependencies, no environment-specific imports, a kernel TypeScript environment that does not expose Bun/Node ambient globals, and a structural capability-bypass check rejecting ambient wall-time/randomness access (`Date.now()`, zero-argument `new Date()`, `Math.random()`) in production kernel sources.
 
 Supervised bootstrap/M0 work may proceed while the repository-readiness tracker proves its guardrails. **Unattended fleet fan-out waits for that tracker to demonstrate every required gate both green and red.** Dependency-cruiser remains a spike until its Bun-workspace/TypeScript behavior is demonstrated; capability-bypass checks do not wait for it because import-graph tooling cannot see ambient calls with no import.
 
-Exit: through public kernel APIs, drafts can be validated and appended into the in-memory test store; returned records have kernel-assigned IDs and `recorded_at`; malformed keys/references fail with actionable errors; the default ClaimPolicy reproduces the declared-key/exclusive behavior; deterministic capability substitutes reproduce the same first stamped record across fresh assemblies while repeated appends consume fresh entropy; attempts to introduce environment-specific or ambient time/randomness kernel APIs fail the configured boundary/type checks.
+Exit: through public kernel APIs, drafts can be validated and appended into the test-only in-memory seam; returned records have kernel-assigned IDs and `recorded_at`; malformed keys/references fail with actionable errors; the default ClaimPolicy reproduces the declared-key/exclusive behavior; deterministic capability substitutes reproduce the same first stamped record across fresh assemblies while repeated appends consume fresh entropy; attempts to introduce environment-specific or ambient time/randomness kernel APIs fail the configured boundary/type checks. This exit does not claim durable-provider, filesystem, or codec behavior; T15 is an M0 test-seam row and T06 remains M1.
 
 ## M1 — Durable plain-file persistence
 
@@ -38,7 +38,7 @@ Implement:
 
 - the reusable `RecordStore` conformance kit under `@loredu/kernel/testing` from the published store guarantees;
 - `@loredu/store-plainfile` implementing the already-defined `RecordStore` port;
-- Markdown/frontmatter codec for canonical records with free-text Entry bodies;
+- Markdown/frontmatter codec for canonical records with free-text Entry bodies, including the unknown-namespaced-metadata serialize/parse round-trip (T06);
 - append/get/scan/stream/head/replay semantics;
 - single-writer locking, atomic record visibility, durable-before-return/fsync behavior, and prefix-valid crash behavior;
 - monotonic stream positions stable across replays ([decision 0006](../../decisions/0006-explicit-version-basis.md));

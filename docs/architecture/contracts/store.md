@@ -48,6 +48,17 @@ The application layer enforces reference-before-referrer at write time (a claim 
 
 Version control of a store directory (e.g. Git) is an external history/sync layer, not part of these semantics — the store must be correct with or without it.
 
+## M0 test seam and M1 evidence
+
+M0 exercises the application and this provider-neutral port with the test-only
+`InMemoryStore` exposed from `@loredu/kernel/testing`. It is a reference seam for
+logical append/read behavior, not a durable provider and not evidence for locking,
+atomic visibility, fsync, crash recovery, or replay across store instances. M1
+owns the Markdown/YAML adapter and the reusable conformance suite that proves the
+published durable guarantees against each adapter. The metadata serialize/parse
+round-trip in T06 is therefore M1 adapter evidence; this port defines no wire
+format.
+
 ## Concurrency ownership
 
 The port defines the safety guarantees; each adapter implements them with whatever mechanism fits its medium:

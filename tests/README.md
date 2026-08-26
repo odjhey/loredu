@@ -16,8 +16,8 @@ bun test tests/store           # one group
 
 | Directory | Catalog group |
 |---|---|
-| [`records/`](./records/README.md) | M0 — records and validation (T01–T08) |
-| [`store/`](./store/README.md) | M1 — plain-file store (T10–T19) |
+| [`records/`](./records/README.md) | M0 — records and validation (T01–T05, T07–T08, T15, T84–T85) |
+| [`store/`](./store/README.md) | M1 — plain-file store (T06, T10–T14, T16–T19) |
 | [`reconciliation/`](./reconciliation/README.md) | M2 — reconciliation, resolution, projections (T20–T30), kernel invariants and the policy seam (T80–T83) |
 | [`working-lore/`](./working-lore/README.md) | M3 — Working Lore (T40–T45) |
 | [`cli-conformance/`](./cli-conformance/README.md) | CLI conformance (T50–T58), agent-reactive envelope (T60–T68), pagination and link-following (T70–T75) |
