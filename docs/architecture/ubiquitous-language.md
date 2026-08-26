@@ -30,14 +30,14 @@ created_at: 2026-08-26T12:10:00+08:00
 | **Current Knowledge** | Projection representing the preferred interpretation using all currently available records. |
 | **Working Lore** | Bounded, ranked projection prepared for one activity, with handles for deeper disclosure. |
 | **Pattern** | Reusable operational knowledge that helps a future activity investigate more effectively. It is represented as a class/purpose of claim, not a separate storage engine. |
-| **recorded_at** | When Loredu durably learned something — assigned by the kernel at successful append, never caller-authoritative. |
+| **recorded_at** | Kernel timestamp sampled immediately before the durable append attempt, never caller-authoritative. It becomes part of canonical history only if that append succeeds, and is not the exact durability instant — stream position is the commit fact. |
 | **valid_from / valid_until** | When the claim is believed to apply in the external world. Either may be unknown. |
 | **as_of** | Query boundary limiting knowledge to records available at that time. |
 | **valid_at** | Query asking what a projection believes applied at that external-world time. |
 | **Capability port** | Collaborator the kernel needs but cannot reach for itself, injected when the application is assembled: `Clock` and `RandomSource`. Distinct from `RecordStore`, which is a persistence boundary rather than an environment capability. |
 | **Clock** | Injected source of the instant stamped as `recorded_at`. A fixed clock in tests makes `as_of` behavior reproducible. |
 | **RandomSource** | Injected source of entropy for record ids. Supplies bytes only — the kernel owns id format, so no adapter can substitute an id scheme. |
-| **Stream position** | Monotonic position in the canonical record stream, returned by `append` and exposed as the store head. |
+| **Stream position** | Monotonic position in the canonical record stream, returned by `append` and exposed as the store head. It is also the store-level fact that the append committed. |
 | **Basis** | Stamp on a derived view recording the stream position, ruleset version, and query it was computed from; enables deterministic staleness checks. |
 | **Handle** | Stable, runnable reference embedded in a response — an identifier plus the command that expands it. The unit of progressive disclosure. |
 | **Cursor** | Opaque continuation token for a paginated result, pinned to the basis position so a page chain stays consistent while records append. |

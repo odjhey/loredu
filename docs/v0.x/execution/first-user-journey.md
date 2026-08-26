@@ -214,6 +214,8 @@ Grouped by milestone; **AC n** = acceptance criterion in [goal and scope](../sco
 | T07 | same logical input twice → distinct record ids (append, never replace) | store contract |
 | T08 | generated ids carry the three-letter kind prefix (`ent_`/`clm_`/`rel_`/`res_`/`ver_`); a record whose id prefix disagrees with its `kind` is rejected | record contract |
 | T84 | capability determinism without content-addressing: two freshly assembled applications given the same draft, same fixed clock value, and random sources initialized to the same deterministic state produce the same first stamped record (id and `recorded_at` included); two sequential appends of that same draft through one running application consume new entropy and produce distinct ids; caller-supplied `recorded_at` is refused | ADR 0018, clock-and-identity contract |
+| T85 | scope identity is order-insensitive: two claims whose scope maps differ only in pair order share a key; adding a pair yields a different key; absent scope and `{}` are the same key | ADR 0019, ADR 0004 |
+| T86 | value equality is structural over a canonical form and never coerces types: object key order does not affect equality, while `1` and `"1"` under one key are distinct values (conflict candidate, not duplicate) | ADR 0019, ADR 0010 |
 
 ### M1 — plain-file store
 

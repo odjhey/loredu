@@ -46,6 +46,19 @@ const CASES = [
     mutate: () => {},
   },
   {
+    // Regression: an indented fence is still a fence. A regex like
+    // `^[a-z0-9]([a-z0-9._-]*)$` inside one is not a markdown link.
+    name: "link-like syntax inside an indented code fence is not a link",
+    script: "check-docs.mjs",
+    expect: null,
+    mutate: (root) =>
+      edit(
+        root,
+        A_DOC,
+        (t) => `${t}\n- a rule:\n\n  \`\`\`text\n  ^[a-z0-9]([a-z0-9._:/-]*[a-z0-9])?$\n  \`\`\`\n`,
+      ),
+  },
+  {
     name: "broken relative link",
     script: "check-docs.mjs",
     expect: "link",

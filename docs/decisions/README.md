@@ -31,3 +31,4 @@ Initial decisions:
 - [0016: Workspace scaffold — TS sources as exports, and kernel purity as a compiler error](./0016-workspace-scaffold-and-kernel-type-isolation.md)
 - [0017: Branch protection posture](./0017-branch-protection-posture.md)
 - [0018: Capability ports for time and identity](./0018-capability-ports.md)
+- [0019: M0 validation rules](./0019-m0-validation-rules.md)

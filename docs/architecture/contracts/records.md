@@ -34,6 +34,31 @@ res_…  resolution ver_…  verification
 
 The suffix is random, identifier-safe, and carries no meaning (ordering comes from `recorded_at` and stream positions, and sharding is a non-concern). Validation asserts that the prefix agrees with `kind`; beyond that, no logic may parse or derive meaning from an id. Suffix length and alphabet are fixed by the [clock and identity contract](./clock-and-identity.md): 16 symbols of lowercase Crockford base32.
 
+### Field rules
+
+Shape rules the kernel validates, pinned by [decision 0019](../../decisions/0019-m0-validation-rules.md) so every implementation and adapter agrees:
+
+- **Identifier-safe token** — `subject.type`, `subject.id`, `predicate`, `perspective`, `actor.id`, and both halves of a scope pair:
+
+  ```text
+  ^[a-z0-9]([a-z0-9._:/-]*[a-z0-9])?$      max 128 characters
+  ```
+
+  Lowercase only, no whitespace, no leading or trailing separator. Separators inside a token let consumers express their own namespacing (`code-area/command-registration`) without the kernel learning their vocabulary. Lowercase is *enforced, not normalized*: two keys differing only in case would read as identical to a human while reconciling as distinct.
+
+- **`scope`** — a flat, unordered map of identifier-safe key to identifier-safe value; no nesting. Absent and `{}` are the same thing. Because scope is part of the claim key, identity compares the **set of pairs, order-insensitively**: pair order never changes a key, and adding a pair always does.
+
+- **`metadata`** — a flat map whose keys are `<namespace>.<name>`, both halves identifier-safe. A key with no namespace is rejected, which is what makes "unknown namespaced metadata is preserved" a guarantee. `loredu.` is reserved for the kernel; other namespaces are preserved verbatim and ignored by readers that do not understand them.
+
+- **`sources[].ref`** — deliberately *not* identifier-safe: a ref may be a URL, path, or vendor id, so it is any non-empty trimmed string up to 1024 characters.
+
+- **`actor`** — required on every draft. `type` is closed; `id` is identifier-safe.
+
+- **`schema`** — must be exactly a schema identity this kernel can replay. Unknown identities are rejected on write and surfaced as an actionable error on read, never silently skipped.
+
+- **Closed vocabularies** (unknown values rejected, because kernel mechanics depend on them): `kind`, `actor.type`, relation type, resolution `decision`, verification `result`, `confidence`.
+- **Open vocabularies** (recommended values; unknown values accepted and preserved, because the kernel never branches on them): `entry_type`, `claim_class`.
+
 ### Draft vs persisted record
 
 Callers never construct a complete record — they construct a **draft**: the caller-owned fields only (kind payload, actor, scope, sources, metadata). The application append path assigns what only the kernel may assign before handing a complete record to storage:
@@ -75,7 +100,7 @@ sources:
     snapshot: optional source version
 ```
 
-The Markdown body or equivalent `body` field contains the free text. Entries are useful even when no structured claim is extracted.
+`body` carries the free text and is **required and non-empty** — an entry with nothing in it records nothing. `title` is optional. Adapters may store the body as a Markdown document body rather than a frontmatter field; that is a serialization choice, not a shape difference. Entries are useful even when no structured claim is extracted.
 
 ## Claim
 
@@ -96,6 +121,10 @@ valid_from: optional timestamp
 valid_until: optional timestamp
 sources: []
 ```
+
+`value` is **required** and must be JSON-serializable. Equality between values is structural over a canonical form and never coerces types, so `1` and `"1"` under one key are a conflict candidate rather than a duplicate ([decision 0019](../../decisions/0019-m0-validation-rules.md)).
+
+`derived_from` holds **entry ids only**. Claim-to-claim derivation is expressed as an explicit Relation, which keeps provenance to evidence distinct from reasoning between propositions.
 
 A Claim may be submitted directly by a human/program without automated extraction, but provenance should still identify its basis when available.
 
@@ -137,15 +166,15 @@ effective_at: optional timestamp
 reason: short auditable rationale
 ```
 
-`reason` records the decision basis, not hidden chain-of-thought.
+`targets` may reference **claim or relation ids** — both are things a judgment can be made about. `reason` records the decision basis, not hidden chain-of-thought.
 
 ## Verification
 
-A Verification records that knowledge was checked against a stated basis:
+A Verification records that knowledge was checked against a stated basis. Targets are claim ids — a Pattern is a *class of claim*, not a separate record kind, so it is verified as the claim it is:
 
 ```yaml
 kind: verification
-targets: [claim-or-pattern-id]
+targets: [claim-id]
 verified_against:
   - source: source-ref
     snapshot: source-version
