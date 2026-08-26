@@ -3,10 +3,8 @@ name: decision_cli_first_agent_reactive
 description: "Ship the lor CLI right after M1 with mechanical key-overlap feedback; every response carries deterministic advice so agents chain calls until healthy."
 type: decision
 tags: [decisions, cli, sequencing, agents]
-status: draft
 generated: "Claude Fable 5 (Claude Code), 2026-08-26"
 created_at: 2026-08-26T00:00:00+08:00
-updated_at: 2026-08-26T00:00:00+08:00
 ---
 
 # 0008: CLI before full reconciliation; agent-reactive responses

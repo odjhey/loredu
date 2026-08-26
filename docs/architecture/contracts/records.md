@@ -3,10 +3,8 @@ name: record_contract
 description: "Immutable Loredu record envelope and the Entry, Claim, Relation, Resolution, and Verification record families."
 type: contract
 tags: [contracts, records, provenance]
-status: draft
 generated: "ChatGPT GPT-5.6 Sol, 2026-08-26"
 created_at: 2026-08-26T12:10:00+08:00
-updated_at: 2026-08-26T12:10:00+08:00
 ---
 
 # Record contract

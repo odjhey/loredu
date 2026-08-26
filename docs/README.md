@@ -3,10 +3,8 @@ name: docs_guide
 description: "How to explore and maintain the Loredu design corpus."
 type: index
 tags: [docs, meta]
-status: draft
 generated: "ChatGPT GPT-5.6 Sol, 2026-08-26"
 created_at: 2026-08-26T12:10:00+08:00
-updated_at: 2026-08-26T15:45:00+08:00
 ---
 
 # Loredu documentation guide
@@ -33,10 +31,25 @@ name: stable_snake_case_name
 description: "One sentence describing the document."
 type: index | architecture | contract | glossary | plan | report | decision
 tags: [topic]
-status: draft | current | archived | superseded
 ```
 
-Optional fields include `generated`, `verified`, `sources`, `stale_after`, `created_at`, and `updated_at`.
+Optional fields: `status`, `generated`, `verified`, `sources`, `stale_after`, `created_at`.
+
+There is no `updated_at`. Last-changed time comes from git — `git log -1 --format=%cI -- <path>` — which cannot go stale, conflict between parallel agents, or be forgotten ([ADR 0014](./decisions/0014-minimal-frontmatter.md)).
+
+### Status
+
+Set `status` only when it says something. Most docs carry none.
+
+| Value | Meaning |
+|---|---|
+| *(absent)* | Agreed and in force: an accepted decision, a settled contract, an active convention. The default. |
+| `draft` | Deliberately unsettled — in flight, may change under you. Never the default for a new doc. |
+| `current` | Implemented in code, and this doc matches what ships. |
+| `superseded` | Replaced; must link its replacement. |
+| `archived` | Historical, no replacement. |
+
+`generated` marks authorship, not doubt — nearly every doc here was written by a model. `verified` is the operator's stamp and means something because it is rare.
 
 ## Layout
 
@@ -62,6 +75,6 @@ docs/
 1. Prefer updating the existing source of truth over creating a near-duplicate.
 2. Link every document from its nearest index and from [INDEX.md](./INDEX.md).
 3. Supersede durable decisions and design documents rather than deleting useful history.
-4. Treat generated, unverified analysis as a proposal until reviewed.
-5. Keep implementation-provider details out of domain contracts unless the contract itself is intentionally provider-specific.
-6. Bump `updated_at` when you materially edit a document; agent-produced docs set `generated`, and the operator sets `verified` on review.
+4. Keep implementation-provider details out of domain contracts unless the contract itself is intentionally provider-specific.
+5. Write a decision record when you settle something durable — agents decide here, and the record is the obligation ([ADR 0013](./decisions/0013-agent-decision-authority.md)).
+6. Set `generated` on docs you author; leave `verified` for the operator.

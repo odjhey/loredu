@@ -7,7 +7,7 @@ description: Find and filter Loredu design docs by querying their YAML frontmatt
 
 # Finding Loredu docs
 
-Every doc under `docs/` carries YAML frontmatter with at least `name` (snake_case id), `description`, and `type`. Optional: `tags`, `status`, `generated`, `verified`, `sources`, `stale_after`, `created_at`, `updated_at`. Schema details: `docs/README.md`.
+Every doc under `docs/` carries YAML frontmatter with at least `name` (snake_case id), `description`, and `type`. Optional: `tags`, `status`, `generated`, `verified`, `sources`, `stale_after`, `created_at`. There is no `updated_at` — git owns last-changed time. Schema details: `docs/README.md`.
 
 ## Without scripts (progressive disclosure)
 
@@ -68,9 +68,13 @@ grep -r --include='*.md' -l 'Working Lore' docs/ | xargs grep -H '^name:'
 
 Before relying on a doc:
 
+- No `status` → agreed and in force. This is the normal state; it is not a gap.
+- `status: draft` → deliberately unsettled, may change under you.
+- `status: current` → implemented in code and matching what ships.
 - `status: archived` or `superseded` → historical only; find the replacement.
 - `stale_after` in the past → verify content before using.
-- `generated` present but no `verified` → agent or model recommendation, not operator-confirmed. Much of this corpus is currently `status: draft` and generated — treat it as a proposal unless `verified` says otherwise.
+- `generated` present → written by a model. That is the norm here, not a caveat; `verified` is the operator's rarer stamp.
+- Last changed: `git log -1 --format=%cI -- <path>`, not frontmatter.
 
 ```sh
 grep -rl --include='*.md' '^status: \(archived\|superseded\)' docs/   # what NOT to trust

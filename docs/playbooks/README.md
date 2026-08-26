@@ -3,9 +3,7 @@ name: playbooks_index
 description: "Index of repeatable operational playbooks for agents and operators working in this repo."
 type: index
 tags: [playbooks, agents]
-status: draft
 created_at: 2026-08-26T15:40:00+08:00
-updated_at: 2026-08-26T15:40:00+08:00
 ---
 
 # Playbooks

@@ -3,10 +3,8 @@ name: contracts_index
 description: "Index of Loredu's initial provider-neutral application and knowledge contracts."
 type: index
 tags: [architecture, contracts]
-status: draft
 generated: "ChatGPT GPT-5.6 Sol, 2026-08-26"
 created_at: 2026-08-26T12:10:00+08:00
-updated_at: 2026-08-26T12:10:00+08:00
 ---
 
 # Core contracts

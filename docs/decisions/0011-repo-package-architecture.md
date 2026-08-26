@@ -3,10 +3,8 @@ name: decision_repo_package_architecture
 description: "Bun workspaces with three packages (kernel, store-plainfile, cli); structural dependency law; catalog-shaped central test tree; skill embedded from docs at build."
 type: decision
 tags: [decisions, repo, packages, testing, toolchain]
-status: draft
 generated: "Claude Fable 5 (Claude Code), 2026-08-26"
 created_at: 2026-08-26T00:00:00+08:00
-updated_at: 2026-08-26T00:00:00+08:00
 ---
 
 # 0011: Repository and package architecture

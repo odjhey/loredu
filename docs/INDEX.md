@@ -3,10 +3,8 @@ name: docs_index
 description: "Flat index of the initial Loredu design and v0.x documents."
 type: index
 tags: [docs, meta]
-status: draft
 generated: "ChatGPT GPT-5.6 Sol, 2026-08-26"
 created_at: 2026-08-26T12:10:00+08:00
-updated_at: 2026-08-26T15:45:00+08:00
 ---
 
 # Loredu docs index
@@ -41,6 +39,8 @@ updated_at: 2026-08-26T15:45:00+08:00
 | [0010: The ClaimPolicy extension seam](./decisions/0010-claim-policy-seam.md) | One versioned seam for consumer claim semantics; kernel invariants stay in core |
 | [0011: Repository and package architecture](./decisions/0011-repo-package-architecture.md) | Bun workspaces (kernel · store-plainfile · cli), structural dependency law, catalog-shaped tests |
 | [0012: Developer experience and CI gating](./decisions/0012-dx-and-ci-gating.md) | Biome + cspell, single fail-closed ci-required gate with fail-safe path selection, catalog drift check, AGENTS.md symlink convention |
+| [0013: Agent decision authority](./decisions/0013-agent-decision-authority.md) | Agents decide and land without sign-off until production; the obligation is the record, not the gate |
+| [0014: Minimal frontmatter](./decisions/0014-minimal-frontmatter.md) | Git owns last-changed time; `status` gets a vocabulary with real signal and no draft-by-default |
 
 ## Agents and process
 

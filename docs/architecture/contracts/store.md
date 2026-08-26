@@ -3,10 +3,8 @@ name: record_store_contract
 description: "Provider-neutral persistence port for append-only Loredu records."
 type: contract
 tags: [contracts, storage, ports]
-status: draft
 generated: "ChatGPT GPT-5.6 Sol, 2026-08-26"
 created_at: 2026-08-26T12:10:00+08:00
-updated_at: 2026-08-26T12:10:00+08:00
 ---
 
 # Record store port

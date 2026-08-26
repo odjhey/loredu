@@ -3,10 +3,8 @@ name: projection_contract
 description: "Event-sourced current and historical projections, including recorded-time and valid-time queries."
 type: contract
 tags: [contracts, projection, temporal, event-sourcing]
-status: draft
 generated: "ChatGPT GPT-5.6 Sol, 2026-08-26"
 created_at: 2026-08-26T12:10:00+08:00
-updated_at: 2026-08-26T12:10:00+08:00
 ---
 
 # Projection contract

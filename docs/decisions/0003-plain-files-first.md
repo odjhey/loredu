@@ -3,10 +3,8 @@ name: decision_plain_files_first
 description: "Use Markdown with YAML frontmatter as the first canonical RecordStore adapter while keeping storage semantics provider-neutral."
 type: decision
 tags: [decisions, storage, alpha]
-status: draft
 generated: "ChatGPT GPT-5.6 Sol, 2026-08-26"
 created_at: 2026-08-26T12:10:00+08:00
-updated_at: 2026-08-26T12:10:00+08:00
 ---
 
 # 0003: Plain files first

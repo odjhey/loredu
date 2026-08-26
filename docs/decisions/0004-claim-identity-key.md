@@ -3,10 +3,8 @@ name: decision_claim_identity_key
 description: "Make claim identity an explicit, caller-declared key in the M0 record contract so reconciliation semantics stay consistent across consumers."
 type: decision
 tags: [decisions, records, reconciliation, identity]
-status: draft
 generated: "Claude Fable 5 (Claude Code), 2026-08-26"
 created_at: 2026-08-26T00:00:00+08:00
-updated_at: 2026-08-26T00:00:00+08:00
 ---
 
 # 0004: Claim identity is a declared key

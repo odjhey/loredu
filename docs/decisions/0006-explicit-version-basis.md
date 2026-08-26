@@ -3,10 +3,8 @@ name: decision_explicit_version_basis
 description: "Every layer carries an explicit version identity; derived views are stamped with the basis (stream position, ruleset version, query) they were computed from."
 type: decision
 tags: [decisions, versioning, projections, staleness]
-status: draft
 generated: "Claude Fable 5 (Claude Code), 2026-08-26"
 created_at: 2026-08-26T00:00:00+08:00
-updated_at: 2026-08-26T00:00:00+08:00
 ---
 
 # 0006: Versioning is explicit at every layer

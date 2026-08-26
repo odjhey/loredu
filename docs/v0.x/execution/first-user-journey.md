@@ -3,10 +3,8 @@ name: first_user_journey
 description: "The first real usage journey (human driver + agents via CLI) and the automated behavioral test catalog derived from it."
 type: plan
 tags: [v0.x, execution, journey, testing, cli]
-status: draft
 generated: "Claude Fable 5 (Claude Code), 2026-08-26"
 created_at: 2026-08-26T00:00:00+08:00
-updated_at: 2026-08-26T00:00:00+08:00
 ---
 
 # First user journey and behavioral test cases

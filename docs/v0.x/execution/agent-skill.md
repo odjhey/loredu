@@ -6,7 +6,6 @@ tags: [v0.x, execution, agents, skill]
 status: draft
 generated: "Claude Fable 5 (Claude Code), 2026-08-26"
 created_at: 2026-08-26T00:00:00+08:00
-updated_at: 2026-08-26T00:00:00+08:00
 ---
 
 # Agent skill (draft v1)

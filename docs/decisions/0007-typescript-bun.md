@@ -3,10 +3,8 @@ name: decision_typescript_bun
 description: "Implement the core and CLI in TypeScript on the Bun toolchain, shipping the CLI as a compiled single-file executable."
 type: decision
 tags: [decisions, language, toolchain, cli]
-status: draft
 generated: "Claude Fable 5 (Claude Code), 2026-08-26"
 created_at: 2026-08-26T00:00:00+08:00
-updated_at: 2026-08-26T00:00:00+08:00
 ---
 
 # 0007: TypeScript on Bun

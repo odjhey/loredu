@@ -3,9 +3,7 @@ name: ai_docs_index
 description: "Index for agent-behavior policy docs: the human-readable and machine-readable agent policy."
 type: index
 tags: [ai, agents, policy]
-status: draft
 created_at: 2026-08-26T15:40:00+08:00
-updated_at: 2026-08-26T15:40:00+08:00
 ---
 
 # AI / agent policy docs

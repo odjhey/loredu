@@ -3,10 +3,8 @@ name: decisions_index
 description: "Format and index for durable Loredu architecture and product decisions."
 type: index
 tags: [decisions]
-status: draft
 generated: "ChatGPT GPT-5.6 Sol, 2026-08-26"
 created_at: 2026-08-26T12:10:00+08:00
-updated_at: 2026-08-26T12:10:00+08:00
 ---
 
 # Decision records
@@ -27,3 +25,5 @@ Initial decisions:
 - [0010: The ClaimPolicy extension seam](./0010-claim-policy-seam.md)
 - [0011: Repository and package architecture](./0011-repo-package-architecture.md)
 - [0012: Developer experience and CI gating](./0012-dx-and-ci-gating.md)
+- [0013: Agent decision authority and the record obligation](./0013-agent-decision-authority.md)
+- [0014: Minimal frontmatter — git owns time, status carries signal](./0014-minimal-frontmatter.md)

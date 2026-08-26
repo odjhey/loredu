@@ -4,7 +4,7 @@ This repository uses `AGENTS.md` as the cross-harness entry point for agent beha
 
 Loredu is an embedded operational knowledge kernel — a utility our own products build on, not a standalone product. Activities append what they learn as immutable, provenance-carrying records; claims declare identity keys so knowledge about the same fact meets instead of piling up. The kernel is strictly mechanical: it detects duplicates, conflicts, divergence, and staleness deterministically and never judges. Humans and agents make the judgments, and every judgment is itself a record.
 
-The repo is design-first and currently holds **no source tree**: contracts, decision records, and the v0.x plan are the artifact until the application contracts settle. Treat docs as the thing being built, and the maintenance rules in `docs/README.md` as its build system.
+The repo is agent-first and design-first, and currently holds **no source tree**: contracts, decision records, and the v0.x plan are the artifact until the application contracts settle. Treat docs as the thing being built, and the maintenance rules in `docs/README.md` as its build system.
 
 ## Source of truth
 
@@ -16,7 +16,8 @@ The repo is design-first and currently holds **no source tree**: contracts, deci
 - Domain contracts: `docs/architecture/contracts/README.md`
 - Durable decisions (supersede, never rewrite): `docs/decisions/README.md`
 - Current scope and plan: `docs/v0.x/scope/goal-and-scope.md`, `docs/v0.x/execution/implementation-plan.md`
-- Human gates that require operator sign-off: `docs/ai/agent-policy.md#human-gates`
+- Who decides, and the record you owe when you do: `docs/ai/agent-policy.md#who-decides` (`docs/decisions/0013-agent-decision-authority.md`)
+- Frontmatter schema and `status` vocabulary: `docs/decisions/0014-minimal-frontmatter.md`
 - Repo and package architecture (dependency law, test catalog shape): `docs/decisions/0011-repo-package-architecture.md`
 - Toolchain, lint, and CI gating: `docs/decisions/0012-dx-and-ci-gating.md`
 - Behavioral test catalog (T-numbers) and expected CLI journeys: `docs/v0.x/execution/first-user-journey.md`
@@ -40,13 +41,23 @@ Boundaries that will be enforced once code exists (see ADRs 0011 and 0012): the 
 5. When working inside a package/service/script directory, check its `README.md` for local context.
 6. Load skills when their trigger conditions apply.
 7. Prefer repository scripts and deterministic CLI tooling over manually recreating documented procedures.
-8. Respect required human gates (design and contract review, scope changes, PR review).
+8. Decide rather than block — and write the decision record you owe (`docs/decisions/`).
 9. Use an isolated worktree when concurrent work exists.
 10. Verify the result and produce the expected evidence before considering work complete.
 
+## You decide; the record is the obligation
+
+Agents settle design questions, change contracts, and adjust scope here without operator sign-off, until production release. The condition is that anything durable you settle becomes a decision record under `docs/decisions/` — written before or with the change that depends on it. Supersede earlier records, never rewrite them. The failure mode this repo polices is the *unrecorded* decision, not the unreviewed one.
+
+Still the operator's call: production release, anything reaching outside the repo (publishing, external services, credentials, spend), and irreversible operations (history rewrites, force-push to `master`, bulk deletion).
+
 ## Trust the frontmatter
 
-Most docs here are `status: draft` and carry a `generated` field with no `verified` field: a model proposed them and no operator has confirmed them. Build on them, but say so. `status: archived`/`superseded` or a past `stale_after` means historical only.
+- No `status` → agreed and in force; that is the normal state, not a gap.
+- `draft` → deliberately unsettled. `current` → implemented in code and matching what ships.
+- `archived`/`superseded`, or a past `stale_after` → historical only; find the replacement.
+- `generated` marks model authorship — the norm here, not a caveat; `verified` is the operator's stamp.
+- There is no `updated_at`: last-changed time is `git log -1 --format=%cI -- <path>`.
 
 ## Harness adapters
 
@@ -64,7 +75,7 @@ Most docs here are `status: draft` and carry a `generated` field with no `verifi
 
 - Use `docs/playbooks/domain-doc-update.md` when domain documentation may be impacted.
 - If domain behavior, terminology, or boundaries changed, update the relevant docs under `docs/architecture/` (start with the ubiquitous language and contracts); otherwise record why no domain-doc update was needed.
-- Bump `updated_at`, and link every new doc from its directory index and `docs/INDEX.md`.
+- Link every new doc from its directory index and `docs/INDEX.md`; record any durable choice you made along the way.
 
 ## Documentation conventions
 

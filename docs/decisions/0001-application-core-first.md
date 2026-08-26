@@ -3,10 +3,8 @@ name: decision_application_core_first
 description: "Choose a surface- and provider-agnostic Loredu application core before CLI, agent, crawler, or model integrations."
 type: decision
 tags: [decisions, architecture, core]
-status: draft
 generated: "ChatGPT GPT-5.6 Sol, 2026-08-26"
 created_at: 2026-08-26T12:10:00+08:00
-updated_at: 2026-08-26T12:10:00+08:00
 ---
 
 # 0001: Application core first

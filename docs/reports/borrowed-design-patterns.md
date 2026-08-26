@@ -3,10 +3,8 @@ name: borrowed_design_patterns
 description: "Prior-art ideas Loredu intends to reuse while deliberately avoiding unnecessary platform and scaling dependencies."
 type: report
 tags: [reports, prior-art, design]
-status: draft
 generated: "ChatGPT GPT-5.6 Sol, 2026-08-26"
 created_at: 2026-08-26T12:10:00+08:00
-updated_at: 2026-08-26T12:10:00+08:00
 ---
 
 # Borrowed design patterns
