@@ -4,8 +4,9 @@
  *
  * This module is vocabulary, not behavior: it names the record kinds and the
  * three-letter id prefix each one uses, so adapters and the CLI agree on the
- * spelling. Record validation, id generation, and the append path arrive with
- * M0 (catalog T01–T08); nothing here validates a record.
+ * spelling. Record validation lives in `./validation.ts`; id generation and
+ * the append path arrive later in M0 (catalog T01–T08). Nothing here
+ * validates a record.
  */
 
 /** Value of the `schema` field every persisted record carries. */
