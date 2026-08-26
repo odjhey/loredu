@@ -22,11 +22,11 @@ Every command returns the same envelope shape in text and `--json`:
 ```json
 {
   "ok": true,
-  "result": { "id": "c_0003", "kind": "claim" },
-  "reconciliation": { "state": "conflict-candidate", "key": "(repo=rozoro code-area command-registration).location", "related": ["c_0001"] },
+  "result": { "id": "clm_x4x8", "kind": "claim" },
+  "reconciliation": { "state": "conflict-candidate", "key": "(repo=rozoro code-area command-registration).location", "related": ["clm_7f3k"] },
   "next": [
-    { "why": "another claim exists under this key with a different value", "run": "lor show c_0001" },
-    { "why": "record your judgment once verified against the source", "run": "lor resolve --targets c_0001,c_0003 --decision prefer --replacement c_0003 --reason \"...\"" }
+    { "why": "another claim exists under this key with a different value", "run": "lor show clm_7f3k" },
+    { "why": "record your judgment once verified against the source", "run": "lor resolve --targets clm_7f3k,clm_x4x8 --decision prefer --replacement clm_x4x8 --reason \"...\"" }
   ],
   "basis": { "position": 6 }
 }
@@ -37,8 +37,8 @@ Rules: `next` is derived only from deterministic checks (key overlap, dangling r
 List-returning commands add a `page` object and a navigational entry in `next` ([decision 0009](../../decisions/0009-hypermedia-pagination.md)):
 
 ```json
-"page": { "returned": 20, "total": 143, "cursor": "eyJwb3MiOjQyLCJpZCI6ImNfMDEyMCJ9" },
-"next": [ { "why": "123 more claims under this filter", "run": "lor claims --scope repo=rozoro --cursor eyJwb3MiOjQyLCJpZCI6ImNfMDEyMCJ9" } ]
+"page": { "returned": 20, "total": 143, "cursor": "eyJwb3MiOjQyLCJpZCI6ImNsbV8wMTIwIn0" },
+"next": [ { "why": "123 more claims under this filter", "run": "lor claims --scope repo=rozoro --cursor eyJwb3MiOjQyLCJpZCI6ImNsbV8wMTIwIn0" } ]
 ```
 
 Cursors are opaque and pinned to the basis position: a page chain is a consistent snapshot even while writers append; a cursorless query picks up the new head. Truncation is never silent (`returned`/`total` always present when a bound applies), ordering is deterministic (position/timestamp, id tiebreak), and every id printed anywhere is a handle — the response embeds or implies the command that expands it, so an agent navigates disclosure levels 0→4 by following links, never by memorizing the surface.
@@ -78,7 +78,7 @@ $ echo "Command registration is concentrated in src/commands, but plugins
   can register commands dynamically elsewhere." | lor add entry \
     --type finding --title "command registration" \
     --source repo=rozoro --locator src/commands --snapshot 3a1d8b7 --body -
-e_0001
+ent_a1b2
 ```
 
 Then the structured claim, keyed ([decision 0004](../../decisions/0004-claim-identity-key.md)):
@@ -87,8 +87,8 @@ Then the structured claim, keyed ([decision 0004](../../decisions/0004-claim-ide
 $ lor add claim --scope repo=rozoro \
     --subject-type code-area --subject command-registration \
     --predicate location --value src/commands \
-    --derived-from e_0001 --confidence observed
-c_0001  new claim (no prior claims under this key)
+    --derived-from ent_a1b2 --confidence observed
+clm_7f3k  new claim (no prior claims under this key)
 ```
 
 The write-time feedback line is part of the contract: it is how writers learn whether their key vocabulary is landing.
@@ -99,16 +99,16 @@ A second actor (an agent, different phrasing, same declared key):
 
 ```text
 $ lor add claim ... --predicate location --value src/commands ...
-c_0002  corroborates c_0001
+clm_9d2q  corroborates clm_7f3k
 ```
 
 A later run finds the world changed:
 
 ```text
 $ lor add claim ... --predicate location --value src/cli/commands ...
-c_0003  conflict candidate under key with c_0001
-next: lor show c_0001
-next: lor resolve --targets c_0001,c_0003 --decision prefer --replacement c_0003 --reason "..."
+clm_x4x8  conflict candidate under key with clm_7f3k
+next: lor show clm_7f3k
+next: lor resolve --targets clm_7f3k,clm_x4x8 --decision prefer --replacement clm_x4x8 --reason "..."
 ```
 
 Nothing is deleted or overwritten; the conflict is now visible knowledge, and the advice tells the same agent how to close it.
@@ -147,9 +147,9 @@ The shell is the rest of the query engine; lor does not need to grow one.
 ```text
 $ lor lore --activity investigate --scope repo=rozoro
 current:
-  (code-area command-registration) location = src/commands   [c_0001, corroborated]
+  (code-area command-registration) location = src/commands   [clm_7f3k, corroborated]
 attention:
-  conflict: location = src/commands vs src/cli/commands      [c_0001 ~ c_0003]
+  conflict: location = src/commands vs src/cli/commands      [clm_7f3k ~ clm_x4x8]
 basis: position=4 ruleset=r1
 ```
 
@@ -158,11 +158,11 @@ Bounded, ranked, with stable handles — not a record dump.
 ## Journey 5 — resolve
 
 ```text
-$ lor resolve --targets c_0001,c_0003 --decision prefer --replacement c_0003 \
+$ lor resolve --targets clm_7f3k,clm_x4x8 --decision prefer --replacement clm_x4x8 \
     --reason "verified against snapshot 9f21c44; registration moved"
-r_0001
+res_5m1p
 $ lor current --scope repo=rozoro
-(code-area command-registration) location = src/cli/commands  [c_0003, resolved]
+(code-area command-registration) location = src/cli/commands  [clm_x4x8, resolved]
 ```
 
 ## Journey 6 — time travel
@@ -177,9 +177,9 @@ $ lor current --scope repo=rozoro --as-of 2026-08-26T12:00:00Z
 ## Journey 7 — drill down
 
 ```text
-$ lor show c_0003        # claim detail + provenance refs
-$ lor history c_0003     # relations, resolution, verifications
-$ lor show e_0001        # the original free text
+$ lor show clm_x4x8        # claim detail + provenance refs
+$ lor history clm_x4x8     # relations, resolution, verifications
+$ lor show ent_a1b2        # the original free text
 ```
 
 Every id printed anywhere is resolvable — the progressive-disclosure promise.
@@ -212,6 +212,7 @@ Grouped by milestone; **AC n** = acceptance criterion in [goal and scope](../sco
 | T05 | records are value-immutable: no API mutates a created record | invariant 1 |
 | T06 | unknown namespaced metadata round-trips through serialize/parse | ADR 0005 |
 | T07 | same logical input twice → distinct record ids (append, never replace) | store contract |
+| T08 | generated ids carry the three-letter kind prefix (`ent_`/`clm_`/`rel_`/`res_`/`ver_`); a record whose id prefix disagrees with its `kind` is rejected | record contract |
 
 ### M1 — plain-file store
 

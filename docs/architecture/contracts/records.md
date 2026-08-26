@@ -27,7 +27,14 @@ scope: {}
 metadata: {}
 ```
 
-IDs must be stable, opaque to domain meaning, and globally unique enough for the selected store. The exact ID algorithm is an implementation decision.
+IDs must be stable, opaque to domain meaning, and globally unique enough for the selected store — with one human affordance: every id starts with a three-letter kind prefix so a reader identifies what an id refers to at a glance:
+
+```text
+ent_…  entry      clm_…  claim      rel_…  relation
+res_…  resolution ver_…  verification
+```
+
+The suffix is random, identifier-safe, and carries no meaning (ordering comes from `recorded_at` and stream positions, and sharding is a non-concern). Validation asserts that the prefix agrees with `kind`; beyond that, no logic may parse or derive meaning from an id. Suffix length and alphabet are an M0 implementation decision.
 
 Unknown namespaced metadata should be preserved by storage adapters when practical and ignored by readers that do not understand it.
 
