@@ -36,6 +36,15 @@ res_…  resolution ver_…  verification
 
 The suffix is random, identifier-safe, and carries no meaning (ordering comes from `recorded_at` and stream positions, and sharding is a non-concern). Validation asserts that the prefix agrees with `kind`; beyond that, no logic may parse or derive meaning from an id. Suffix length and alphabet are an M0 implementation decision.
 
+### Time ownership
+
+`recorded_at` is **assigned by the kernel at successful append**, never caller-authoritative — `as_of` only has a stable meaning if Loredu owns when a record entered canonical history. The distinct time concepts:
+
+- `recorded_at` — when Loredu durably learned it (kernel-assigned at commit);
+- `valid_from` / `valid_until` — when a claim applies in the external world (caller-declared);
+- stream position — canonical append ordering (store-assigned);
+- an actor's own observation time, if ever needed, is a separate future field (`observed_at`) or consumer metadata — it is not `recorded_at`.
+
 Unknown namespaced metadata should be preserved by storage adapters when practical and ignored by readers that do not understand it.
 
 ## Entry
@@ -140,3 +149,4 @@ result: confirmed | contradicted | unchanged | needs_revalidation
 7. The complete projection must be reconstructable from canonical records.
 8. Every claim declares a well-formed claim key; deterministic reconciliation never crosses key boundaries.
 9. Every persisted record schema version remains replayable; schema evolution is additive or versioned, never breaking ([decision 0005](../../decisions/0005-embedded-kernel-compatibility.md)).
+10. `recorded_at` is assigned by the kernel at append; callers cannot backdate canonical history.

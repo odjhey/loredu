@@ -42,8 +42,10 @@ basis:
   stream_position: <position of the last record included>
   ruleset: <reconciliation ruleset version>
   query: { as_of: ..., valid_at: ..., scope: ... }
-  computed_at: <timestamp>
+computed_at: <timestamp>
 ```
+
+`computed_at` is informational display metadata and sits **outside** the basis: two views with identical basis are identical regardless of when they were computed — wall-clock time never participates in basis identity or comparison.
 
 Staleness detection is then a cheap comparison: a packet whose `basis.stream_position` is behind the store head (for the relevant scope) may be stale; equal positions with an equal ruleset guarantee the packet is current. Two views with the same basis and query are byte-comparable; a reproducibility failure is a bug, not noise.
 

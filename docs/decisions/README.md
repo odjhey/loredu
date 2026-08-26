@@ -24,3 +24,4 @@ Initial decisions:
 - [0007: TypeScript on Bun](./0007-typescript-bun.md)
 - [0008: CLI before full reconciliation; agent-reactive responses](./0008-cli-first-agent-reactive.md)
 - [0009: Hypermedia responses and basis-pinned pagination](./0009-hypermedia-pagination.md)
+- [0010: The ClaimPolicy extension seam](./0010-claim-policy-seam.md)
