@@ -133,6 +133,301 @@ describe("kernel ambient capability guard", () => {
     expectRed(root, "[Date.now]");
   });
 
+  test("declaration-only Date, Math, and globalThis bindings remain ambient red", () => {
+    const root = fixture({
+      "fixture.ts": `
+        declare const Date: DateConstructor;
+        declare const Math: Math;
+        declare const globalThis: typeof globalThis;
+        export const values = [Date.now(), Math.random(), globalThis.Date];
+      `,
+    });
+    const result = run(root);
+    expect(result.exitCode).toBe(1);
+    expect(result.output).toContain("[Date.now]");
+    expect(result.output).toContain("[Math.random]");
+    expect(result.output).toContain("binding is erased");
+  });
+
+  test("nested declaration-only dangerous bindings remain red", () => {
+    const root = fixture({
+      "fixture.ts": `
+        export function read() {
+          declare const Date: DateConstructor;
+          declare const Math: Math;
+          declare const globalThis: typeof globalThis;
+          return [Date.now(), Math.random(), globalThis.Date];
+        }
+      `,
+    });
+    const result = run(root);
+    expect(result.exitCode).toBe(1);
+    expect(result.output).toContain("[Date.now]");
+    expect(result.output).toContain("[Math.random]");
+    expect(result.output).toContain("declaration-only");
+  });
+
+  for (const [name, source, diagnostic] of [
+    ["declare var", "declare var Date: DateConstructor; Date.now();", "[Date.now]"],
+    ["declare let", "declare let Date: DateConstructor; Date.now();", "[Date.now]"],
+    ["declare function", "declare function Date(): string; Date();", "[new Date]"],
+    ["declare class", "declare class Date { static now(): number } Date.now();", "[Date.now]"],
+    [
+      "declare namespace",
+      "declare namespace Math { function random(): number } Math.random();",
+      "[Math.random]",
+    ],
+    ["declare enum", "declare enum Math { random } Math.random;", "[Math.random]"],
+  ] as const) {
+    test(`${name} does not establish a runtime shadow`, () => {
+      expectRed(fixture({ "fixture.ts": source }), diagnostic);
+    });
+  }
+
+  test("declaration-file imports do not establish runtime shadows", () => {
+    const root = fixture({
+      "ambient.d.ts": `
+        export declare const Date: DateConstructor;
+        export declare const Math: Math;
+        export declare const globalThis: typeof globalThis;
+      `,
+      "fixture.ts": `
+        import { Date, Math, globalThis } from "./ambient";
+        export const values = [Date.now(), Math.random(), globalThis.Date];
+      `,
+    });
+    const result = run(root);
+    expect(result.exitCode).toBe(1);
+    expect(result.output).toContain("declaration-file");
+  });
+
+  test("interfaces and type aliases used as values remain ambient red", () => {
+    const root = fixture({
+      "fixture.ts": `
+        interface Date { marker: true }
+        type Math = { marker: true };
+        export const values = [Date.now(), Math.random()];
+      `,
+    });
+    const result = run(root);
+    expect(result.exitCode).toBe(1);
+    expect(result.output).toContain("[Date.now]");
+    expect(result.output).toContain("[Math.random]");
+  });
+
+  test("every type-only import form remains ambient red", () => {
+    const root = fixture({
+      "runtime.ts": `
+        export const Date = { now: () => 1 };
+        export const Math = { random: () => 2 };
+        export const marker = 3;
+      `,
+      "fixture.ts": `
+        import type { Date } from "./runtime";
+        import { type Math } from "./runtime";
+        import type * as globalThis from "./runtime";
+        export const values = [Date.now(), Math.random(), globalThis.Date];
+      `,
+    });
+    const result = run(root);
+    expect(result.exitCode).toBe(1);
+    expect(result.output).toContain("type-only/declaration-only alias");
+  });
+
+  test("ambient overload signatures with no implementation remain red", () => {
+    expectRed(
+      fixture({
+        "fixture.ts": `
+          declare function Date(value: string): string;
+          declare function Date(value: number): string;
+          export const value = Date("x");
+        `,
+      }),
+      "[new Date]",
+    );
+  });
+
+  test("a chained ambient re-export remains red", () => {
+    const root = fixture({
+      "ambient.d.ts": "export declare const Date: DateConstructor;\n",
+      "bridge.ts": 'export { Date } from "./ambient";\n',
+      "fixture.ts": 'import { Date } from "./bridge"; export const value = Date.now();\n',
+    });
+    const result = run(root);
+    expect(result.exitCode).toBe(1);
+    expect(result.output).toContain("[Date.now]");
+    expect(result.output).toContain("target is erased");
+  });
+
+  test("an unresolved dangerous import alias fails closed", () => {
+    const root = fixture({
+      "fixture.ts": 'import { Date } from "./missing"; export const value = Date.now();\n',
+    });
+    const result = run(root);
+    expect(result.exitCode).toBe(1);
+    expect(result.output).toContain("[source-analysis]");
+    expect(result.output).toContain("unresolved");
+  });
+
+  test("const enums cannot masquerade as runtime shadows", () => {
+    const root = fixture({
+      "fixture.ts": `
+        const enum Date { now }
+        const enum Math { random }
+        export const values = [Date.now, Math.random];
+      `,
+    });
+    const result = run(root);
+    expect(result.exitCode).toBe(1);
+    expect(result.output).toContain("const enum is erased");
+  });
+
+  test("mixed ambient and runtime declaration sets fail closed", () => {
+    const root = fixture({
+      "fixture.ts": `
+        function Date(value: string): string;
+        function Date(value: unknown): string { return String(value); }
+        declare namespace Date { function now(): number }
+        export const value = Date.now();
+      `,
+    });
+    const result = run(root);
+    expect(result.exitCode).toBe(1);
+    expect(result.output).toContain("[source-analysis]");
+    expect(result.output).toContain("mixes emitted and erased declarations");
+  });
+
+  test("cyclic dangerous aliases fail closed", () => {
+    const root = fixture({
+      "a.ts": 'export { Date } from "./b";\n',
+      "b.ts": 'export { Date } from "./a";\n',
+      "fixture.ts": 'import { Date } from "./a"; export const value = Date.now();\n',
+    });
+    const result = run(root);
+    expect(result.exitCode).toBe(1);
+    expect(result.output).toContain("[source-analysis]");
+    expect(result.output).toMatch(/cyclic|cycle|unresolved/);
+  });
+
+  test("unsupported declaration kinds fail closed", () => {
+    const root = fixture({
+      "unsupported.ts": "export default { now: () => 1 };\n",
+      "fixture.ts": 'import Date from "./unsupported"; export const value = Date.now();\n',
+    });
+    const result = run(root);
+    expect(result.exitCode).toBe(1);
+    expect(result.output).toContain("[source-analysis]");
+    expect(result.output).toContain("unsupported declaration kind ExportAssignment");
+  });
+
+  test("unsupported mixed runtime declaration sets fail closed", () => {
+    const root = fixture({
+      "fixture.ts": `
+        class Date { static now() { return 1; } }
+        namespace Date { export const marker = true; }
+        export const value = Date.now();
+      `,
+    });
+    const result = run(root);
+    expect(result.exitCode).toBe(1);
+    expect(result.output).toContain("[source-analysis]");
+    expect(result.output).toContain("unsupported mixed runtime declarations");
+  });
+
+  test("ordinary const, let, and var shadows are emitted and green", () => {
+    const root = fixture({
+      "fixture.ts": `
+        const Date = { now: () => 1 };
+        let Math = { random: () => 2 };
+        var globalThis = { Date };
+        export const values = [Date.now(), Math.random(), globalThis.Date.now()];
+      `,
+    });
+    expect(run(root)).toMatchObject({ exitCode: 0 });
+  });
+
+  for (const [name, source] of [
+    ["class", "class Date { static now() { return 1; } } export const value = Date.now();"],
+    ["function", "function Date() { return 'local'; } export const value = Date();"],
+    ["namespace", "namespace Date { export const now = () => 1; } export const value = Date.now();"],
+    ["non-const enum", "enum Date { now } export const value = Date.now;"],
+  ] as const) {
+    test(`ordinary emitted ${name} shadows are green`, () => {
+      expect(run(fixture({ "fixture.ts": source }))).toMatchObject({ exitCode: 0 });
+    });
+  }
+
+  test("default and namespace imports from concrete runtime sources are green", () => {
+    const root = fixture({
+      "runtime.ts": `
+        const LocalDate = { now: () => 1 };
+        export default LocalDate;
+        export const random = () => 2;
+      `,
+      "fixture.ts": `
+        import Date from "./runtime";
+        import * as Math from "./runtime";
+        export const values = [Date.now(), Math.random()];
+      `,
+    });
+    expect(run(root)).toMatchObject({ exitCode: 0 });
+  });
+
+  test("ordinary variable destructuring bindings are emitted and green", () => {
+    const root = fixture({
+      "fixture.ts": `
+        const source = {
+          Date: { now: () => 1 },
+          Math: { random: () => 2 },
+          globalThis: { Date: { now: () => 3 } },
+        };
+        const { Date, Math, globalThis } = source;
+        export const values = [Date.now(), Math.random(), globalThis.Date.now()];
+      `,
+    });
+    expect(run(root)).toMatchObject({ exitCode: 0 });
+  });
+
+  test("ordinary import-equals aliases to concrete runtime code are green", () => {
+    const root = fixture({
+      "runtime.ts": "const LocalDate = { now: () => 1 }; export = LocalDate;\n",
+      "fixture.ts": 'import Date = require("./runtime"); export const value = Date.now();\n',
+    });
+    expect(run(root)).toMatchObject({ exitCode: 0 });
+  });
+
+  test("parameter, rest, destructured, catch, loop, and nested bindings are green", () => {
+    const root = fixture({
+      "fixture.ts": `
+        export function parameters(Date: any, ...Math: any[]) {
+          return [Date.now(), Math.random()];
+        }
+        export function destructured({ Date, Math }: any) {
+          return [Date.now(), Math.random()];
+        }
+        export function caught() {
+          try { throw { Date: {} }; } catch (globalThis) { return globalThis.Date; }
+        }
+        export function loop(values: any[]) {
+          for (const Date of values) { Date.now(); }
+        }
+      `,
+    });
+    expect(run(root)).toMatchObject({ exitCode: 0 });
+  });
+
+  test("an ordinary overload set with one implementation is green", () => {
+    const root = fixture({
+      "fixture.ts": `
+        function Date(value: string): string;
+        function Date(value: number): string;
+        function Date(value: unknown): string { return String(value); }
+        export const value = Date("local");
+      `,
+    });
+    expect(run(root)).toMatchObject({ exitCode: 0 });
+  });
+
   test("Date.now() fails red", () => {
     expectRed(fixture({ "fixture.ts": "export const value = Date.now();\n" }), "[Date.now]");
   });
