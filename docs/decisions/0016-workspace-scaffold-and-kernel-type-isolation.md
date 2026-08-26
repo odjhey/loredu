@@ -94,9 +94,9 @@ environment import in kernel production code, no production import of `/testing`
 ambient-capability bypass check ([decision 0018](./0018-capability-ports.md)). The rules
 themselves live in `tests/workspace-boundary.ts`, a purpose-built scanner exercised by
 `tests/workspace-structure.test.ts` with a synthetic RED-then-GREEN proof per rule; this is
-the issue #9 Phase C checker the scaffold anticipated, chosen over dependency-cruiser per
-the fallback in [decision 0011](./0011-repo-package-architecture.md). They claim no
-T-number because they test the repository rather than the product.
+the issue #9 Phase C checker the scaffold anticipated. [Decision 0021](./0021-workspace-boundary-checker-selection.md)
+records the checker selection, rationale, and revisit conditions. They claim no T-number
+because they test the repository rather than the product.
 
 **`@loredu/kernel/testing` is a declared seam with no test doubles in it.** The subpath
 exists and is typechecked, exporting only the `StoreUnderTest` shape a conformance suite

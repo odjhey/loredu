@@ -1,5 +1,7 @@
 import { existsSync, readdirSync, readFileSync } from "node:fs";
-import { join, relative } from "node:path";
+import { builtinModules } from "node:module";
+import { dirname, join, relative, resolve, sep } from "node:path";
+import ts from "typescript";
 
 export type BoundaryRule =
   | "manifest-name"
@@ -29,20 +31,13 @@ const PACKAGE_NAMES = {
   "store-plainfile": "@loredu/store-plainfile",
   cli: "@loredu/cli",
 } as const;
+type PackageDirectory = keyof typeof PACKAGE_NAMES;
 
-const ENVIRONMENT_MODULES = new Set([
-  "fs",
-  "path",
-  "os",
-  "crypto",
-  "child_process",
-  "util",
-  "url",
-  "process",
-  "buffer",
-]);
+const BARE_BUILTINS = new Set(
+  builtinModules.map((name) => (name.startsWith("node:") ? name.slice("node:".length) : name)),
+);
 
-function manifest(root: string, pkg: keyof typeof PACKAGE_NAMES): Manifest {
+function manifest(root: string, pkg: PackageDirectory): Manifest {
   return JSON.parse(readFileSync(join(root, "packages", pkg, "package.json"), "utf8")) as Manifest;
 }
 
@@ -61,199 +56,182 @@ function sourceFiles(dir: string): string[] {
     .map((entry) => join(dir, entry));
 }
 
-interface ScanResult {
-  readonly i: number;
-  readonly withoutComments: string;
-  readonly executableCode: string;
+function stringLiteral(node: ts.Node | undefined): string | undefined {
+  return node && (ts.isStringLiteral(node) || ts.isNoSubstitutionTemplateLiteral(node))
+    ? node.text
+    : undefined;
 }
 
-function scanRegion(text: string, start: number, stopAtBrace: boolean): ScanResult {
-  let withoutComments = "";
-  let executableCode = "";
-  const n = text.length;
-  let i = start;
-  let depth = 0;
-  while (i < n) {
-    const ch = text[i];
-    const next = text[i + 1];
-    if (stopAtBrace) {
-      if (ch === "{") depth++;
-      if (ch === "}") {
-        if (depth === 0) {
-          i++;
-          break;
-        }
-        depth--;
+function unwrap(node: ts.Expression): ts.Expression {
+  let current = node;
+  while (
+    ts.isParenthesizedExpression(current) ||
+    ts.isAsExpression(current) ||
+    ts.isTypeAssertionExpression(current) ||
+    ts.isNonNullExpression(current)
+  ) {
+    current = current.expression;
+  }
+  return current;
+}
+
+function member(objectName: string, propertyName: string, expression: ts.Expression): boolean {
+  const current = unwrap(expression);
+  if (ts.isPropertyAccessExpression(current)) {
+    const object = unwrap(current.expression);
+    return ts.isIdentifier(object) && object.text === objectName && current.name.text === propertyName;
+  }
+  if (ts.isElementAccessExpression(current)) {
+    const object = unwrap(current.expression);
+    return (
+      ts.isIdentifier(object) &&
+      object.text === objectName &&
+      stringLiteral(current.argumentExpression) === propertyName
+    );
+  }
+  return false;
+}
+
+interface SourceFacts {
+  readonly specifiers: readonly string[];
+  readonly ambientUses: readonly string[];
+}
+
+function sourceFacts(file: string, text: string): SourceFacts {
+  // createSourceFile is bounded and returns parse diagnostics rather than throwing for malformed input.
+  // The mandatory TypeScript gate owns syntax rejection; this checker analyzes the recoverable tree.
+  const source = ts.createSourceFile(file, text, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS);
+  const specifiers: string[] = [];
+  const ambientUses = new Set<string>();
+
+  function visit(node: ts.Node): void {
+    if (ts.isImportDeclaration(node) || ts.isExportDeclaration(node)) {
+      const specifier = stringLiteral(node.moduleSpecifier);
+      if (specifier) specifiers.push(specifier);
+    } else if (ts.isImportEqualsDeclaration(node) && ts.isExternalModuleReference(node.moduleReference)) {
+      const specifier = stringLiteral(node.moduleReference.expression);
+      if (specifier) specifiers.push(specifier);
+    } else if (ts.isCallExpression(node)) {
+      const expression = unwrap(node.expression);
+      const specifier =
+        expression.kind === ts.SyntaxKind.ImportKeyword ||
+        (ts.isIdentifier(expression) && expression.text === "require")
+          ? stringLiteral(node.arguments[0])
+          : undefined;
+      if (specifier) specifiers.push(specifier);
+      if (node.arguments.length === 0) {
+        if (member("Date", "now", node.expression)) ambientUses.add("Date.now()");
+        if (member("Math", "random", node.expression)) ambientUses.add("Math.random()");
+      }
+    } else if (ts.isNewExpression(node)) {
+      const expression = unwrap(node.expression);
+      if (ts.isIdentifier(expression) && expression.text === "Date" && (node.arguments?.length ?? 0) === 0) {
+        ambientUses.add("new Date()");
       }
     }
-    if (ch === "/" && next === "/") {
-      let j = i + 2;
-      while (j < n && text[j] !== "\n" && text[j] !== "\r") j++;
-      withoutComments += " ";
-      executableCode += " ";
-      i = j;
-      continue;
-    }
-    if (ch === "/" && next === "*") {
-      let j = i + 2;
-      while (j < n && !(text[j] === "*" && text[j + 1] === "/")) j++;
-      j = Math.min(j + 2, n);
-      withoutComments += " ";
-      executableCode += " ";
-      i = j;
-      continue;
-    }
-    if (ch === '"' || ch === "'") {
-      const quote = ch;
-      let raw = ch;
-      let j = i + 1;
-      while (j < n) {
-        if (text[j] === "\\") {
-          raw += text[j] + (text[j + 1] ?? "");
-          j += 2;
-          continue;
-        }
-        if (text[j] === quote) {
-          raw += text[j];
-          j++;
-          break;
-        }
-        raw += text[j];
-        j++;
-      }
-      withoutComments += raw;
-      executableCode += " VALUE ";
-      i = j;
-      continue;
-    }
-    if (ch === "`") {
-      const template = scanTemplate(text, i);
-      withoutComments += template.withoutComments;
-      executableCode += template.executableCode;
-      i = template.i;
-      continue;
-    }
-    withoutComments += ch;
-    executableCode += ch;
-    i++;
+    ts.forEachChild(node, visit);
   }
-  return { i, withoutComments, executableCode };
+
+  visit(source);
+  return { specifiers, ambientUses: [...ambientUses] };
 }
 
-function scanTemplate(text: string, start: number): ScanResult {
-  let withoutComments = "`";
-  let executableCode = " VALUE ";
-  const n = text.length;
-  let i = start + 1;
-  while (i < n) {
-    if (text[i] === "\\") {
-      withoutComments += text[i] + (text[i + 1] ?? "");
-      i += 2;
-      continue;
+function packageForSpecifier(root: string, file: string, specifier: string): PackageDirectory | undefined {
+  for (const [pkg, packageName] of Object.entries(PACKAGE_NAMES)) {
+    if (specifier === packageName || specifier.startsWith(`${packageName}/`)) {
+      return pkg as PackageDirectory;
     }
-    if (text[i] === "`") {
-      withoutComments += "`";
-      i++;
-      return { i, withoutComments, executableCode };
-    }
-    if (text[i] === "$" && text[i + 1] === "{") {
-      withoutComments += "${";
-      i += 2;
-      const inner = scanRegion(text, i, true);
-      withoutComments += `${inner.withoutComments}}`;
-      executableCode += `${inner.executableCode} VALUE `;
-      i = inner.i;
-      continue;
-    }
-    withoutComments += text[i];
-    i++;
   }
-  return { i, withoutComments, executableCode };
+  if (!specifier.startsWith(".")) return undefined;
+  const target = resolve(dirname(file), specifier);
+  for (const pkg of Object.keys(PACKAGE_NAMES) as PackageDirectory[]) {
+    const packageRoot = resolve(root, "packages", pkg);
+    if (target === packageRoot || target.startsWith(`${packageRoot}${sep}`)) return pkg;
+  }
+  return undefined;
 }
 
-function scanSource(text: string): { withoutComments: string; executableCode: string } {
-  const { withoutComments, executableCode } = scanRegion(text, 0, false);
-  return { withoutComments, executableCode };
+function targetsKernelTesting(root: string, file: string, specifier: string): boolean {
+  if (specifier === "@loredu/kernel/testing" || specifier.startsWith("@loredu/kernel/testing/")) {
+    return true;
+  }
+  if (!specifier.startsWith(".")) return false;
+  const target = resolve(dirname(file), specifier);
+  const testingRoot = resolve(root, "packages/kernel/testing");
+  return target === testingRoot || target.startsWith(`${testingRoot}${sep}`);
 }
 
-function importSpecifiers(code: string): string[] {
-  return [
-    ...code.matchAll(/\bfrom\s+["']([^"']+)["']/g),
-    ...code.matchAll(/\bimport\s+["']([^"']+)["']/g),
-  ].map((match) => match[1] as string);
+function environmentModule(specifier: string): boolean {
+  if (specifier.startsWith("node:") || specifier.startsWith("bun:")) return true;
+  const root = specifier.split("/")[0] ?? specifier;
+  return BARE_BUILTINS.has(specifier) || BARE_BUILTINS.has(root);
 }
 
 export function boundaryViolations(root: string): BoundaryViolation[] {
   const violations: BoundaryViolation[] = [];
   const manifests = Object.fromEntries(
-    Object.keys(PACKAGE_NAMES).map((pkg) => [pkg, manifest(root, pkg as keyof typeof PACKAGE_NAMES)]),
-  ) as Record<keyof typeof PACKAGE_NAMES, Manifest>;
+    Object.keys(PACKAGE_NAMES).map((pkg) => [pkg, manifest(root, pkg as PackageDirectory)]),
+  ) as Record<PackageDirectory, Manifest>;
 
   for (const [pkg, expected] of Object.entries(PACKAGE_NAMES)) {
-    if (manifests[pkg as keyof typeof PACKAGE_NAMES].name !== expected) {
+    if (manifests[pkg as PackageDirectory].name !== expected) {
       violations.push({ rule: "manifest-name", detail: `${pkg} must be named ${expected}` });
     }
   }
 
   if (runtimeDeps(manifests.kernel).length > 0) {
-    violations.push({ rule: "kernel-runtime-dependency", detail: runtimeDeps(manifests.kernel).join(", ") });
+    violations.push({
+      rule: "kernel-runtime-dependency",
+      detail: runtimeDeps(manifests.kernel).join(", "),
+    });
   }
 
-  const expectedDeps = {
-    "store-plainfile": ["@loredu/kernel"],
-    cli: ["@loredu/kernel", "@loredu/store-plainfile"],
-  } as const;
-  for (const pkg of ["store-plainfile", "cli"] as const) {
-    if (JSON.stringify(runtimeDeps(manifests[pkg])) !== JSON.stringify(expectedDeps[pkg])) {
-      violations.push({
-        rule: "package-dag-manifest",
-        detail: `${pkg}: ${runtimeDeps(manifests[pkg]).join(", ")}`,
-      });
-    }
+  const workspaceDeps = (pkg: PackageDirectory): Set<string> =>
+    new Set(
+      runtimeDeps(manifests[pkg]).filter((dependency) =>
+        Object.values(PACKAGE_NAMES).includes(dependency as never),
+      ),
+    );
+  const storeDeps = workspaceDeps("store-plainfile");
+  const cliDeps = workspaceDeps("cli");
+  if (!storeDeps.has("@loredu/kernel") || storeDeps.has("@loredu/cli")) {
+    violations.push({
+      rule: "package-dag-manifest",
+      detail: `store-plainfile: ${[...storeDeps].sort().join(", ")}`,
+    });
+  }
+  if (!cliDeps.has("@loredu/kernel") || !cliDeps.has("@loredu/store-plainfile")) {
+    violations.push({ rule: "package-dag-manifest", detail: `cli: ${[...cliDeps].sort().join(", ")}` });
   }
 
   if (JSON.stringify(Object.keys(manifests.kernel.exports ?? {}).sort()) !== '[".","./testing"]') {
     violations.push({ rule: "kernel-exports", detail: "kernel exports must be . and ./testing" });
   }
 
-  const productionDirs = ["kernel/src", "store-plainfile/src", "cli/src", "cli/bin"];
+  const productionDirs = ["kernel/src", "store-plainfile/src", "cli/src", "cli/bin"] as const;
   for (const dir of productionDirs) {
+    const pkg = dir.split("/")[0] as PackageDirectory;
     for (const file of sourceFiles(join(root, "packages", dir))) {
-      const text = readFileSync(file, "utf8");
       const display = relative(root, file);
-      const { withoutComments, executableCode: code } = scanSource(text);
-      for (const specifier of importSpecifiers(withoutComments)) {
-        if (specifier === "@loredu/kernel/testing" || specifier.startsWith("@loredu/kernel/testing/")) {
+      const facts = sourceFacts(file, readFileSync(file, "utf8"));
+      for (const specifier of facts.specifiers) {
+        if (targetsKernelTesting(root, file, specifier)) {
           violations.push({ rule: "production-testing-import", detail: `${display} imports ${specifier}` });
         }
-        const pkg = dir.split("/")[0];
-        const importsPackage = (name: string): boolean =>
-          specifier === name || specifier.startsWith(`${name}/`);
+        const targetPackage = packageForSpecifier(root, file, specifier);
         if (
-          (pkg === "kernel" && ["@loredu/store-plainfile", "@loredu/cli"].some(importsPackage)) ||
-          (pkg === "store-plainfile" && importsPackage("@loredu/cli"))
+          (pkg === "kernel" && (targetPackage === "store-plainfile" || targetPackage === "cli")) ||
+          (pkg === "store-plainfile" && targetPackage === "cli")
         ) {
           violations.push({ rule: "package-dag-import", detail: `${display} imports ${specifier}` });
         }
-        if (
-          pkg === "kernel" &&
-          (specifier.startsWith("node:") ||
-            specifier.startsWith("bun:") ||
-            ENVIRONMENT_MODULES.has(specifier))
-        ) {
+        if (pkg === "kernel" && environmentModule(specifier)) {
           violations.push({ rule: "environment-import", detail: `${display} imports ${specifier}` });
         }
       }
-
-      if (dir === "kernel/src") {
-        for (const [label, pattern] of [
-          ["Date.now()", /\bDate\s*\.\s*now\s*\(\s*\)/g],
-          ["new Date()", /\bnew\s+Date\s*\(\s*\)/g],
-          ["Math.random()", /\bMath\s*\.\s*random\s*\(\s*\)/g],
-        ] as const) {
-          if (pattern.test(code)) {
-            violations.push({ rule: "ambient-capability", detail: `${display} uses ${label}` });
-          }
+      if (pkg === "kernel") {
+        for (const label of facts.ambientUses) {
+          violations.push({ rule: "ambient-capability", detail: `${display} uses ${label}` });
         }
       }
     }
