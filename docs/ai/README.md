@@ -15,4 +15,6 @@ Policy for how agents behave in this repository. [`AGENTS.md`](../../AGENTS.md) 
 | [agent-policy.md](./agent-policy.md) | guide | Human-readable agent behavior policy |
 | [agent-policy.yaml](./agent-policy.yaml) | — | Machine-readable companion to the policy |
 
+Proof-of-gate scratch line — this branch exists to demonstrate the docs-only suite and is not merged.
+
 Parent index: [docs/INDEX.md](../INDEX.md)
