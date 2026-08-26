@@ -1,6 +1,6 @@
 ---
 name: decision_dx_and_ci_gating
-description: "Biome for lint+format, cspell gate, single required ci-required status with fail-safe path selection, catalog drift check, AGENTS.md single entry with harness symlinks."
+description: "Biome for lint+format, cspell gate, single required ci-required status with fail-safe path selection, catalog integrity check, AGENTS.md single entry with harness symlinks."
 type: decision
 tags: [decisions, dx, ci, lint, agents]
 status: draft
@@ -27,22 +27,32 @@ Bun supplies the runtime, test runner, workspaces, and compiler ([0007](./0007-t
 
 **cspell as a CI gate.** This is a prose-first repo; spelling drift in contracts is contract drift.
 
-**CI: xatu's `ci-required` pattern, collapsed to kernel scale.** One required branch-protection status. A path selector decides what runs, **fail-safe**: docs-only changes select nothing (CI green with no suites); any change outside `docs/` — including root config, lockfile, CI itself — selects everything. One workspace suite runs, in order: Biome check → cspell → typecheck → the full behavioral `tests/` tree → the kernel boundary check ([0011](./0011-repo-package-architecture.md)) → catalog drift check → `lor` compile smoke. A final aggregate job **fails closed** (`if: always()`, asserts every selected suite succeeded) and is the only required status — requiring skippable suites directly would deadlock docs-only PRs.
+**CI: xatu's `ci-required` pattern, collapsed to kernel scale.** One required branch-protection status. A fail-safe path selector chooses between two suites:
 
-**Catalog drift check.** A small script asserts a bijection between the [behavioral test catalog](../v0.x/execution/first-user-journey.md) and the test tree: every T-number in the catalog appears in at least one test file under `tests/`, and no test file names a T-number the catalog lacks. This mechanizes the drift mitigation [0011](./0011-repo-package-architecture.md) otherwise leaves to convention.
+- **docs-only suite** for changes confined to `docs/**`: cspell plus catalog integrity checks. Documentation is not unguarded merely because it is cheap to validate; this is where contracts and the behavioral catalog live.
+- **full workspace suite** for any change outside `docs/**` — including root config, lockfile, CI itself, packages, tests, or scripts: Biome check → cspell → typecheck → the full behavioral `tests/` tree → the kernel boundary check ([0011](./0011-repo-package-architecture.md)) → catalog integrity check → `lor` compile smoke.
+
+When path classification is uncertain, run the full suite. A final aggregate job **fails closed** (`if: always()`, asserts every selected suite succeeded) and is the only required status — requiring conditionally skipped component jobs directly would deadlock PRs whose paths do not select them.
+
+**Catalog integrity, not placeholder coverage.** The behavioral catalog is authoritative, but the drift check must not confuse a placeholder file with an implemented test. Every T-number in the [behavioral test catalog](../v0.x/execution/first-user-journey.md) must be represented in exactly one of two states:
+
+1. **implemented** — named by an executable test under `tests/`;
+2. **explicitly deferred** — listed in a machine-readable catalog-status file with its target milestone/reason.
+
+A T-number may not be both implemented and deferred, and neither tests nor the status file may invent T-numbers absent from the catalog. As implementation lands, a T-number moves from the deferred status file into a real executable test. The integrity check therefore proves catalog accounting, while the test runner proves implemented behavior; a green placeholder alone can never masquerade as coverage.
 
 **Agent entry point: one file, symlinked.** Root `AGENTS.md` is the single cross-harness source; `CLAUDE.md` (and any other harness file) is a symlink to it. Shared skills live in `.agents/skills/`, with `.claude/skills` symlinked in. Adopted verbatim from xatu — edit-here-only prevents multi-harness drift.
 
-**Pinning and hooks.** The Bun version is pinned (version file consumed by CI setup) so humans, CI, and agents agree. **No pre-commit hooks** — enforcement is CI-side only, deliberate for agent fan-out under one identity. **No coverage tooling** — the bet is determinism plus catalog conformance, not coverage percentage; a green `tests/` tree that mirrors the catalog *is* the coverage report.
+**Pinning and hooks.** The Bun version is pinned (version file consumed by CI setup) so humans, CI, and agents agree. **No pre-commit hooks** — enforcement is CI-side only, deliberate for agent fan-out under one identity. **No percentage coverage tooling** — the behavioral catalog, explicit deferred-state accounting, and executable tests are the coverage model. A green test run only proves the T-numbers marked implemented; the catalog-status file makes the remaining debt visible rather than hiding it behind placeholders.
 
 ## Consequences
 
 - one lint/format tool with no plugin surface; if a future web/Next surface ever appears, its package can carry its own ESLint without changing the kernel's tooling (xatu's split proves this works);
-- docs-only PRs — the majority so far — get instant green without burning CI minutes;
-- the drift check turns "did we implement the catalog?" from a review question into a failing job;
+- docs-only PRs stay cheap while still checking the prose/contracts they change;
+- the catalog integrity check turns "is every behavioral requirement either implemented or explicitly deferred?" from a review question into a failing job;
 - agents joining from other repos in this ecosystem find the same entry-point convention xatu uses;
 - local enforcement is zero: a contributor (human or agent) learns of a violation from CI, which is acceptable because pushes are cheap and the trunk is protected by the single gate.
 
 ## Rule or follow-up
 
-The gate composition above is authoritative; adding, removing, or reordering a gate is an update to this decision, not an ad-hoc workflow edit. The selector must stay fail-safe: when in doubt about a path, run everything.
+The gate composition above is authoritative; adding, removing, or reordering a gate is an update to this decision, not an ad-hoc workflow edit. The selector must stay fail-safe: when in doubt about a path, run everything. Catalog accounting must never treat non-executable placeholders as implemented behavior.
