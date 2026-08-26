@@ -34,6 +34,15 @@ Every command returns the same envelope shape in text and `--json`:
 
 Rules: `next` is derived only from deterministic checks (key overlap, dangling references, unresolved groups) — the envelope never speculates. Its shape is stable across milestones; only who computes `reconciliation` changes (mechanical key-overlap in the early CLI, the full ruleset from M2). Text mode mirrors it compactly as `next:` lines.
 
+List-returning commands add a `page` object and a navigational entry in `next` ([decision 0009](../../decisions/0009-hypermedia-pagination.md)):
+
+```json
+"page": { "returned": 20, "total": 143, "cursor": "eyJwb3MiOjQyLCJpZCI6ImNfMDEyMCJ9" },
+"next": [ { "why": "123 more claims under this filter", "run": "lor claims --scope repo=rozoro --cursor eyJwb3MiOjQyLCJpZCI6ImNfMDEyMCJ9" } ]
+```
+
+Cursors are opaque and pinned to the basis position: a page chain is a consistent snapshot even while writers append; a cursorless query picks up the new head. Truncation is never silent (`returned`/`total` always present when a bound applies), ordering is deterministic (position/timestamp, id tiebreak), and every id printed anywhere is a handle — the response embeds or implies the command that expands it, so an agent navigates disclosure levels 0→4 by following links, never by memorizing the surface.
+
 Two suites automate the same journeys:
 
 - **application suite** (`bun:test`, fast, majority of cases) — drives the application API directly;
@@ -266,6 +275,17 @@ Grouped by milestone; **AC n** = acceptance criterion in [goal and scope](../sco
 | T66 | `next` advice is deterministic: same store state → byte-identical advice; no advice on healthy state | ADR 0008 |
 | T67 | `lor claims` filters compose across fields (scope + predicate + value, etc.) and return stable ordering with `--json` | key hygiene |
 | T68 | same value recorded under two different keys in one scope → `status` advisory (non-blocking); `--check` still exits 0 | key hygiene |
+
+### Pagination and link-following (ADR 0009)
+
+| # | Given / When / Then | Covers |
+|---|---|---|
+| T70 | any list over the default limit → `page` with `returned`/`total`/`cursor` plus a runnable continuation in `next`; under the limit → counts, no cursor | ADR 0009 |
+| T71 | append records mid-pagination → the cursor chain yields no duplicates or skips (basis-pinned); a fresh query reflects the new head | ADR 0009 + 0006 |
+| T72 | invalid or foreign `--cursor` → actionable error, distinct exit code, never a silent restart | ADR 0009 |
+| T73 | link-following: starting from a `lor lore` packet, disclosure levels 0→4 (packet → claim → evidence/history → entry → source ref) are reachable using only commands embedded in responses | ADR 0009, journey 7 |
+| T74 | no dead ends: every id printed by any command resolves via `show`/`history` (generalizes T44 to all output) | ADR 0009 |
+| T75 | a Working Lore section hitting its budget states its full count and carries a continuation handle | working-lore contract |
 
 ### Deliberately not tested yet
 

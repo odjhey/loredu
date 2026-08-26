@@ -69,7 +69,8 @@ Borrow:
 - truncation with explicit full-detail escape hatches;
 - precomputed summaries that avoid unnecessary round trips;
 - contextual disclosure and stable drill-down handles;
-- definitive empty/attention states.
+- definitive empty/attention states;
+- hypermedia-style responses (REST's "hypertext as the engine of application state"): every response embeds the runnable affordances to continue, so callers navigate by link instead of memorized surface.
 
 These apply to Loredu application views and future surfaces; a CLI is not required for the core.
 

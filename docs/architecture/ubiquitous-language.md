@@ -37,6 +37,8 @@ updated_at: 2026-08-26T12:10:00+08:00
 | **valid_at** | Query asking what a projection believes applied at that external-world time. |
 | **Stream position** | Monotonic position in the canonical record stream, returned by `append` and exposed as the store head. |
 | **Basis** | Stamp on a derived view recording the stream position, ruleset version, and query it was computed from; enables deterministic staleness checks. |
+| **Handle** | Stable, runnable reference embedded in a response — an identifier plus the command that expands it. The unit of progressive disclosure. |
+| **Cursor** | Opaque continuation token for a paginated result, pinned to the basis position so a page chain stays consistent while records append. |
 
 ## Important distinctions
 

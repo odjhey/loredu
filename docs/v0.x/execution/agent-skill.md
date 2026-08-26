@@ -44,6 +44,10 @@ agent's) start from what you record now.
 4. **Follow the advice.** Every response includes `next:` commands. Run them.
    They are deterministic — lor only points at real, mechanical issues
    (same-key overlap, dangling references), never guesses.
+   Responses are also your map: navigate by the embedded commands and ids
+   instead of constructing calls from memory. When a list says more exists,
+   the continuation command (with its `--cursor`) is in the response — use
+   it only if the bounded view was not enough.
 5. **Judge conflicts yourself.** When lor reports a conflict candidate:
    verify against the current source, then record your judgment:
    `lor resolve --targets <old>,<new> --decision prefer --replacement <new> --reason "<what you checked>"`
