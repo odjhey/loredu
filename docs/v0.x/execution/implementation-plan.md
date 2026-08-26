@@ -46,9 +46,10 @@ Exit: deleting all derived state and replaying the Markdown records reconstructs
 
 Pulled ahead of full reconciliation ([decision 0008](../../decisions/0008-cli-first-agent-reactive.md)) so real usage and dogfooding start as early as possible. Implement:
 
-- commands: `init`, `add entry`, `add claim`, `relate`, `resolve`, `add verification`, `show`, `history`, `claims` (list/filter by scope and key), `head`, `status` (`--check`), `skill`;
+- commands: `init`, `add entry`, `add claim`, `relate`, `resolve`, `add verification`, `show`, `history`, `claims` (query engine: composable filters over any key/envelope field — scope, subject-type, subject, predicate, value, actor, since), `head`, `status` (`--check`), `skill`;
 - the agent-reactive response envelope (`result`, `reconciliation`, `next`, `basis`) in text and `--json`, with stable exit codes;
-- the mechanical key-overlap slice of reconciliation: same key + same value → corroboration feedback; same key + different value → conflict candidate + advice; unresolved same-key groups, dangling refs, and malformed records surfaced by `status`;
+- the mechanical key-overlap slice of reconciliation: same key + same value → corroboration feedback; same key + different value → conflict candidate + advice; unresolved same-key groups, dangling refs, and malformed records surfaced by `status` as health failures, plus non-blocking advisories (same value under different keys in one scope → possible key divergence);
+- namespacing stays consumer-imposed: the kernel validates key shape only; examples and CLI output model healthy conventions without mandating them;
 - embedded agent guide printed by `lor skill` ([draft](./agent-skill.md));
 - compiled single-file binary via `bun build --compile`.
 

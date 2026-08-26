@@ -37,8 +37,10 @@ agent's) start from what you record now.
 3. **Claim when stable.** When a finding is solid enough to key, add a claim:
    `lor add claim --scope <scope> --subject-type <type> --subject <id> --predicate <pred> --value <val> --derived-from <entry-id> --confidence observed`
    Keys are identifiers, not prose: lowercase, hyphenated, no sentences.
-   Reuse existing subjects/predicates from `lor claims --scope <scope>` before
-   inventing new ones — reconciliation only works when keys converge.
+   **Search before you invent a key.** Check whether the fact is already
+   claimed under an existing key: `lor claims --scope <scope> --value <val>`,
+   or narrow by `--subject-type` / `--predicate`. Reuse what you find —
+   reconciliation only works when keys converge.
 4. **Follow the advice.** Every response includes `next:` commands. Run them.
    They are deterministic — lor only points at real, mechanical issues
    (same-key overlap, dangling references), never guesses.
@@ -57,6 +59,13 @@ agent's) start from what you record now.
 
 ### Rules
 
+- Naming and namespacing conventions come from the project you are working
+  in (its repo skill or docs), not from lor — lor only enforces identifier
+  shape. Follow the project's vocabulary; when none exists, mirror the
+  patterns already in `lor claims --scope <scope>`.
+- Heed `status` advisories: "same value under different keys" usually means
+  two writers named one fact differently — relate the claims as duplicates
+  or align on one key going forward.
 - Different perspectives are not conflicts: record documented vs observed
   process as `--perspective documented` / `--perspective observed`. Both stay.
 - Provenance always: `--source`/`--snapshot` on entries, `--derived-from` on

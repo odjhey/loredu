@@ -112,7 +112,16 @@ open attention: 0    malformed: 0    dangling refs: 0
 healthy
 ```
 
-`lor status` is the "am I done?" check that terminates the chain. It reports unresolved same-key groups, malformed records, and dangling `derived_from` references — all mechanical checks, available even before full reconciliation exists. `lor status --check` exits nonzero when unhealthy, for scripts and CI.
+`lor status` is the "am I done?" check that terminates the chain. It has two tiers:
+
+- **health** (blocks `--check`): unresolved same-key groups, malformed records, dangling `derived_from` references;
+- **advisories** (reported, never blocking): cheap divergence hints, e.g. the same value recorded under different keys within one scope — a sign two writers named the same fact differently.
+
+All checks are mechanical and available before full reconciliation exists. `lor status --check` exits nonzero only on health failures.
+
+## Namespacing and key hygiene
+
+The kernel enforces key **shape** only (identifier-safe, no prose). Namespacing and vocabulary are the consumer's to impose — Loredu models healthy conventions in its examples and CLI output (e.g. `--scope repo=rozoro`, subjects like `code-area/command-registration`) without mandating them. The agent's duplicate-detection tool is the query engine, not a kernel rule: `lor claims` filters by any field (`--scope`, `--subject-type`, `--subject`, `--predicate`, `--value`, `--actor`, `--since`), so an agent checks for existing keys before inventing one, and `status` advisories catch what slips through.
 
 ## Journey 4 — working lore reflects it
 
@@ -247,6 +256,8 @@ Grouped by milestone; **AC n** = acceptance criterion in [goal and scope](../sco
 | T64 | `lor status` flags dangling `derived_from`, malformed records, and same-key groups with no relation/resolution among them | journey 3b |
 | T65 | `lor skill` prints the agent guide; a fresh store + only the guide's commands completes journeys 1–5 | journey 9 |
 | T66 | `next` advice is deterministic: same store state → byte-identical advice; no advice on healthy state | ADR 0008 |
+| T67 | `lor claims` filters compose across fields (scope + predicate + value, etc.) and return stable ordering with `--json` | key hygiene |
+| T68 | same value recorded under two different keys in one scope → `status` advisory (non-blocking); `--check` still exits 0 | key hygiene |
 
 ### Deliberately not tested yet
 
