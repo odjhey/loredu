@@ -60,7 +60,7 @@ v0.x assumes a single writer at a time. The plain-file adapter satisfies the gua
 A store is a self-contained directory; nothing about a store lives outside its root. Callers operate any number of named stores side by side under a relocatable home:
 
 - an explicit path flag always wins;
-- otherwise a store name resolves under `$LOREDU_HOME` (default `~/.loredu`), one subdirectory per store;
+- otherwise a store name resolves to `$LOREDU_HOME/stores/<name>` (`LOREDU_HOME` defaults to `~/.loredu`), keeping the home root free for configuration and other non-store concerns;
 - if the resolved store does not exist, the call **fails with an actionable error** — no upward discovery from the working directory, no silent creation outside `init`.
 
 Predictability over magic: resolution never depends on where a command happens to be run from. Test isolation is pointing `LOREDU_HOME` at a temp directory, not a mocking exercise.
