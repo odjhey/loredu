@@ -82,7 +82,7 @@ These are capability implementations around the kernel, not new runtime dependen
 
 ## Capability bypass guard
 
-The port contract is only meaningful if production kernel code cannot silently bypass it. The existing workspace structural guard should reject direct ambient time/randomness access such as `Date.now()`, zero-argument `new Date()`, and `Math.random()` in `packages/kernel` production sources. This is separate from dependency-cruiser issue #18: import-graph tooling cannot see calls that require no import. Temporal parsing/construction from an explicit value (for example `new Date(value)` if implementation needs it) is not the same as reading ambient wall time.
+The port contract is only meaningful if production kernel code cannot silently bypass it. The existing workspace structural guard should reject direct ambient time/randomness access such as calls to `Date.now` or `Math.random`, regardless of supplied arguments, and zero-argument `new Date()`, in `packages/kernel` production sources. This is separate from dependency-cruiser issue #18: import-graph tooling cannot see calls that require no import. Temporal parsing/construction from an explicit value (for example `new Date(value)` if implementation needs it) is not the same as reading ambient wall time.
 
 ## Related
 
