@@ -34,6 +34,7 @@ updated_at: 2026-08-26T12:10:00+08:00
 | [0003: Plain files first](./decisions/0003-plain-files-first.md) | Markdown/frontmatter adapter for alpha; indexes remain replaceable |
 | [0004: Claim identity is a declared key](./decisions/0004-claim-identity-key.md) | Caller-declared claim keys scope deterministic reconciliation |
 | [0005: Embedded kernel, not a standalone product](./decisions/0005-embedded-kernel-compatibility.md) | Consumer-driven stabilization and the record compatibility policy |
+| [0006: Versioning is explicit at every layer](./decisions/0006-explicit-version-basis.md) | Stream positions, ruleset versions, and basis stamps on derived views |
 
 ## Reports
 

@@ -30,6 +30,7 @@ Prove that Loredu can maintain small, inspectable, provenance-aware operational 
 11. Two actors recording the same fact with different free text but the same declared claim key are reconciled (corroboration or conflict), and the same fact under different perspectives coexists without destructive conflict ([decision 0004](../../decisions/0004-claim-identity-key.md)).
 12. Embedding ergonomics: a consumer reaches "appended entry + claim" and "Working Lore in hand" in a few calls with no runtime dependencies beyond the store adapter.
 13. At least one real consumer from [candidate consumers](../../reports/candidate-consumers.md) is wired in before any contract is marked `status: current`.
+14. Every projection and Working Lore packet carries a `basis`; a cached packet is detected as stale after one new relevant record and reproduces identically when basis and query are unchanged ([decision 0006](../../decisions/0006-explicit-version-basis.md)).
 
 ## Included
 

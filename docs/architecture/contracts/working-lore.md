@@ -26,6 +26,10 @@ activity: caller-defined-activity-kind
 scope: {}
 corpus: optional-corpus-ref
 snapshot: optional-snapshot
+basis:
+  stream_position: position-of-last-record-included
+  ruleset: ruleset-version
+  computed_at: timestamp
 orientation:
   current_count: 0
   candidate_count: 0
@@ -42,6 +46,8 @@ budget:
 ```
 
 Token budgets may be supported by adapters that can measure them reliably; the core should also support implementation-neutral item/character bounds.
+
+The `basis` block makes a packet cacheable: comparing `basis.stream_position` to the store head detects staleness deterministically ([decision 0006](../../decisions/0006-explicit-version-basis.md)).
 
 ## Disclosure levels
 

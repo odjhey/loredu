@@ -47,10 +47,24 @@ Reconciliation does not rewrite claims.
 
 Resolution records may alter which claims a projection prefers, supersede, retract, or leave disputed. Historical records remain addressable.
 
+## Basis
+
+Every projection is stamped with the basis it was computed from ([decision 0006](../../decisions/0006-explicit-version-basis.md)):
+
+```yaml
+basis:
+  stream_position: position of the last record included
+  ruleset: reconciliation ruleset version
+  query: { as_of: ..., valid_at: ..., scope: ... }
+  computed_at: timestamp
+```
+
+A consumer compares `basis.stream_position` against the store head to detect staleness without replaying history. Same basis + same query must reproduce the same projection.
+
 ## Changes since a point
 
-A separate event-stream style query may expose records and derived changes since a cursor/time. This supports recurring activities asking what Loredu learned since the previous run without rebuilding their own change log.
+A separate event-stream style query may expose records and derived changes since a stream position. This supports recurring activities asking what Loredu learned since the previous run — keyed off the previous packet's `basis.stream_position` — without rebuilding their own change log.
 
 ## Rebuild invariant
 
-Deleting any materialized/current projection and replaying canonical records must reproduce the same projected knowledge for the same query and reconciliation/resolution ruleset.
+Deleting any materialized/current projection and replaying canonical records must reproduce the same projected knowledge for the same query and the same (versioned) reconciliation/resolution ruleset. A ruleset version bump invalidates cached views without touching canonical records.

@@ -35,6 +35,7 @@ Implement:
 - `PlainFileStore` adapter;
 - Markdown/frontmatter codec for records with free-text Entry bodies;
 - append/get/scan/replay semantics;
+- monotonic stream positions (`append` returns one, `head` exposes the latest) stable across replays ([decision 0006](../../decisions/0006-explicit-version-basis.md));
 - deterministic filesystem layout that is not exposed as a domain contract.
 
 Optional only if useful: a generated human-readable index. Do not make the index canonical.
@@ -51,9 +52,10 @@ Implement deterministic baseline rules, all scoped within a claim key:
 - mechanical temporal precedence where inputs are sufficient;
 - explicit Resolution application;
 - current, `as_of`, `valid_at`, and combined temporal projections;
+- a versioned ruleset identifier and `basis` stamping on every projection;
 - evidence/history lookup by record identity.
 
-Exit: projections are deterministic and rebuildable from canonical records and the same ruleset.
+Exit: projections are deterministic and rebuildable from canonical records and the same versioned ruleset; a stale cached projection is detectable by comparing its `basis.stream_position` to the store head.
 
 ## M3 — Working Lore
 
