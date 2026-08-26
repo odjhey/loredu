@@ -1,11 +1,6 @@
 ---
 name: find-docs
 description: Find and filter Loredu design docs by querying their YAML frontmatter (name, type, tags, status) or the docs index. Use when looking for a contract, decision record, plan, or report in docs/, or when asked "where is the doc about X".
-type: guide
-tags: [docs, meta, skill]
-status: current
-created_at: 2026-08-26T15:40:00+08:00
-updated_at: 2026-08-26T15:40:00+08:00
 ---
 
 > Canonical home of the `find-docs` skill (`.agents/skills/find-docs/SKILL.md`, exposed to harnesses via the `.claude/skills` symlink). To activate in another repo that carries these docs, copy this file to `.claude/skills/find-docs/SKILL.md` there.
