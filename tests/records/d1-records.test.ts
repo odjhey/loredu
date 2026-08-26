@@ -1,4 +1,5 @@
 import { describe, expect, test } from "bun:test";
+import { Buffer } from "node:buffer";
 import { runInNewContext } from "node:vm";
 import {
   ACTOR_TYPES,
@@ -67,6 +68,76 @@ function inheritedMapArray<A extends unknown[]>(values: A, replacement: unknown[
     values,
     calls: () => ({ getterCalls, methodCalls }),
   };
+}
+
+function hostileByteView(length: 9 | 10, fill: number, iteratorValues: number[]) {
+  const calls = {
+    length: 0,
+    iterator: 0,
+    tag: 0,
+    buffer: 0,
+    byteOffset: 0,
+    byteLength: 0,
+    constructor: 0,
+    species: 0,
+  };
+  const bytes = new Uint8Array(length);
+  bytes.fill(fill);
+  const prototype = Object.create(Uint8Array.prototype);
+  Object.defineProperties(prototype, {
+    length: {
+      get() {
+        calls.length += 1;
+        return 10;
+      },
+    },
+    [Symbol.iterator]: {
+      get() {
+        calls.iterator += 1;
+        return function* () {
+          yield* iteratorValues;
+        };
+      },
+    },
+    [Symbol.toStringTag]: {
+      get() {
+        calls.tag += 1;
+        return "CallerTag";
+      },
+    },
+    buffer: {
+      get() {
+        calls.buffer += 1;
+        return new ArrayBuffer(10);
+      },
+    },
+    byteOffset: {
+      get() {
+        calls.byteOffset += 1;
+        return 0;
+      },
+    },
+    byteLength: {
+      get() {
+        calls.byteLength += 1;
+        return 10;
+      },
+    },
+    constructor: {
+      get() {
+        calls.constructor += 1;
+        return class CallerBytes extends Uint8Array {};
+      },
+    },
+    [Symbol.species]: {
+      get() {
+        calls.species += 1;
+        return Uint8Array;
+      },
+    },
+  });
+  Object.setPrototypeOf(bytes, prototype);
+  return { bytes, calls };
 }
 
 function persistedEnvelope<K extends keyof typeof IDS>(kind: K) {
@@ -779,12 +850,141 @@ describe("timestamps and validity", () => {
 });
 
 describe("opaque record identity", () => {
-  test("encodes exactly ten bytes into sixteen lowercase Crockford symbols", () => {
-    expect(encodeRecordIdSuffix(new Uint8Array(10))).toBe("0000000000000000");
-    expect(encodeRecordIdSuffix(new Uint8Array(10).fill(255))).toBe("zzzzzzzzzzzzzzzz");
-    expect(recordIdFromBytes("entry", new Uint8Array(10))).toBe(IDS.entry);
+  test("encodes six independent vectors and every prefix exactly", () => {
+    const vectors = [
+      ["00000000000000000000", "0000000000000000"],
+      ["ffffffffffffffffffff", "zzzzzzzzzzzzzzzz"],
+      ["00010203040506070809", "000g40r40m30e209"],
+      ["0123456789abcdef0123", "04hmasw9nf6yy093"],
+      ["80000000000000000000", "g000000000000000"],
+      ["00000000000000000001", "0000000000000001"],
+    ] as const;
+    for (const [hex, expected] of vectors) {
+      expect(encodeRecordIdSuffix(Uint8Array.from(Buffer.from(hex, "hex")))).toBe(expected);
+    }
+    for (const kind of RECORD_KINDS) {
+      expect(recordIdFromBytes(kind, new Uint8Array(10))).toBe(IDS[kind]);
+    }
     expect(RECORD_ID_SUFFIX_ALPHABET).toBe("0123456789abcdefghjkmnpqrstvwxyz");
-    expectFieldError(() => encodeRecordIdSuffix(new Uint8Array(9)), "bytes", "exactly 10");
+  });
+
+  test("uses genuine represented bytes without inherited hook or iterator authority", () => {
+    const zeroCalls = {
+      length: 0,
+      iterator: 0,
+      tag: 0,
+      buffer: 0,
+      byteOffset: 0,
+      byteLength: 0,
+      constructor: 0,
+      species: 0,
+    };
+    const rewritten = hostileByteView(10, 255, new Array(10).fill(0));
+    expect(encodeRecordIdSuffix(rewritten.bytes)).toBe("zzzzzzzzzzzzzzzz");
+    expect(recordIdFromBytes("entry", rewritten.bytes)).toBe("ent_zzzzzzzzzzzzzzzz");
+    expect(rewritten.calls).toEqual(zeroCalls);
+
+    const short = hostileByteView(10, 255, [0]);
+    expect(encodeRecordIdSuffix(short.bytes)).toBe("zzzzzzzzzzzzzzzz");
+    expect(short.calls).toEqual(zeroCalls);
+
+    const spoofedNine = hostileByteView(9, 0, new Array(10).fill(0));
+    expectFieldError(() => encodeRecordIdSuffix(spoofedNine.bytes), "bytes", "exactly 10");
+    expect(spoofedNine.calls).toEqual(zeroCalls);
+  });
+
+  test("accepts exact offset, subclass, custom-prototype, freeze-attempted, cross-realm, and Buffer views", () => {
+    const backing = new ArrayBuffer(32);
+    const offset = new Uint8Array(backing, 7, 10);
+    offset.set(Uint8Array.from(Buffer.from("00010203040506070809", "hex")));
+    expect(encodeRecordIdSuffix(offset)).toBe("000g40r40m30e209");
+
+    let subclassCalls = 0;
+    class CallerBytes extends Uint8Array {
+      override *[Symbol.iterator](): ArrayIterator<number> {
+        subclassCalls += 1;
+        yield 0;
+      }
+    }
+    const subclass = new CallerBytes(10);
+    subclass.fill(255);
+    const customPrototype = Object.create(CallerBytes.prototype);
+    Object.defineProperty(customPrototype, "length", {
+      get() {
+        subclassCalls += 1;
+        return 9;
+      },
+    });
+    Object.setPrototypeOf(subclass, customPrototype);
+    try {
+      Object.freeze(subclass);
+    } catch {
+      Object.preventExtensions(subclass);
+    }
+    expect(encodeRecordIdSuffix(subclass)).toBe("zzzzzzzzzzzzzzzz");
+    expect(subclassCalls).toBe(0);
+
+    const crossRealm = runInNewContext("new Uint8Array([0,1,2,3,4,5,6,7,8,9])") as Uint8Array;
+    expect(encodeRecordIdSuffix(crossRealm)).toBe("000g40r40m30e209");
+
+    const slab = Buffer.alloc(64, 0);
+    const bufferView = slab.subarray(23, 33);
+    Buffer.from("0123456789abcdef0123", "hex").copy(bufferView);
+    expect(bufferView.byteOffset).toBeGreaterThan(0);
+    expect(encodeRecordIdSuffix(bufferView)).toBe("04hmasw9nf6yy093");
+  });
+
+  test("rejects wrong brands/counts, Proxy, and detached views actionably without traps", () => {
+    for (const bytes of [
+      new Uint8Array(9),
+      new Uint8Array(11),
+      new Uint16Array(5),
+      new Int8Array(10),
+      new Uint8ClampedArray(10),
+      new DataView(new ArrayBuffer(10)),
+      new ArrayBuffer(10),
+      new Array(10).fill(0),
+      { length: 10 },
+    ]) {
+      expectFieldError(() => encodeRecordIdSuffix(bytes as Uint8Array), "bytes");
+    }
+
+    const traps = { get: 0, getPrototypeOf: 0, ownKeys: 0, getOwnPropertyDescriptor: 0 };
+    const proxy = new Proxy(new Uint8Array(10), {
+      get() {
+        traps.get += 1;
+        throw new Error("get trap");
+      },
+      getPrototypeOf() {
+        traps.getPrototypeOf += 1;
+        throw new Error("prototype trap");
+      },
+      ownKeys() {
+        traps.ownKeys += 1;
+        throw new Error("ownKeys trap");
+      },
+      getOwnPropertyDescriptor() {
+        traps.getOwnPropertyDescriptor += 1;
+        throw new Error("descriptor trap");
+      },
+    });
+    expectFieldError(() => encodeRecordIdSuffix(proxy), "bytes");
+    expect(traps).toEqual({ get: 0, getPrototypeOf: 0, ownKeys: 0, getOwnPropertyDescriptor: 0 });
+
+    const detachedBuffer = new ArrayBuffer(10);
+    const detached = new Uint8Array(detachedBuffer);
+    structuredClone(detachedBuffer, { transfer: [detachedBuffer] });
+    expectFieldError(() => encodeRecordIdSuffix(detached), "bytes");
+  });
+
+  test("snapshots source bytes before return", () => {
+    const source = new Uint8Array(10);
+    source.fill(255);
+    const encoded = encodeRecordIdSuffix(source);
+    const id = recordIdFromBytes("verification", source);
+    source.fill(0);
+    expect(encoded).toBe("zzzzzzzzzzzzzzzz");
+    expect(id).toBe("ver_zzzzzzzzzzzzzzzz");
   });
 
   test("validates all kind prefixes and only the exact suffix alphabet/length", () => {

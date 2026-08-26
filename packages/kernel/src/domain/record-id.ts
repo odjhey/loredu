@@ -24,16 +24,69 @@ export type RecordIdFor<K extends RecordKind> = RecordIdByKind[K];
 
 const ID_PATTERN = /^(ent|clm|rel|res|ver)_([0-9a-hjkmnp-tv-z]{16})$/;
 
+const IntrinsicUint8Array = Uint8Array;
+const IntrinsicGetPrototypeOf = Object.getPrototypeOf;
+const IntrinsicGetOwnPropertyDescriptor = Object.getOwnPropertyDescriptor;
+const IntrinsicReflectApply = Reflect.apply;
+const TypedArrayPrototype = IntrinsicGetPrototypeOf(IntrinsicUint8Array.prototype) as object;
+
+type IntrinsicGetter = (this: unknown) => unknown;
+
+function captureTypedArrayGetter(key: PropertyKey): IntrinsicGetter {
+  const getter = IntrinsicGetOwnPropertyDescriptor(TypedArrayPrototype, key)?.get;
+  if (getter === undefined) throw new Error(`missing typed-array intrinsic getter ${String(key)}`);
+  return getter as IntrinsicGetter;
+}
+
+const IntrinsicTypedArrayTag = captureTypedArrayGetter(Symbol.toStringTag);
+const IntrinsicTypedArrayByteLength = captureTypedArrayGetter("byteLength");
+const IntrinsicTypedArrayByteOffset = captureTypedArrayGetter("byteOffset");
+const IntrinsicTypedArrayBuffer = captureTypedArrayGetter("buffer");
+
+function applyIntrinsicGetter(getter: IntrinsicGetter, receiver: unknown): unknown {
+  return IntrinsicReflectApply(getter, receiver, []);
+}
+
+function copyEntropyBytes(bytes: unknown): Uint8Array {
+  try {
+    const tag = applyIntrinsicGetter(IntrinsicTypedArrayTag, bytes);
+    if (tag !== "Uint8Array") {
+      throw new RecordValidationError("bytes", "must be a genuine Uint8Array view");
+    }
+
+    const byteLength = applyIntrinsicGetter(IntrinsicTypedArrayByteLength, bytes);
+    if (byteLength !== RECORD_ID_ENTROPY_BYTES) {
+      throw new RecordValidationError(
+        "bytes",
+        `must contain exactly ${RECORD_ID_ENTROPY_BYTES} represented bytes`,
+      );
+    }
+
+    const buffer = applyIntrinsicGetter(IntrinsicTypedArrayBuffer, bytes) as ArrayBufferLike;
+    const byteOffset = applyIntrinsicGetter(IntrinsicTypedArrayByteOffset, bytes) as number;
+    const represented = new IntrinsicUint8Array(buffer, byteOffset, RECORD_ID_ENTROPY_BYTES);
+    const copy = new IntrinsicUint8Array(RECORD_ID_ENTROPY_BYTES);
+    for (let index = 0; index < RECORD_ID_ENTROPY_BYTES; index += 1) {
+      copy[index] = represented[index] as number;
+    }
+    return copy;
+  } catch (error) {
+    if (error instanceof RecordValidationError) throw error;
+    throw new RecordValidationError(
+      "bytes",
+      `must be an attached Uint8Array view containing exactly ${RECORD_ID_ENTROPY_BYTES} bytes`,
+    );
+  }
+}
+
 /** Pure, deterministic Crockford-base32 encoding of exactly 80 entropy bits. */
 export function encodeRecordIdSuffix(bytes: Uint8Array): string {
-  if (bytes.length !== RECORD_ID_ENTROPY_BYTES) {
-    throw new RecordValidationError("bytes", `must contain exactly ${RECORD_ID_ENTROPY_BYTES} bytes`);
-  }
-
+  const trustedBytes = copyEntropyBytes(bytes);
   let bits = 0;
   let bitCount = 0;
   let encoded = "";
-  for (const byte of bytes) {
+  for (let index = 0; index < RECORD_ID_ENTROPY_BYTES; index += 1) {
+    const byte = trustedBytes[index] as number;
     bits = (bits << 8) | byte;
     bitCount += 8;
     while (bitCount >= 5) {
