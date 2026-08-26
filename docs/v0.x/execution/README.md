@@ -11,6 +11,7 @@ updated_at: 2026-08-26T12:10:00+08:00
 
 # v0.x execution
 
-- [Implementation plan](./implementation-plan.md) — M0–M3 sequence plus technical, policy/legal, and process-perspective acceptance scenarios.
+- [Implementation plan](./implementation-plan.md) — M0–M4 sequence plus technical, policy/legal, and process-perspective acceptance scenarios.
+- [First user journey](./first-user-journey.md) — how CLI-driven usage is expected to work and the behavioral test catalog automated against it.
 
 Back to [v0.x](../README.md).

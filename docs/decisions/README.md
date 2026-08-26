@@ -21,3 +21,4 @@ Initial decisions:
 - [0004: Claim identity is a declared key](./0004-claim-identity-key.md)
 - [0005: Embedded kernel, not a standalone product](./0005-embedded-kernel-compatibility.md)
 - [0006: Versioning is explicit at every layer](./0006-explicit-version-basis.md)
+- [0007: TypeScript on Bun](./0007-typescript-bun.md)
