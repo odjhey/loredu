@@ -88,12 +88,15 @@ directories, each with a README naming the rows that belong to it and the contra
 answer to, and no `describe()`, `test.todo`, or `.skip` anywhere. A directory that
 documents what is missing is honest; an empty test that runs green is not.
 
-One thing does live in `tests/` today: the structural guardrails at the tree root
-(`tests/workspace-structure.test.ts` — manifest DAG edges, kernel zero-dependency,
-`/testing` published separately, no environment import in kernel production code, no
-production import of `/testing`). They claim no T-number because they test the repository
-rather than the product, and they overlap deliberately with the Phase C boundary-checker
-spike — they are meant to be superseded by it, not to settle its choice in advance.
+One thing does live in `tests/` today: the structural guardrails at the tree root —
+manifest DAG edges, kernel zero-dependency, `/testing` published separately, no
+environment import in kernel production code, no production import of `/testing`, and the
+ambient-capability bypass check ([decision 0018](./0018-capability-ports.md)). The rules
+themselves live in `tests/workspace-boundary.ts`, a purpose-built scanner exercised by
+`tests/workspace-structure.test.ts` with a synthetic RED-then-GREEN proof per rule; this is
+the issue #9 Phase C checker the scaffold anticipated, chosen over dependency-cruiser per
+the fallback in [decision 0011](./0011-repo-package-architecture.md). They claim no
+T-number because they test the repository rather than the product.
 
 **`@loredu/kernel/testing` is a declared seam with no test doubles in it.** The subpath
 exists and is typechecked, exporting only the `StoreUnderTest` shape a conformance suite
@@ -120,8 +123,6 @@ forbids — in the one place it would be least visible.
   clock/random/filesystem" is answered by a port, not by a type package.
 - Both guardrails must stay demonstrably red: a deliberate `process.env` or `node:fs` in
   kernel production code fails typecheck, and the same import fails
-  `tests/workspace-structure.test.ts`. Both were demonstrated on the scaffold PR; issue #9
-  Phase C owns making that a repeatable check rather than a one-off paste.
-- When the Phase C checker lands, fold the scanning assertions of
-  `tests/workspace-structure.test.ts` into it and keep the manifest-DAG assertions or move
-  them, but do not leave both claiming to be the guardrail.
+  `tests/workspace-structure.test.ts`. Both were demonstrated on the scaffold PR, and the
+  boundary rules now carry their own synthetic RED-then-GREEN proof in
+  `tests/workspace-boundary.ts`/`tests/workspace-structure.test.ts`.

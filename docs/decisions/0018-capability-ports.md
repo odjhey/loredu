@@ -47,5 +47,5 @@ A second question surfaced alongside it. The [store contract](../architecture/co
 ## Rule / follow-up
 
 - Contracts of record: [clock and identity](../architecture/contracts/clock-and-identity.md), with [records](../architecture/contracts/records.md) and [store](../architecture/contracts/store.md) updated to match.
-- Extend the current workspace structural test with a capability-bypass proof for direct ambient time/randomness use in kernel production sources; keep dependency-cruiser #18 focused on graph complexity when that complexity justifies it.
+- Done: the ambient-capability rule in `tests/workspace-boundary.ts` rejects `Date.now()`, zero-argument `new Date()`, and `Math.random()` in kernel production sources, proven RED-then-GREEN in `tests/workspace-structure.test.ts`. Keep dependency-cruiser #18 focused on graph complexity when that complexity justifies it.
 - If a future adapter genuinely needs its own identity scheme, that is a superseding record, not a local exception.
