@@ -21,7 +21,8 @@ created_at: 2026-08-26T12:10:00+08:00
 | [Store port](./architecture/contracts/store.md) | Staged M0 append/get boundary and exact M1 snapshot scan, stream, head, commit, and conformance extension |
 | [Plain-file store contract](./architecture/contracts/plain-file-store.md) | M1 provider codec, layout, replay, locking, fsync, initialization, and named-root resolution |
 | [Clock and identity ports](./architecture/contracts/clock-and-identity.md) | Capability ports for `recorded_at` and record id entropy, and the single stamping point in the append path |
-| [Kernel API contract](./architecture/contracts/kernel-api.md) | Exact M0 TypeScript entrypoints, exports, signatures, branded constructors, and assembly |
+| [Kernel API contract](./architecture/contracts/kernel-api.md) | Exact staged TypeScript entrypoints, exports, signatures, branded constructors, assembly, and M1.5 additions |
+| [Application and CLI contract](./architecture/contracts/application-cli.md) | Exact M1.5 application reads/responses/filters/cursors/health and CLI grammar/errors/exits/composition/skill behavior |
 | [Projection contract](./architecture/contracts/projection.md) | Current and historical temporal views |
 | [Working Lore contract](./architecture/contracts/working-lore.md) | Bounded progressive-disclosure context for an activity |
 
@@ -53,6 +54,7 @@ created_at: 2026-08-26T12:10:00+08:00
 | [0023: Repository-local no-mistakes pipeline](./decisions/0023-repository-no-mistakes-pipeline.md) | Deterministic static/corpus commands, targeted Test evidence, trusted path guidance, bounded repair, and protected CI as landing authority |
 | [0024: M0 policy and Basis runtime boundaries](./decisions/0024-m0-policy-and-basis-runtime-boundaries.md) | Closed policy assembly, callback-free ruleset snapshots, canonical Basis construction, and structural equality |
 | [0025: M0 application append phase boundaries](./decisions/0025-m0-application-append-phase-boundaries.md) | Custom-policy result validation, ordered reference failures, all-family stamping, and detached in-memory snapshots |
+| [0026: M1.5 application and CLI contract closure](./decisions/0026-m15-application-cli-contract.md) | Exact application/CLI protocol, mechanics, pagination, disclosure, host capabilities, embedded skill, and staged M2/M3 boundary |
 | [0018: Capability ports for time and identity](./decisions/0018-capability-ports.md) | `Clock` and `RandomSource` injected; the application stamps `id`/`recorded_at`, the store assigns only the position |
 | [0017: Branch protection posture](./decisions/0017-branch-protection-posture.md) | `ci-required` the only required status, zero reviews, squash-only, no bypass actors, up-to-date-before-merge on |
 

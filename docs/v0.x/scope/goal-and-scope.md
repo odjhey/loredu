@@ -40,7 +40,7 @@ Prove that Loredu can maintain small, inspectable, provenance-aware operational 
 - current and historical projections;
 - bounded Working Lore representation;
 - simple filtering/ranking sufficient for fixtures;
-- the agent-operable `lor` CLI as an adapter (M1.5, [decisions 0007](../../decisions/0007-typescript-bun.md)–[0009](../../decisions/0009-hypermedia-pagination.md));
+- the agent-operable `lor` CLI as an adapter (M1.5, [decisions 0007](../../decisions/0007-typescript-bun.md)–[0009](../../decisions/0009-hypermedia-pagination.md), closed exactly by [decision 0026](../../decisions/0026-m15-application-cli-contract.md));
 - conformance and end-to-end tests around the published contracts.
 
 ## Explicitly deferred

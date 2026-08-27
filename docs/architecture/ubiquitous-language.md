@@ -45,14 +45,14 @@ created_at: 2026-08-26T12:10:00+08:00
 | **Record filter** | Provider-neutral M1 scan selector, closed to exact record-kind membership. Claim/query semantics remain application-owned. |
 | **Store root** | One explicitly selected physical directory containing an isolated canonical record stream plus provider control state; never discovered by walking cwd parents. |
 | **Basis** | Exactly stream position, structural RulesetIdentity, and canonical JSON query. `computed_at` is outside Basis and equality. |
-| **Handle** | Stable, runnable reference embedded in a response — an identifier plus the command that expands it. The unit of progressive disclosure. |
-| **Cursor** | Opaque continuation token for a paginated result, pinned to the basis position so a page chain stays consistent while records append. |
-| **Envelope** | The uniform response shape every surface returns: `ok`, `result`, `reconciliation`, `advice`, `basis` — plus `page` on list-returning results. |
-| **ok** | Envelope field stating whether the call succeeded. Failures carry a structured, actionable error and a distinct nonzero exit code. |
-| **Advice** | Deterministic, runnable follow-up entries in a response — corrective (close an attention item) or navigational (continue a list, expand a handle). Never speculative. |
-| **Page** | Bounded slice of a list result: returned count, total count, and a cursor when more exists. Truncation is never silent. |
-| **Health** | Mechanically checkable store condition that blocks a health check: unresolved same-key groups, malformed records, dangling references. |
-| **Advisory** | Non-blocking mechanical hint. Generic same-value/different-key divergence is later M1.5 versioned core mechanics, never ClaimPolicy advice, and never reconciles across keys. |
+| **Handle** | Existing Loredu record id paired with surface-neutral show/history affordances. Invalid-reference diagnostics and SourceRefs are terminal values, not record handles. |
+| **Cursor** | Opaque `loredu.cursor.v1.` continuation token binding operation, normalized query, complete Basis, pinned-head record-id anchor, and an operation-specific exclusive resume key. Claims/history use position; status adds item class and same-position ordinal. It preserves one immutable prefix while records append and rejects foreign snapshots. |
+| **Envelope** | Uniform semantic response shape: success has `ok`, `result`, `reconciliation`, `advice`, and `basis`; list success adds `page`, and CLI failure adds `error`. Direct version metadata, help, and text `skill` are non-envelope outputs; `skill --json` is the documented successful null-Basis exception. |
+| **ok** | Envelope field stating whether execution produced a semantic result. Ordinary unhealthy status remains `ok: true`; `--check` changes only the process exit. |
+| **Advice** | Deterministic follow-up affordance with `rel`, stable application `action`, typed `params`, and `why`; a surface may add a runnable rendering. Never speculative. |
+| **Page** | Bounded collection slice with this page's returned count, the pinned snapshot's total matching count, and a cursor exactly when more exists. |
+| **Health** | Blocking M1.5 condition: an exclusive exact-key group without an eligible Resolution whose record references all point backward and whose targets cover every current member, or a reference with no matching record at a lower position. Provider corruption prevents a health result rather than becoming partial health data. |
+| **Advisory** | Non-blocking mechanical hint. Generic same-scope, canonically equal-value, different-key divergence is M1.5 versioned core mechanics, can be connected by eligible explicit duplicate Relations whose endpoints point backward, is never ClaimPolicy advice, and never reconciles across keys. |
 | **Scope** | Caller-declared namespace a claim key belongs to (e.g. `repo=rozoro`); the consumer owns its vocabulary. |
 | **Perspective** | Optional claim-key component distinguishing coexisting views of the same subject/predicate, e.g. `documented_process` vs `observed_process`. |
 | **Confidence** | Claim field grading evidential strength: `candidate`, `observed`, `corroborated`, `confirmed`, `authoritative`. |
@@ -60,7 +60,7 @@ created_at: 2026-08-26T12:10:00+08:00
 | **ClaimPolicy** | Versioned seam that in M0 may validate (never transform) the exact declared ClaimKey and select `exclusive|coexisting`; the M0 interface has no `advise` method. Optional policy advice requires a later additive API when M2/M4 executes it. |
 | **LoreduError** | Structured public failure with stable top-level code, human message, and ordered ValidationIssues. |
 | **ValidationIssue** | Stable issue code, RFC6901 JSON Pointer path, and human message identifying one validation/reference problem. |
-| **Affordance** | Surface-neutral follow-up emitted by the application layer (`rel`, `action`, `params`); surface adapters render it as a CLI command, link, or call. Advice is a list of affordances. |
+| **Affordance** | Surface-neutral follow-up emitted by the application layer (`rel`, `action`, `params`, `why`); the CLI adds shell-ready `run`, while another adapter may render a link or call. Advice is an ordered list of affordances. |
 
 ## Naming rule
 

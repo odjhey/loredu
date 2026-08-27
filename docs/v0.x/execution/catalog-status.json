@@ -139,19 +139,19 @@
       "reason": "lor binary not built yet"
     },
     "T54": {
-      "milestone": "M1.5",
+      "milestone": "M3",
       "group": "CLI conformance (compiled binary)",
-      "reason": "lor binary not built yet"
+      "reason": "full scenario requires M2 projections and M3 Working Lore"
     },
     "T55": {
-      "milestone": "M1.5",
+      "milestone": "M2",
       "group": "CLI conformance (compiled binary)",
-      "reason": "lor binary not built yet"
+      "reason": "temporal projection commands land in M2"
     },
     "T56": {
-      "milestone": "M1.5",
+      "milestone": "M3",
       "group": "CLI conformance (compiled binary)",
-      "reason": "lor binary not built yet"
+      "reason": "complete staged journey requires M2 current and M3 lore commands"
     },
     "T57": {
       "milestone": "M1.5",
@@ -226,7 +226,7 @@
     "T73": {
       "milestone": "M1.5",
       "group": "Pagination and link-following (ADR 0009)",
-      "reason": "pagination and affordance links not implemented yet"
+      "reason": "M1.5 affordance link-following not implemented yet"
     },
     "T74": {
       "milestone": "M1.5",
@@ -234,9 +234,9 @@
       "reason": "pagination and affordance links not implemented yet"
     },
     "T75": {
-      "milestone": "M1.5",
+      "milestone": "M3",
       "group": "Pagination and link-following (ADR 0009)",
-      "reason": "pagination and affordance links not implemented yet"
+      "reason": "Working Lore section continuation lands in M3"
     },
     "T86": {
       "milestone": "M2",
