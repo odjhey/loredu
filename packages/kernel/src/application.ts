@@ -16,6 +16,7 @@ import {
   type RecordStore,
   type StreamPosition,
 } from "./ports/capabilities";
+import { type ClaimPolicy, DEFAULT_CLAIM_POLICY, validateClaimPolicy } from "./ports/claim-policy";
 
 export type { LoreduErrorCode, LoreduIssue, LoreduIssueCode } from "./errors";
 export { LoreduError } from "./errors";
@@ -27,6 +28,7 @@ export interface LoreduApplicationDependencies {
   readonly store: RecordStore;
   readonly clock: Clock;
   readonly randomSource: RandomSource;
+  readonly claimPolicy?: ClaimPolicy;
 }
 export interface LoreduApplication {
   append<D extends EntryDraft>(draft: D): Promise<AppendRecordResult<Entry>>;
@@ -403,7 +405,9 @@ export function createLoreduApplication({
   store,
   clock,
   randomSource,
+  claimPolicy = DEFAULT_CLAIM_POLICY,
 }: LoreduApplicationDependencies): LoreduApplication {
+  validateClaimPolicy(claimPolicy);
   return Object.freeze({
     async append<D extends EntryDraft>(input: D) {
       const draft = validateEntry(input);

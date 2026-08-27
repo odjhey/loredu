@@ -535,13 +535,18 @@ describe("portable value, timestamp, id, and exact family boundaries", () => {
   test("public brands, structured errors, and this slice's runtime exports remain exact", () => {
     expect(Object.keys(kernel).sort()).toEqual(
       [
+        "DEFAULT_CLAIM_POLICY",
+        "DEFAULT_RULESET_IDENTITY",
         "LoreduError",
         "RECORD_ID_PREFIX",
         "RECORD_SCHEMA_ID",
+        "basisEquals",
         "claimKeyOf",
         "claimKeysEqual",
+        "createBasis",
         "createInstant",
         "createLoreduApplication",
+        "createRulesetIdentity",
         "createStreamPosition",
         "decodePersistedRecord",
         "decodeRecordDraft",

@@ -263,16 +263,6 @@
       "group": "Kernel invariants and the policy seam (issue #6)",
       "reason": "kernel invariants and ClaimPolicy seam not implemented yet"
     },
-    "T81": {
-      "milestone": "M0",
-      "group": "Kernel invariants and the policy seam (issue #6)",
-      "reason": "kernel invariants and ClaimPolicy seam not implemented yet"
-    },
-    "T82": {
-      "milestone": "M0",
-      "group": "Kernel invariants and the policy seam (issue #6)",
-      "reason": "kernel invariants and ClaimPolicy seam not implemented yet"
-    },
     "T83": {
       "milestone": "M0",
       "group": "Kernel invariants and the policy seam (issue #6)",

@@ -93,7 +93,7 @@ confidence: observed
 derived_from: [ent_0123456789abcdef]
 ```
 
-The exact declared ClaimKey is `(scope, subject.type, subject.id, predicate, perspective?)`. Core constructs it from persisted fields. A ClaimPolicy may validate or reject it but cannot normalize, replace, merge, split, or return another key; any retained identity method must return the exact declared canonical key or fail. Reconciliation never crosses exact keys. Unkeyed knowledge is an Entry.
+The exact declared ClaimKey is `(scope, subject.type, subject.id, predicate, perspective?)`. Core constructs it from persisted fields. A ClaimPolicy may validate or reject it but cannot normalize, replace, merge, split, or return another key. The M0 runtime rejects an `identity` member at policy assembly and ruleset construction rather than retaining a remapping callback ([decision 0024](../../decisions/0024-m0-policy-and-basis-runtime-boundaries.md)). The built-in policy validates this closed declared shape and selects `exclusive`; custom callback execution belongs to generic Claim append in M0-A. Reconciliation never crosses exact keys. Unkeyed knowledge is an Entry.
 
 ### Relation
 
