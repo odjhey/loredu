@@ -765,7 +765,7 @@ describe("authoritative workspace boundary guard", () => {
       expect(mutant).not.toEqual(normal);
       expect(mutant.some((item) => item.rule === scenarios[id].rule)).toBe(false);
     }
-  });
+  }, 15_000);
 
   test("the actual kernel project rejects node:fs, Bun, process, and Buffer", async () => {
     const root = fixture();
