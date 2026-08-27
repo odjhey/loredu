@@ -1,4 +1,4 @@
-import type { PersistedRecord, RecordKind } from "../src/domain/entry";
+import type { PersistedRecord, RecordId, RecordKind } from "../src/domain/entry";
 import { jsonValuesEqual } from "../src/domain/portable-json";
 import { decodePersistedRecord, encodePersistedRecord } from "../src/domain/records";
 import { LoreduError } from "../src/errors";
