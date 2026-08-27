@@ -426,6 +426,157 @@ describe("authoritative workspace boundary guard", () => {
     );
   });
 
+  test("fails closed for package-root and unclassified symlinks and malformed roots", () => {
+    const linkedRoot = fixture();
+    const external = `${linkedRoot}-packages`;
+    temporaryRoots.push(external);
+    cpSync(join(linkedRoot, "packages"), external, { recursive: true });
+    rmSync(join(linkedRoot, "packages"), { recursive: true });
+    symlinkSync(external, join(linkedRoot, "packages"));
+    expect(scanWorkspace(linkedRoot)).toContainEqual(
+      violation("packages", "source-tree", "symlinked packages directory is not inspectable"),
+    );
+
+    const unclassified = fixture();
+    symlinkSync(join(unclassified, "packages/kernel/src"), join(unclassified, "packages/kernel/hidden"));
+    expectViolation(
+      unclassified,
+      violation(
+        "packages/kernel/hidden",
+        "source-tree",
+        "symlinked unclassified package entry is not inspectable",
+      ),
+    );
+
+    const missingPackage = fixture();
+    rmSync(join(missingPackage, "packages/kernel"), { recursive: true });
+    expect(() => scanWorkspace(missingPackage)).not.toThrow();
+    expectViolation(
+      missingPackage,
+      violation("packages/kernel", "source-tree", "directory could not be read"),
+    );
+
+    const testingFile = fixture();
+    rmSync(join(testingFile, "packages/kernel/testing"), { recursive: true });
+    plant(testingFile, "packages/kernel/testing", "not a directory");
+    expectViolation(
+      testingFile,
+      violation("packages/kernel/testing", "source-tree", "testing root is not an inspectable directory"),
+    );
+  });
+
+  test("uses TypeScript resolution and rejects ignored and unknown workspace targets", () => {
+    const root = fixture();
+    plant(root, "packages/kernel/src/substituted.ts", "export {};\n");
+    plant(root, "packages/kernel/src/declaration.d.ts", "export {};\n");
+    plant(root, "packages/kernel/src/alias.ts", "export {};\n");
+    mutateJson(root, "packages/kernel/tsconfig.json", (value) => {
+      const options = value.compilerOptions as Record<string, unknown>;
+      options.baseUrl = ".";
+      options.paths = { "@internal/*": ["src/*"] };
+    });
+    plant(
+      root,
+      "packages/kernel/src/resolution.ts",
+      'import "./substituted.js"; import "./declaration"; import "@internal/alias";',
+    );
+    expect(scanWorkspace(root)).toEqual([]);
+
+    const ignored = fixture();
+    plant(ignored, "packages/kernel/node_modules/evil/index.ts", "export {};\n");
+    plant(ignored, "packages/kernel/src/ignored.ts", 'import "../node_modules/evil/index";');
+    expectViolation(
+      ignored,
+      violation(
+        "packages/kernel/src/ignored.ts",
+        "boundary-target",
+        "1:8 resolves into an ignored source tree: ../node_modules/evil/index",
+      ),
+    );
+    const unknown = fixture();
+    plant(unknown, "packages/store-plainfile/src/unknown.ts", 'import "@loredu/unknown";');
+    expectViolation(
+      unknown,
+      violation(
+        "packages/store-plainfile/src/unknown.ts",
+        "boundary-unresolved",
+        "1:8 unknown workspace package: @loredu/unknown",
+      ),
+    );
+  });
+
+  test("supports static import attributes and retains dynamic uncertainty", () => {
+    const root = fixture();
+    plant(
+      root,
+      "packages/store-plainfile/src/attributes.ts",
+      'import("vendor", { with: { type: "json" } });',
+    );
+    expect(scanWorkspace(root)).toEqual([]);
+    plant(
+      root,
+      "packages/store-plainfile/src/attributes.ts",
+      'const name = "vendor"; import(name, { with: { type: "json" } });',
+    );
+    expectViolation(
+      root,
+      violation(
+        "packages/store-plainfile/src/attributes.ts",
+        "boundary-dynamic",
+        "1:24 module reference is not one static string",
+      ),
+    );
+  });
+
+  test.each([
+    ["lib", '/// <reference lib="dom" />', "1:21 triple-slash lib reference is forbidden: dom"],
+    ["types", '/// <reference types="bun" />', "1:23 triple-slash types reference is forbidden: bun"],
+    [
+      "path",
+      '/// <reference path="./index.ts" />',
+      "1:22 triple-slash path reference is forbidden: ./index.ts",
+    ],
+  ])("rejects kernel triple-slash %s widening", (_label, source, detail) => {
+    const root = fixture();
+    plant(root, "packages/kernel/src/reference.ts", `${source}\nexport {};`);
+    expectViolation(root, violation("packages/kernel/src/reference.ts", "kernel-reference", detail));
+  });
+
+  test("resolves ambient bindings lexically and follows capability aliases", () => {
+    const red = fixture();
+    plant(
+      red,
+      "packages/kernel/src/lexical.ts",
+      "function f() { const Date = class {}; return new Date(); } Date.now(); const d = Date; const n = d.now; n(); globalThis.process.pid; globalThis['Buffer'].from('x');",
+    );
+    const violations = scanWorkspace(red).filter((item) => item.path.endsWith("lexical.ts"));
+    for (const detail of [
+      "1:60 ambient Date.now",
+      "1:105 ambient Date.now",
+      "1:110 ambient global process",
+      "1:134 ambient global Buffer",
+    ])
+      expect(violations).toContainEqual(
+        violation("packages/kernel/src/lexical.ts", "ambient-capability", detail),
+      );
+
+    const green = fixture();
+    plant(
+      green,
+      "packages/kernel/src/locals.ts",
+      "function f(process: unknown, Bun: unknown, Date: {(): void}) { Date(); return [process, Bun]; } const o = { process() {}, Buffer: 1 }; export {f,o};",
+    );
+    expect(scanWorkspace(green)).toEqual([]);
+  });
+
+  test("compares exact export maps independent of object key order", () => {
+    const root = fixture();
+    mutateJson(root, "packages/kernel/package.json", (value) => {
+      value.exports = { "./testing": "./testing/index.ts", ".": "./src/index.ts" };
+    });
+    expect(scanWorkspace(root)).toEqual([]);
+  });
+
   test("the actual kernel project rejects node:fs, Bun, process, and Buffer", async () => {
     const root = fixture();
     plant(

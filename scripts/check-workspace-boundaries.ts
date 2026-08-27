@@ -1,6 +1,6 @@
-import { existsSync, lstatSync, readdirSync, readFileSync, realpathSync } from "node:fs";
+import { type Dirent, existsSync, lstatSync, readdirSync, readFileSync, realpathSync } from "node:fs";
 import { builtinModules } from "node:module";
-import { dirname, extname, join, relative, resolve, sep } from "node:path";
+import { dirname, extname, join, relative, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import ts from "typescript";
 
@@ -52,6 +52,21 @@ function push(result: Violation[], root: string, path: string, rule: string, det
 }
 function manifest(path: string): Manifest {
   return JSON.parse(readFileSync(path, "utf8")) as Manifest;
+}
+function inspect(path: string): ReturnType<typeof lstatSync> | undefined {
+  try {
+    return lstatSync(path);
+  } catch {
+    return undefined;
+  }
+}
+function entries(root: string, path: string, result: Violation[]): Dirent[] | undefined {
+  try {
+    return readdirSync(path, { withFileTypes: true });
+  } catch {
+    push(result, root, path, "source-tree", "directory could not be read");
+    return undefined;
+  }
 }
 function runtimeDependencies(value: Manifest): string[] {
   return [
@@ -122,11 +137,20 @@ function discover(root: string, result: Violation[]): Discovered {
   const packagesRoot = join(root, "packages");
   const production = new Map<PackageName, string[]>(PACKAGES.map((name) => [name, []]));
   const tests: string[] = [];
-  if (!existsSync(packagesRoot)) {
+  const packagesInfo = inspect(packagesRoot);
+  if (!packagesInfo) {
     push(result, root, packagesRoot, "source-tree", "required packages directory is missing");
     return { production, tests };
   }
-  for (const entry of readdirSync(packagesRoot, { withFileTypes: true })) {
+  if (packagesInfo.isSymbolicLink()) {
+    push(result, root, packagesRoot, "source-tree", "symlinked packages directory is not inspectable");
+    return { production, tests };
+  }
+  if (!packagesInfo.isDirectory()) {
+    push(result, root, packagesRoot, "source-tree", "packages root is not a directory");
+    return { production, tests };
+  }
+  for (const entry of entries(root, packagesRoot, result) ?? []) {
     const path = join(packagesRoot, entry.name);
     if (entry.isSymbolicLink()) {
       push(result, root, path, "source-tree", "symlinked package entry is not inspectable");
@@ -141,13 +165,24 @@ function discover(root: string, result: Violation[]): Discovered {
     const packageRoot = join(packagesRoot, name);
     const roots = [join(packageRoot, "src"), ...(name === "cli" ? [join(packageRoot, "bin")] : [])];
     for (const sourceRoot of roots) {
-      if (!existsSync(sourceRoot) || !lstatSync(sourceRoot).isDirectory()) {
+      const sourceInfo = inspect(sourceRoot);
+      if (!sourceInfo) {
         push(result, root, sourceRoot, "source-tree", "required production source root is missing");
+        continue;
+      }
+      if (sourceInfo.isSymbolicLink() || !sourceInfo.isDirectory()) {
+        push(
+          result,
+          root,
+          sourceRoot,
+          "source-tree",
+          "required production source root is not an inspectable directory",
+        );
         continue;
       }
       let count = 0;
       const visit = (directory: string): void => {
-        for (const entry of readdirSync(directory, { withFileTypes: true })) {
+        for (const entry of entries(root, directory, result) ?? []) {
           const path = join(directory, entry.name);
           if (entry.isSymbolicLink()) {
             push(result, root, path, "source-tree", "symlinked source entry is not inspectable");
@@ -181,19 +216,26 @@ function discover(root: string, result: Violation[]): Discovered {
     }
     const testingRoot = join(packageRoot, "testing");
     if (existsSync(testingRoot)) {
-      const visitTesting = (directory: string): void => {
-        for (const entry of readdirSync(directory, { withFileTypes: true })) {
-          const path = join(directory, entry.name);
-          if (entry.isSymbolicLink())
-            push(result, root, path, "source-tree", "symlinked test entry is not inspectable");
-          else if (entry.isDirectory()) visitTesting(path);
-          else if (entry.isFile() && SOURCE_EXTENSIONS.has(extname(path))) tests.push(path);
-          else push(result, root, path, "source-tree", "unrecognized test source entry");
-        }
-      };
-      visitTesting(testingRoot);
+      const testingInfo = inspect(testingRoot);
+      if (!testingInfo || testingInfo.isSymbolicLink() || !testingInfo.isDirectory()) {
+        push(result, root, testingRoot, "source-tree", "testing root is not an inspectable directory");
+      } else {
+        const visitTesting = (directory: string): void => {
+          for (const entry of entries(root, directory, result) ?? []) {
+            const path = join(directory, entry.name);
+            if (entry.isSymbolicLink())
+              push(result, root, path, "source-tree", "symlinked test entry is not inspectable");
+            else if (entry.isDirectory()) visitTesting(path);
+            else if (entry.isFile() && SOURCE_EXTENSIONS.has(extname(path))) tests.push(path);
+            else push(result, root, path, "source-tree", "unrecognized test source entry");
+          }
+        };
+        visitTesting(testingRoot);
+      }
     }
-    for (const entry of readdirSync(packageRoot, { withFileTypes: true })) {
+    const packageEntries = entries(root, packageRoot, result);
+    if (!packageEntries) continue;
+    for (const entry of packageEntries) {
       if (
         entry.name === "src" ||
         entry.name === "testing" ||
@@ -206,6 +248,10 @@ function discover(root: string, result: Violation[]): Discovered {
       )
         continue;
       const path = join(packageRoot, entry.name);
+      if (entry.isSymbolicLink()) {
+        push(result, root, path, "source-tree", "symlinked unclassified package entry is not inspectable");
+        continue;
+      }
       if (
         entry.isFile() &&
         (SOURCE_EXTENSIONS.has(extname(path)) || EXECUTABLE_EXTENSIONS.has(extname(path)))
@@ -221,7 +267,7 @@ function discover(root: string, result: Violation[]): Discovered {
         const stack = [path];
         while (stack.length) {
           const current = stack.pop() as string;
-          for (const child of readdirSync(current, { withFileTypes: true })) {
+          for (const child of entries(root, current, result) ?? []) {
             const childPath = join(current, child.name);
             if (child.isDirectory()) stack.push(childPath);
             else if (child.isSymbolicLink())
@@ -249,14 +295,20 @@ function owningPackage(root: string, path: string): PackageName | undefined {
   const local = portable(relative(join(root, "packages"), path));
   return PACKAGES.find((name) => local === name || local.startsWith(`${name}/`));
 }
-function resolveRelative(from: string, specifier: string): string | undefined {
-  const base = resolve(dirname(from), specifier);
-  const candidates = [
-    base,
-    ...[".ts", ".tsx", ".mts", ".cts"].map((extension) => `${base}${extension}`),
-    ...["index.ts", "index.tsx", "index.mts", "index.cts"].map((file) => join(base, file)),
-  ];
-  return candidates.find((candidate) => existsSync(candidate) && lstatSync(candidate).isFile());
+function compilerOptions(root: string, owner: PackageName): ts.CompilerOptions {
+  const configPath = join(root, "packages", owner, "tsconfig.json");
+  const loaded = ts.readConfigFile(configPath, ts.sys.readFile);
+  if (loaded.error) return {};
+  return ts.parseJsonConfigFileContent(loaded.config, ts.sys, dirname(configPath)).options;
+}
+function resolveModule(from: string, specifier: string, options: ts.CompilerOptions): string | undefined {
+  return ts.resolveModuleName(specifier, from, options, ts.sys).resolvedModule?.resolvedFileName;
+}
+function ignoredTarget(root: string, target: string): boolean {
+  const owner = owningPackage(root, target);
+  if (!owner) return false;
+  const local = portable(relative(join(root, "packages", owner), target));
+  return local.split("/").some((part) => part === "node_modules" || part === "dist" || part.startsWith("."));
 }
 function workspaceSpecifier(specifier: string): PackageName | undefined {
   return PACKAGES.find(
@@ -272,10 +324,13 @@ function checkReference(
   node: ts.Node,
   specifier: string,
   result: Violation[],
+  options: ts.CompilerOptions,
 ): void {
   const at = location(source, node);
-  if (specifier.startsWith(".") || specifier.startsWith("/")) {
-    const target = resolveRelative(file, specifier);
+  const configuredTarget = resolveModule(file, specifier, options);
+  const relativeReference = specifier.startsWith(".") || specifier.startsWith("/");
+  if (relativeReference || (configuredTarget && !portable(configuredTarget).includes("/node_modules/"))) {
+    const target = configuredTarget;
     if (!target) {
       push(result, root, file, "boundary-unresolved", `${at} cannot resolve ${specifier}`);
       return;
@@ -283,6 +338,8 @@ function checkReference(
     const targetOwner = owningPackage(root, target);
     if (!targetOwner)
       push(result, root, file, "boundary-target", `${at} resolves outside the workspace: ${specifier}`);
+    else if (ignoredTarget(root, target))
+      push(result, root, file, "boundary-target", `${at} resolves into an ignored source tree: ${specifier}`);
     else if (portable(relative(join(root, "packages", targetOwner), target)).startsWith("testing/"))
       push(
         result,
@@ -302,6 +359,10 @@ function checkReference(
     return;
   }
   const workspace = workspaceSpecifier(specifier);
+  if (!workspace && specifier.startsWith("@loredu/")) {
+    push(result, root, file, "boundary-unresolved", `${at} unknown workspace package: ${specifier}`);
+    return;
+  }
   if (workspace) {
     if (specifier === "@loredu/kernel/testing" || specifier.startsWith("@loredu/kernel/testing/")) {
       push(result, root, file, "testing-import", `${at} production imports ${specifier}`);
@@ -326,7 +387,14 @@ function checkReference(
   }
 }
 
-function analyzeFile(root: string, owner: PackageName, file: string, result: Violation[]): void {
+function analyzeFile(
+  root: string,
+  owner: PackageName,
+  file: string,
+  result: Violation[],
+  options: ts.CompilerOptions,
+  program: ts.Program,
+): void {
   let text: string;
   try {
     text = readFileSync(file, "utf8");
@@ -334,7 +402,10 @@ function analyzeFile(root: string, owner: PackageName, file: string, result: Vio
     push(result, root, file, "source-read", "source could not be read");
     return;
   }
-  const source = ts.createSourceFile(file, text, ts.ScriptTarget.Latest, true, sourceKind(file));
+  const source =
+    program.getSourceFile(file) ??
+    ts.createSourceFile(file, text, ts.ScriptTarget.Latest, true, sourceKind(file));
+  const checker = program.getTypeChecker();
   const parseDiagnostics = (source as ts.SourceFile & { readonly parseDiagnostics: readonly ts.Diagnostic[] })
     .parseDiagnostics;
   for (const diagnostic of parseDiagnostics) {
@@ -354,23 +425,71 @@ function analyzeFile(root: string, owner: PackageName, file: string, result: Vio
     );
   }
   if (parseDiagnostics.length) return;
+  if (owner === "kernel") {
+    const directiveLocation = (position: number): string => {
+      const point = source.getLineAndCharacterOfPosition(position);
+      return `${point.line + 1}:${point.character + 1}`;
+    };
+    for (const directive of source.libReferenceDirectives)
+      push(
+        result,
+        root,
+        file,
+        "kernel-reference",
+        `${directiveLocation(directive.pos)} triple-slash lib reference is forbidden: ${directive.fileName}`,
+      );
+    for (const directive of source.typeReferenceDirectives)
+      push(
+        result,
+        root,
+        file,
+        "kernel-reference",
+        `${directiveLocation(directive.pos)} triple-slash types reference is forbidden: ${directive.fileName}`,
+      );
+    for (const directive of source.referencedFiles)
+      push(
+        result,
+        root,
+        file,
+        "kernel-reference",
+        `${directiveLocation(directive.pos)} triple-slash path reference is forbidden: ${directive.fileName}`,
+      );
+  }
   const packageRoot = join(root, "packages", owner);
   const shadows = new Set<string>();
-  const aliases = new Map<string, string>();
+  const aliases = new Map<ts.Symbol, string>();
+  const locallyBound = (node: ts.Identifier): boolean =>
+    checker
+      .getSymbolAtLocation(node)
+      ?.declarations?.some((declaration) => declaration.getSourceFile() === source) ?? false;
+  const expressionCapability = (expression: ts.Expression): string | undefined => {
+    const value = unwrap(expression);
+    if (ts.isIdentifier(value)) {
+      if (["Date", "Math", "Bun", "process", "Buffer"].includes(value.text) && !locallyBound(value))
+        return value.text;
+      const symbol = checker.getSymbolAtLocation(value);
+      return symbol ? aliases.get(symbol) : undefined;
+    }
+    const member = propertyName(value);
+    if (!member) return undefined;
+    const base = identifier(member.object, "globalThis") ? "globalThis" : expressionCapability(member.object);
+    if (
+      base === "globalThis" &&
+      member.name &&
+      ["Date", "Math", "Bun", "process", "Buffer"].includes(member.name)
+    )
+      return member.name;
+    return base && member.name ? `${base}.${member.name}` : undefined;
+  };
   const collect = (node: ts.Node): void => {
     if (ts.isVariableDeclaration(node)) {
       const initial = node.initializer && unwrap(node.initializer);
       if (ts.isIdentifier(node.name)) {
         const name = node.name.text;
-        if (initial && globalObject(initial, "Date")) aliases.set(name, "Date");
-        else {
-          const member = initial && propertyName(initial);
-          if (member && globalObject(member.object, "Date") && member.name === "now")
-            aliases.set(name, "Date.now");
-          else if (member && globalObject(member.object, "Math") && member.name === "random")
-            aliases.set(name, "Math.random");
-          else shadows.add(name);
-        }
+        const capability = initial && expressionCapability(initial);
+        const symbol = checker.getSymbolAtLocation(node.name);
+        if (capability && symbol) aliases.set(symbol, capability);
+        else shadows.add(name);
       } else if (ts.isObjectBindingPattern(node.name) && initial) {
         const capability = globalObject(initial, "Date")
           ? "Date.now"
@@ -384,7 +503,7 @@ function analyzeFile(root: string, owner: PackageName, file: string, result: Vio
             property === (capability === "Date.now" ? "now" : "random") &&
             ts.isIdentifier(element.name)
           )
-            aliases.set(element.name.text, capability);
+            aliases.set(checker.getSymbolAtLocation(element.name) as ts.Symbol, capability);
           else if (ts.isIdentifier(element.name)) shadows.add(element.name.text);
         }
       }
@@ -401,7 +520,7 @@ function analyzeFile(root: string, owner: PackageName, file: string, result: Vio
   };
   collect(source);
   const isGlobal = (expression: ts.Expression, name: string): boolean =>
-    globalObject(expression, name) && !shadows.has(name);
+    expressionCapability(expression) === name;
   const visit = (node: ts.Node): void => {
     let reference: string | undefined;
     let referenceNode: ts.Node = node;
@@ -417,11 +536,16 @@ function analyzeFile(root: string, owner: PackageName, file: string, result: Vio
       const callee = unwrap(node.expression);
       if (
         callee.kind === ts.SyntaxKind.ImportKeyword ||
-        (ts.isIdentifier(callee) && callee.text === "require" && !shadows.has("require"))
+        (ts.isIdentifier(callee) && callee.text === "require" && !locallyBound(callee))
       ) {
         reference = staticText(node.arguments[0]);
         referenceNode = node;
-        if (node.arguments.length !== 1 || reference === undefined)
+        const importCall = callee.kind === ts.SyntaxKind.ImportKeyword;
+        if (
+          (!importCall && node.arguments.length !== 1) ||
+          (importCall && ![1, 2].includes(node.arguments.length)) ||
+          reference === undefined
+        )
           push(
             result,
             root,
@@ -430,30 +554,22 @@ function analyzeFile(root: string, owner: PackageName, file: string, result: Vio
             `${location(source, node)} module reference is not one static string`,
           );
       }
-      const member = propertyName(callee);
-      const directDate =
-        isGlobal(callee, "Date") || (ts.isIdentifier(callee) && aliases.get(callee.text) === "Date");
-      const dateNow =
-        member &&
-        (isGlobal(member.object, "Date") ||
-          (ts.isIdentifier(member.object) && aliases.get(member.object.text) === "Date")) &&
-        member.name === "now";
-      const mathRandom = member && isGlobal(member.object, "Math") && member.name === "random";
-      const aliasCapability =
-        ts.isIdentifier(callee) && ["Date.now", "Math.random"].includes(aliases.get(callee.text) ?? "");
+      const calleeCapability = expressionCapability(callee);
+      const directDate = calleeCapability === "Date";
+      const dateNow = calleeCapability === "Date.now";
+      const mathRandom = calleeCapability === "Math.random";
+      const aliasCapability = dateNow || mathRandom;
       if (owner === "kernel" && (directDate || dateNow || mathRandom || aliasCapability))
         push(
           result,
           root,
           file,
           "ambient-capability",
-          `${location(source, node)} ambient ${directDate ? "Date call" : dateNow || aliases.get(ts.isIdentifier(callee) ? callee.text : "") === "Date.now" ? "Date.now" : "Math.random"}`,
+          `${location(source, node)} ambient ${directDate ? "Date call" : dateNow ? "Date.now" : "Math.random"}`,
         );
     } else if (ts.isNewExpression(node)) {
       const constructorExpression = unwrap(node.expression);
-      const date =
-        isGlobal(constructorExpression, "Date") ||
-        (ts.isIdentifier(constructorExpression) && aliases.get(constructorExpression.text) === "Date");
+      const date = isGlobal(constructorExpression, "Date");
       if (
         owner === "kernel" &&
         date &&
@@ -468,18 +584,31 @@ function analyzeFile(root: string, owner: PackageName, file: string, result: Vio
         );
     }
     if (reference !== undefined)
-      checkReference(root, owner, packageRoot, file, source, referenceNode, reference, result);
+      checkReference(root, owner, packageRoot, file, source, referenceNode, reference, result, options);
+    if (owner === "kernel" && (ts.isPropertyAccessExpression(node) || ts.isElementAccessExpression(node))) {
+      const capability = expressionCapability(node);
+      if (["Bun", "process", "Buffer"].includes(capability ?? ""))
+        push(
+          result,
+          root,
+          file,
+          "ambient-capability",
+          `${location(source, node)} ambient global ${capability}`,
+        );
+    }
     const parent = node.parent;
     const propertyNameOnly =
       !!parent &&
       ((ts.isPropertyAccessExpression(parent) && parent.name === node) ||
         (ts.isPropertyAssignment(parent) && parent.name === node) ||
-        (ts.isPropertySignature(parent) && parent.name === node));
+        (ts.isPropertySignature(parent) && parent.name === node) ||
+        (ts.isMethodDeclaration(parent) && parent.name === node) ||
+        (ts.isMethodSignature(parent) && parent.name === node));
     if (
       owner === "kernel" &&
       ts.isIdentifier(node) &&
       ["Bun", "process", "Buffer"].includes(node.text) &&
-      !shadows.has(node.text) &&
+      !locallyBound(node) &&
       !propertyNameOnly &&
       (!parent || (!ts.isTypeReferenceNode(parent) && !ts.isTypeAliasDeclaration(parent)))
     )
@@ -575,14 +704,23 @@ export function scanWorkspace(root: string): Violation[] {
           `missing required manifest edge ${name} -> ${required}`,
         );
     const expected = EXPECTED_EXPORTS[name];
-    if (JSON.stringify(value.exports ?? {}) !== JSON.stringify(expected))
+    const actualExports = value.exports ?? {};
+    const sameExports =
+      typeof actualExports === "object" &&
+      !Array.isArray(actualExports) &&
+      JSON.stringify(Object.entries(actualExports).sort(([left], [right]) => left.localeCompare(right))) ===
+        JSON.stringify(Object.entries(expected).sort(([left], [right]) => left.localeCompare(right)));
+    if (!sameExports)
       push(result, root, manifestPath, "package-exports", `exports must equal ${JSON.stringify(expected)}`);
     for (const [key, target] of Object.entries(expected)) {
       const targetPath = join(packageRoot, target);
       if (!existsSync(targetPath) || !lstatSync(targetPath).isFile())
         push(result, root, manifestPath, "package-exports", `export ${key} target does not exist: ${target}`);
     }
-    for (const file of discovered.production.get(name) ?? []) analyzeFile(root, name, file, result);
+    const options = compilerOptions(root, name);
+    const files = discovered.production.get(name) ?? [];
+    const program = ts.createProgram([...files], options);
+    for (const file of files) analyzeFile(root, name, file, result, options, program);
   }
   checkKernelCompiler(root, result);
   return result.sort((left, right) =>
