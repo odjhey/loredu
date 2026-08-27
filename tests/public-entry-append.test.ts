@@ -76,6 +76,74 @@ describe("public Entry assembly", () => {
     expect("SeededRandomSource" in kernel).toBe(false);
   });
 
+  test("descriptor and portable-data boundaries reject inertly while valid provenance and aliases survive", async () => {
+    const { app } = assembly();
+    const malformed: unknown[] = [];
+    const hiddenStamp = { ...draft };
+    Object.defineProperty(hiddenStamp, "id", { value: "ent_hidden", enumerable: false });
+    malformed.push(hiddenStamp);
+    malformed.push(Object.assign({ ...draft }, { [Symbol("extra")]: true }));
+    malformed.push(Object.assign(Object.create({ inherited: true }), draft));
+    const extraSources: unknown[] = [];
+    Object.defineProperty(extraSources, "extra", { value: true, enumerable: true });
+    malformed.push({ ...draft, sources: extraSources });
+    const sparse = new Array(1);
+    malformed.push({ ...draft, metadata: { "test.value": sparse } });
+    malformed.push({ ...draft, body: "bad\ud800" });
+    malformed.push({ ...draft, metadata: { "test.value": "bad\udfff" } });
+    let getterCalls = 0;
+    const accessor = { ...draft };
+    Object.defineProperty(accessor, "body", {
+      enumerable: true,
+      get() {
+        getterCalls++;
+        return "do not invoke";
+      },
+    });
+    malformed.push(accessor);
+    for (const value of malformed)
+      await expect(app.append(value as EntryDraft)).rejects.toMatchObject({ code: "VALIDATION_FAILED" });
+    expect(getterCalls).toBe(0);
+
+    const shared = { nested: ["x", "x"] };
+    const title = "😀".repeat(256);
+    const accepted = await app.append({
+      ...draft,
+      title,
+      sources: [{ ref: "https://example.test/source", locator: "page-1", snapshot: "sha256:abc" }],
+      metadata: { "test.aliases": [shared, shared] },
+    });
+    expect(accepted.record.title).toBe(title);
+    expect(accepted.record.sources).toEqual([
+      { ref: "https://example.test/source", locator: "page-1", snapshot: "sha256:abc" },
+    ]);
+    expect(accepted.record.metadata["test.aliases"]).toEqual([shared, shared]);
+    shared.nested[0] = "mutated";
+    expect(accepted.record.metadata["test.aliases"]).toEqual([
+      { nested: ["x", "x"] },
+      { nested: ["x", "x"] },
+    ]);
+  });
+
+  test("invalid adapter positions become controlled failures", async () => {
+    for (const position of [0, -1, 1.5, Number.NaN, Number.MAX_SAFE_INTEGER + 1]) {
+      const store = {
+        async append() {
+          return position as StreamPosition;
+        },
+        async get() {
+          return undefined;
+        },
+      };
+      const app = createLoreduApplication({
+        store,
+        clock: new FixedClock(createInstant(0)),
+        randomSource: new SeededRandomSource(1),
+      });
+      await expect(app.append(draft)).rejects.toMatchObject({ code: "STORE_APPEND_FAILED" });
+    }
+  });
+
   test("capabilities are called once in entropy-clock-store order and collisions do not retry", async () => {
     const calls: string[] = [];
     let randomCalls = 0;
