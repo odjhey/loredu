@@ -3,16 +3,6 @@
   "catalog": "docs/v0.x/execution/first-user-journey.md",
   "note": "Every catalog T-number is either claimed by an executable test under tests/ (via an @covers annotation) or listed here with the milestone that will implement it. Never both, never neither. See ADR 0015.",
   "deferred": {
-    "T01": {
-      "milestone": "M0",
-      "group": "M0 — records and validation",
-      "reason": "kernel record types and validation not implemented yet"
-    },
-    "T02": {
-      "milestone": "M0",
-      "group": "M0 — records and validation",
-      "reason": "kernel record types and validation not implemented yet"
-    },
     "T03": {
       "milestone": "M0",
       "group": "M0 — records and validation",
@@ -318,11 +308,6 @@
       "group": "Kernel invariants and the policy seam (issue #6)",
       "reason": "kernel invariants and ClaimPolicy seam not implemented yet"
     },
-    "T84": {
-      "milestone": "M0",
-      "group": "M0 — records and validation",
-      "reason": "capability ports and the append stamping path not implemented yet"
-    },
     "T85": {
       "milestone": "M0",
       "group": "M0 — records and validation",
@@ -332,11 +317,6 @@
       "milestone": "M2",
       "group": "M2 — reconciliation, resolution, projections",
       "reason": "value canonicalization lands with the kernel in M0; its use in conflict detection is M2"
-    },
-    "T87": {
-      "milestone": "M0",
-      "group": "M0 — records and validation",
-      "reason": "public application assembly, branded position, failure non-advancement, and exact export boundaries are not implemented yet"
     }
   }
 }

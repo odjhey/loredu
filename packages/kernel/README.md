@@ -19,7 +19,7 @@ Anything the kernel needs from its environment arrives through a port in
 
 ## Public M0 surface
 
-Only `@loredu/kernel` and `@loredu/kernel/testing` are entrypoints; deep imports are unsupported. The exact value/type allowlists and signatures are the [kernel API contract](../../docs/architecture/contracts/kernel-api.md). Normal runtime includes validated `createInstant`/`createStreamPosition`, codecs/equality, ClaimKey/Basis/policy primitives, and `createLoreduApplication`. Testing exports exactly InMemoryStore, FixedClock, and SeededRandomSource. Scaffold-only `AppendResult`, `RecordRef`, `stream`, `head`, and `StoreUnderTest` do not survive M0.
+Only `@loredu/kernel` and `@loredu/kernel/testing` are entrypoints; deep imports are unsupported. The exact final M0 value/type allowlists and signatures are the [kernel API contract](../../docs/architecture/contracts/kernel-api.md). The current P0 runtime exports its Entry/application and capability slice; codecs/equality, ClaimKey/Basis/policy primitives, and the other families arrive in their owning M0 slices rather than as placeholders. Testing exports exactly InMemoryStore, FixedClock, and SeededRandomSource. Scaffold-only `AppendResult`, `RecordRef`, `stream`, `head`, and `StoreUnderTest` do not survive M0.
 
 ## Layout
 
@@ -36,5 +36,8 @@ full scan/stream/head and reusable durable-store conformance remain M1.
 
 ## State
 
-Scaffold. `src/` currently holds the record-kind vocabulary and the `RecordStore`
-port declaration; no record is validated and no record is stored yet. Behavior arrives against the [behavioral catalog](../../docs/v0.x/execution/first-user-journey.md), including T87 public assembly/position evidence.
+The P0 slice implements the public Entry draft/envelope and application append path,
+the M0 `RecordStore` append/get port, branded Instant and StreamPosition constructors,
+and the three testing helpers. Catalog rows T01, T02, T84, and T87 are executable.
+Claim, Relation, Resolution, Verification, codecs/equality, policy, Basis, references,
+and the remaining M0 behavior are still pending in their owning slices.
