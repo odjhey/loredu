@@ -17,6 +17,7 @@ import {
   type BoundaryCheckId,
   scanWorkspace,
   scanWorkspaceWithDisabledCheckForTest,
+  scanWorkspaceWithTrivialMutantForTest,
   type Violation,
 } from "../scripts/check-workspace-boundaries";
 
@@ -736,6 +737,10 @@ describe("authoritative workspace boundary guard", () => {
         mutate: (root) => plant(root, "packages/kernel/src/probe.ts", "import(name);"),
         rule: "boundary-dynamic",
       },
+      "G0-C-SOURCE-PARSE": {
+        mutate: (root) => plant(root, "packages/kernel/src/probe.ts", "import {"),
+        rule: "source-parse",
+      },
       "G0-D-CAPABILITY-FLOW": {
         mutate: (root) => plant(root, "packages/kernel/src/probe.ts", "process.exit();"),
         rule: "ambient-capability",
@@ -746,6 +751,10 @@ describe("authoritative workspace boundary guard", () => {
             (value.compilerOptions as Record<string, unknown>).types = ["bun"];
           }),
         rule: "kernel-tsconfig",
+      },
+      "G0-E-CONFIG-GRAPH": {
+        mutate: (root) => rmSync(join(root, "packages/store-plainfile/tsconfig.json")),
+        rule: "project-config",
       },
       "G0-F-MANIFEST-EXPORTS": {
         mutate: (root) =>
@@ -765,7 +774,68 @@ describe("authoritative workspace boundary guard", () => {
       expect(mutant).not.toEqual(normal);
       expect(mutant.some((item) => item.rule === scenarios[id].rule)).toBe(false);
     }
-  }, 15_000);
+    const root = fixture();
+    plant(root, "packages/kernel/src/trivial-mutant.ts", 'import "node:fs";');
+    expect(scanWorkspace(root)).not.toEqual([]);
+    expect(scanWorkspaceWithTrivialMutantForTest(root)).toEqual([]);
+    expect(scanWorkspaceWithTrivialMutantForTest(root)).not.toEqual(scanWorkspace(root));
+  }, 20_000);
+
+  test("closes independent reference, escape, config, and ignored-tree probes", () => {
+    const root = fixture();
+    plant(
+      root,
+      "packages/kernel/src/references.ts",
+      'const a = require.resolve("node:fs"); const b = module.require("node:fs"); /** @type {import("node:fs").Stats} */ const c = null; export {a,b,c};',
+    );
+    plant(
+      root,
+      "packages/kernel/src/escapes.ts",
+      "const now = Date.now; accept(now); const o = {now}; const a = [now]; const c = flag ? now : Math.max; function f(v = now) { return v; } const x: {v?: unknown} = {}; x.v = now;",
+    );
+    plant(root, "packages/kernel/src/dist/bypass.ts", 'import "node:fs";');
+    rmSync(join(root, "packages/store-plainfile/tsconfig.json"));
+    writeFileSync(join(root, "packages/kernel/package.json"), "null");
+    const found = scanWorkspace(root);
+    expect(
+      found.filter((item) => item.path.endsWith("references.ts") && item.rule === "kernel-import"),
+    ).toHaveLength(3);
+    expect(
+      found.filter(
+        (item) => item.path.endsWith("escapes.ts") && item.detail.endsWith("ambient capability escapes"),
+      ),
+    ).toHaveLength(6);
+    expect(found).toContainEqual(
+      violation(
+        "packages/kernel/src/dist",
+        "source-tree",
+        "ignored or hidden tree inside a source root is forbidden",
+      ),
+    );
+    expect(found).toContainEqual(
+      violation(
+        "packages/store-plainfile/tsconfig.json",
+        "project-config",
+        "required project config is absent",
+      ),
+    );
+    expect(found).toContainEqual(
+      violation("packages/kernel/package.json", "package-manifest", "manifest is not a valid JSON object"),
+    );
+  });
+
+  test("outer watchdog preserves failures and kills synchronous hangs", async () => {
+    const watchdog = join(REPO_ROOT, "scripts/run-with-watchdog.ts");
+    const success = Bun.spawn(["bun", watchdog, "2", "bun", "-e", "process.exit(0)"]);
+    expect(await success.exited).toBe(0);
+    const failure = Bun.spawn(["bun", watchdog, "2", "bun", "-e", "process.exit(7)"]);
+    expect(await failure.exited).toBe(7);
+    const hang = Bun.spawn(["bun", watchdog, "0.2", "bun", "-e", "while(true){}"], {
+      stderr: "pipe",
+    });
+    expect(await hang.exited).not.toBe(0);
+    expect(await new Response(hang.stderr).text()).toContain("watchdog: command exceeded");
+  }, 5_000);
 
   test("the actual kernel project rejects node:fs, Bun, process, and Buffer", async () => {
     const root = fixture();

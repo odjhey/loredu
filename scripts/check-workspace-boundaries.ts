@@ -10,36 +10,25 @@ export interface Violation {
   readonly detail: string;
 }
 
-/** Stable assurance-stage identities. Production invocation cannot disable them. */
+/** Stable production check identities. Tests mutate execution, never returned diagnostics. */
 export const BOUNDARY_CHECK_IDS = [
   "G0-A-INVENTORY",
   "G0-B-SYNTAX",
   "G0-C-REFERENCES",
+  "G0-C-SOURCE-PARSE",
   "G0-D-CAPABILITY-FLOW",
   "G0-E-COMPILER",
+  "G0-E-CONFIG-GRAPH",
   "G0-F-MANIFEST-EXPORTS",
 ] as const;
 export type BoundaryCheckId = (typeof BOUNDARY_CHECK_IDS)[number];
-const RULE_CHECK: Readonly<Record<string, BoundaryCheckId>> = {
-  "source-tree": "G0-A-INVENTORY",
-  "source-location": "G0-A-INVENTORY",
-  "source-read": "G0-A-INVENTORY",
-  "testing-import": "G0-B-SYNTAX",
-  "workspace-edge": "G0-B-SYNTAX",
-  "kernel-import": "G0-B-SYNTAX",
-  "boundary-unresolved": "G0-C-REFERENCES",
-  "boundary-target": "G0-C-REFERENCES",
-  "boundary-dynamic": "G0-C-REFERENCES",
-  "boundary-ast-uncertain": "G0-C-REFERENCES",
-  "ambient-capability": "G0-D-CAPABILITY-FLOW",
-  "kernel-reference": "G0-E-COMPILER",
-  "kernel-tsconfig": "G0-E-COMPILER",
-  "package-location": "G0-F-MANIFEST-EXPORTS",
-  "package-manifest": "G0-F-MANIFEST-EXPORTS",
-  "package-name": "G0-F-MANIFEST-EXPORTS",
-  "runtime-dependencies": "G0-F-MANIFEST-EXPORTS",
-  "package-exports": "G0-F-MANIFEST-EXPORTS",
-};
+interface ScanMutation {
+  readonly disabled?: ReadonlySet<BoundaryCheckId>;
+  readonly replaceScan?: (root: string) => Violation[];
+}
+function enabled(mutation: ScanMutation | undefined, id: BoundaryCheckId): boolean {
+  return !mutation?.disabled?.has(id);
+}
 interface Manifest {
   readonly name?: string;
   readonly dependencies?: Record<string, string>;
@@ -211,8 +200,23 @@ function discover(root: string, result: Violation[]): Discovered {
           const path = join(directory, entry.name);
           if (entry.isSymbolicLink()) {
             push(result, root, path, "source-tree", "symlinked source entry is not inspectable");
-          } else if (entry.isDirectory()) visit(path);
-          else if (!entry.isFile()) push(result, root, path, "source-tree", "unsupported filesystem entry");
+          } else if (entry.isDirectory()) {
+            if (
+              entry.name === "node_modules" ||
+              entry.name === "dist" ||
+              entry.name === "build" ||
+              entry.name === "generated" ||
+              entry.name.startsWith(".")
+            )
+              push(
+                result,
+                root,
+                path,
+                "source-tree",
+                "ignored or hidden tree inside a source root is forbidden",
+              );
+            else visit(path);
+          } else if (!entry.isFile()) push(result, root, path, "source-tree", "unsupported filesystem entry");
           else if (SOURCE_EXTENSIONS.has(extname(path))) {
             count++;
             if (testSurface(packageRoot, path)) tests.push(path);
@@ -433,6 +437,7 @@ function analyzeFile(
   result: Violation[],
   options: ts.CompilerOptions,
   program: ts.Program,
+  mutation?: ScanMutation,
 ): void {
   let text: string;
   try {
@@ -447,7 +452,7 @@ function analyzeFile(
   const checker = program.getTypeChecker();
   const parseDiagnostics = (source as ts.SourceFile & { readonly parseDiagnostics: readonly ts.Diagnostic[] })
     .parseDiagnostics;
-  for (const diagnostic of parseDiagnostics) {
+  for (const diagnostic of enabled(mutation, "G0-C-SOURCE-PARSE") ? parseDiagnostics : []) {
     const point =
       diagnostic.start === undefined
         ? "?:?"
@@ -463,8 +468,8 @@ function analyzeFile(
       `${point} ${ts.flattenDiagnosticMessageText(diagnostic.messageText, " ")}`,
     );
   }
-  if (parseDiagnostics.length) return;
-  if (owner === "kernel") {
+  if (enabled(mutation, "G0-C-SOURCE-PARSE") && parseDiagnostics.length) return;
+  if (owner === "kernel" && enabled(mutation, "G0-E-COMPILER")) {
     const directiveLocation = (position: number): string => {
       const point = source.getLineAndCharacterOfPosition(position);
       return `${point.line + 1}:${point.character + 1}`;
@@ -496,7 +501,6 @@ function analyzeFile(
   }
   const packageRoot = join(root, "packages", owner);
   const claimedSpecifiers = new Set<string>();
-  const shadows = new Set<string>();
   const aliases = new Map<ts.Symbol, string>();
   const locallyBound = (node: ts.Identifier): boolean =>
     checker
@@ -525,40 +529,43 @@ function analyzeFile(
       return member.name;
     return base && member.name ? `${base}.${member.name}` : undefined;
   };
-  const collect = (node: ts.Node): void => {
+  // Facts are populated in execution order below; pre-collecting aliases would let
+  // future writes affect earlier uses and is deliberately forbidden.
+  const isGlobal = (expression: ts.Expression, name: string): boolean =>
+    expressionCapability(expression) === name;
+  const taintedFact = (fact: string | undefined): fact is string =>
+    fact !== undefined &&
+    (fact === "globalThis" ||
+      fact === "Date" ||
+      fact === "Math" ||
+      fact === "Bun" ||
+      fact === "process" ||
+      fact === "Buffer" ||
+      fact === "Date.now" ||
+      fact.startsWith("Date.now.") ||
+      fact === "Math.random" ||
+      fact.startsWith("Math.random.") ||
+      fact === "UnknownCapabilityDerived");
+  const visit = (node: ts.Node): void => {
     if (ts.isVariableDeclaration(node)) {
       const initial = node.initializer && unwrap(node.initializer);
       if (ts.isIdentifier(node.name)) {
-        const name = node.name.text;
-        const capability = initial && expressionCapability(initial);
         const symbol = checker.getSymbolAtLocation(node.name);
-        if (capability && symbol) aliases.set(symbol, capability);
-        else shadows.add(name);
+        const fact = initial && expressionCapability(initial);
+        if (symbol) {
+          if (fact) aliases.set(symbol, fact);
+          else aliases.delete(symbol);
+        }
       } else if (ts.isObjectBindingPattern(node.name) && initial) {
         const base = expressionCapability(initial);
         for (const element of node.name.elements) {
-          const property = element.propertyName?.getText(source) ?? element.name.getText(source);
-          if (base && property && ts.isIdentifier(element.name)) {
-            const fact = `${base}.${property}`.replace(/^globalThis\./, "");
-            aliases.set(checker.getSymbolAtLocation(element.name) as ts.Symbol, fact);
-          } else if (ts.isIdentifier(element.name)) shadows.add(element.name.text);
+          if (!ts.isIdentifier(element.name)) continue;
+          const symbol = checker.getSymbolAtLocation(element.name);
+          const property = element.propertyName?.getText(source) ?? element.name.text;
+          if (symbol && base) aliases.set(symbol, `${base}.${property}`.replace(/^globalThis\./, ""));
         }
       }
     }
-    if (
-      (ts.isFunctionDeclaration(node) ||
-        ts.isClassDeclaration(node) ||
-        ts.isInterfaceDeclaration(node) ||
-        ts.isTypeAliasDeclaration(node)) &&
-      node.name
-    )
-      shadows.add(node.name.text);
-    ts.forEachChild(node, collect);
-  };
-  collect(source);
-  const isGlobal = (expression: ts.Expression, name: string): boolean =>
-    expressionCapability(expression) === name;
-  const visit = (node: ts.Node): void => {
     // Forward writes update the reaching fact. A definitely clean assignment
     // removes an earlier capability fact; branch-local writes are conservatively
     // not used to clean the outer binding.
@@ -569,10 +576,22 @@ function analyzeFile(
     ) {
       const target = unwrap(node.left) as ts.Identifier;
       const symbol = checker.getSymbolAtLocation(target);
-      if (symbol && !ts.findAncestor(node, ts.isIfStatement)) {
+      if (symbol) {
         const fact = expressionCapability(node.right);
-        if (fact) aliases.set(symbol, fact);
-        else aliases.delete(symbol);
+        const conditional = ts.findAncestor(
+          node,
+          (ancestor) =>
+            ts.isIfStatement(ancestor) ||
+            ts.isConditionalExpression(ancestor) ||
+            ts.isSwitchStatement(ancestor) ||
+            ts.isForStatement(ancestor) ||
+            ts.isForInStatement(ancestor) ||
+            ts.isForOfStatement(ancestor) ||
+            ts.isWhileStatement(ancestor) ||
+            ts.isDoStatement(ancestor),
+        );
+        if (taintedFact(fact)) aliases.set(symbol, fact);
+        else if (!conditional) aliases.delete(symbol);
       }
     }
     let reference: string | undefined;
@@ -582,13 +601,24 @@ function analyzeFile(
         reference = staticText(node.moduleSpecifier);
         referenceNode = node.moduleSpecifier;
       }
+    } else if (ts.isJSDocImportTag(node)) {
+      reference = staticText(node.moduleSpecifier);
+      referenceNode = node.moduleSpecifier;
+      if (reference === undefined && enabled(mutation, "G0-C-REFERENCES"))
+        push(
+          result,
+          root,
+          file,
+          "boundary-ast-uncertain",
+          `${location(source, node)} JSDoc import is not one static string`,
+        );
     } else if (ts.isImportTypeNode(node)) {
       reference =
         ts.isLiteralTypeNode(node.argument) && ts.isStringLiteralLike(node.argument.literal)
           ? node.argument.literal.text
           : undefined;
       referenceNode = node.argument;
-      if (reference === undefined)
+      if (reference === undefined && enabled(mutation, "G0-C-REFERENCES"))
         push(
           result,
           root,
@@ -601,17 +631,31 @@ function analyzeFile(
       referenceNode = node.moduleReference;
     } else if (ts.isCallExpression(node)) {
       const callee = unwrap(node.expression);
+      const loader = propertyName(callee);
+      const ambientRequireResolve =
+        loader?.name === "resolve" &&
+        ts.isIdentifier(loader.object) &&
+        loader.object.text === "require" &&
+        !locallyBound(loader.object);
+      const ambientModuleRequire =
+        loader?.name === "require" &&
+        ts.isIdentifier(loader.object) &&
+        loader.object.text === "module" &&
+        !locallyBound(loader.object);
       if (
         callee.kind === ts.SyntaxKind.ImportKeyword ||
-        (ts.isIdentifier(callee) && callee.text === "require" && !locallyBound(callee))
+        (ts.isIdentifier(callee) && callee.text === "require" && !locallyBound(callee)) ||
+        ambientRequireResolve ||
+        ambientModuleRequire
       ) {
         reference = staticText(node.arguments[0]);
         referenceNode = node;
         const importCall = callee.kind === ts.SyntaxKind.ImportKeyword;
         if (
-          (!importCall && node.arguments.length !== 1) ||
-          (importCall && ![1, 2].includes(node.arguments.length)) ||
-          reference === undefined
+          enabled(mutation, "G0-C-REFERENCES") &&
+          ((!importCall && node.arguments.length !== 1) ||
+            (importCall && ![1, 2].includes(node.arguments.length)) ||
+            reference === undefined)
         )
           push(
             result,
@@ -621,17 +665,29 @@ function analyzeFile(
             `${location(source, node)} module reference is not one static string`,
           );
       }
+      if (owner === "kernel" && enabled(mutation, "G0-D-CAPABILITY-FLOW")) {
+        for (const argument of node.arguments) {
+          const escaped = expressionCapability(argument);
+          if (escaped && escaped !== "Clean")
+            push(
+              result,
+              root,
+              file,
+              "ambient-capability",
+              `${location(source, argument)} ambient capability escapes`,
+            );
+        }
+      }
       const calleeCapability = expressionCapability(callee);
       const directDate = calleeCapability === "Date";
-      const dateNow =
-        calleeCapability === "Date.now" ||
-        calleeCapability === "Date.now.call" ||
-        calleeCapability === "Date.now.apply";
+      const dateNow = calleeCapability === "Date.now" || calleeCapability?.startsWith("Date.now.") === true;
       const mathRandom =
-        calleeCapability === "Math.random" ||
-        calleeCapability === "Math.random.call" ||
-        calleeCapability === "Math.random.apply";
-      if (owner === "kernel" && (directDate || dateNow || mathRandom))
+        calleeCapability === "Math.random" || calleeCapability?.startsWith("Math.random.") === true;
+      if (
+        owner === "kernel" &&
+        enabled(mutation, "G0-D-CAPABILITY-FLOW") &&
+        (directDate || dateNow || mathRandom)
+      )
         push(
           result,
           root,
@@ -644,6 +700,7 @@ function analyzeFile(
       const date = isGlobal(constructorExpression, "Date");
       if (
         owner === "kernel" &&
+        enabled(mutation, "G0-D-CAPABILITY-FLOW") &&
         date &&
         (!node.arguments || node.arguments.length === 0 || node.arguments.some(ts.isSpreadElement))
       )
@@ -655,12 +712,14 @@ function analyzeFile(
           `${location(source, node)} zero-or-uncertain-argument new Date`,
         );
     }
-    if (reference !== undefined) {
+    if (reference !== undefined && enabled(mutation, "G0-C-REFERENCES")) {
       claimedSpecifiers.add(reference);
-      checkReference(root, owner, packageRoot, file, source, referenceNode, reference, result, options);
+      if (enabled(mutation, "G0-B-SYNTAX"))
+        checkReference(root, owner, packageRoot, file, source, referenceNode, reference, result, options);
     }
     if (
       owner === "kernel" &&
+      enabled(mutation, "G0-D-CAPABILITY-FLOW") &&
       ts.isVariableDeclaration(node) &&
       ts.isObjectBindingPattern(node.name) &&
       node.initializer &&
@@ -678,7 +737,27 @@ function analyzeFile(
           );
       }
     }
-    if (owner === "kernel" && ts.isReturnStatement(node) && node.expression) {
+    if (
+      owner === "kernel" &&
+      enabled(mutation, "G0-D-CAPABILITY-FLOW") &&
+      ts.isShorthandPropertyAssignment(node)
+    ) {
+      const valueSymbol = checker.getShorthandAssignmentValueSymbol(node);
+      if (taintedFact(valueSymbol ? aliases.get(valueSymbol) : undefined))
+        push(
+          result,
+          root,
+          file,
+          "ambient-capability",
+          `${location(source, node.name)} ambient capability escapes`,
+        );
+    }
+    if (
+      owner === "kernel" &&
+      enabled(mutation, "G0-D-CAPABILITY-FLOW") &&
+      ts.isReturnStatement(node) &&
+      node.expression
+    ) {
       const escaped = expressionCapability(node.expression);
       if (escaped === "Date.now" || escaped === "Math.random" || escaped === "UnknownCapabilityDerived")
         push(
@@ -689,7 +768,32 @@ function analyzeFile(
           `${location(source, node)} ambient capability escapes`,
         );
     }
-    if (owner === "kernel" && (ts.isPropertyAccessExpression(node) || ts.isElementAccessExpression(node))) {
+    if (owner === "kernel" && enabled(mutation, "G0-D-CAPABILITY-FLOW") && ts.isExpression(node)) {
+      const escaped = expressionCapability(node);
+      const parent = node.parent;
+      const isCapability =
+        escaped === "Date.now" || escaped === "Math.random" || escaped === "UnknownCapabilityDerived";
+      const escapes =
+        (ts.isArrayLiteralExpression(parent) && parent.elements.includes(node as ts.Expression)) ||
+        (ts.isPropertyAssignment(parent) && parent.initializer === node) ||
+        (ts.isShorthandPropertyAssignment(parent) && parent.name === node) ||
+        (ts.isConditionalExpression(parent) && (parent.whenTrue === node || parent.whenFalse === node)) ||
+        (ts.isParameter(parent) && parent.initializer === node) ||
+        (ts.isBinaryExpression(parent) && parent.right === node && !ts.isIdentifier(unwrap(parent.left)));
+      if (isCapability && escapes)
+        push(
+          result,
+          root,
+          file,
+          "ambient-capability",
+          `${location(source, node)} ambient capability escapes`,
+        );
+    }
+    if (
+      owner === "kernel" &&
+      enabled(mutation, "G0-D-CAPABILITY-FLOW") &&
+      (ts.isPropertyAccessExpression(node) || ts.isElementAccessExpression(node))
+    ) {
       const member = propertyName(node);
       const capability = expressionCapability(node);
       if (member && member.name === undefined && expressionCapability(member.object) === "globalThis")
@@ -721,6 +825,7 @@ function analyzeFile(
         (ts.isMethodSignature(parent) && parent.name === node));
     if (
       owner === "kernel" &&
+      enabled(mutation, "G0-D-CAPABILITY-FLOW") &&
       ts.isIdentifier(node) &&
       ["Bun", "process", "Buffer"].includes(node.text) &&
       !locallyBound(node) &&
@@ -731,10 +836,71 @@ function analyzeFile(
     ts.forEachChild(node, visit);
   };
   visit(source);
+  // TypeScript only materializes JSDoc import tags/types on JavaScript-kind source
+  // files. Parse the same bytes in that documented mode so .ts policy files do
+  // not gain a comment-based module-reference bypass.
+  if (enabled(mutation, "G0-C-REFERENCES") && text.includes("/**")) {
+    const jsDocSource = ts.createSourceFile(file, text, ts.ScriptTarget.Latest, true, ts.ScriptKind.JS);
+    const visitJsDoc = (node: ts.Node): void => {
+      if (ts.isJSDocImportTag(node)) {
+        const specifier = staticText(node.moduleSpecifier);
+        if (specifier) {
+          claimedSpecifiers.add(specifier);
+          if (enabled(mutation, "G0-B-SYNTAX"))
+            checkReference(
+              root,
+              owner,
+              packageRoot,
+              file,
+              jsDocSource,
+              node.moduleSpecifier,
+              specifier,
+              result,
+              options,
+            );
+        } else
+          push(
+            result,
+            root,
+            file,
+            "boundary-ast-uncertain",
+            `${location(jsDocSource, node)} JSDoc import is not one static string`,
+          );
+      } else if (ts.isImportTypeNode(node) && ts.isLiteralTypeNode(node.argument)) {
+        const literal = node.argument.literal;
+        if (ts.isStringLiteralLike(literal)) {
+          claimedSpecifiers.add(literal.text);
+          if (enabled(mutation, "G0-B-SYNTAX"))
+            checkReference(
+              root,
+              owner,
+              packageRoot,
+              file,
+              jsDocSource,
+              literal,
+              literal.text,
+              result,
+              options,
+            );
+        }
+      }
+      ts.forEachChild(node, visitJsDoc);
+    };
+    visitJsDoc(jsDocSource);
+    for (const comment of text.matchAll(/\/\*\*[\s\S]*?\*\//g)) {
+      for (const match of comment[0].matchAll(/\bimport\s*(?:\(\s*)?["']([^"']+)["']/g)) {
+        const specifier = match[1];
+        if (!specifier) continue;
+        claimedSpecifiers.add(specifier);
+        if (enabled(mutation, "G0-B-SYNTAX"))
+          checkReference(root, owner, packageRoot, file, source, source, specifier, result, options);
+      }
+    }
+  }
   // Reconcile our AST claims with TypeScript's public preprocessing inventory.
   // A compiler upgrade or future reference-bearing form therefore fails closed.
   const preprocessed = ts.preProcessFile(text, true, true);
-  for (const item of preprocessed.importedFiles)
+  for (const item of enabled(mutation, "G0-C-REFERENCES") ? preprocessed.importedFiles : [])
     if (!claimedSpecifiers.has(item.fileName))
       push(
         result,
@@ -743,6 +909,68 @@ function analyzeFile(
         "boundary-ast-uncertain",
         `${item.pos} TypeScript module reference was not claimed: ${item.fileName}`,
       );
+}
+
+function checkConfigGraph(root: string, result: Violation[]): void {
+  const paths = [
+    join(root, "tsconfig.base.json"),
+    ...PACKAGES.map((name) => join(root, "packages", name, "tsconfig.json")),
+  ];
+  for (const configPath of paths) {
+    const info = inspect(configPath);
+    if (!info) {
+      push(result, root, configPath, "project-config", "required project config is absent");
+      continue;
+    }
+    if (info.isSymbolicLink() || !info.isFile()) {
+      push(result, root, configPath, "project-config", "project config is not a regular file");
+      continue;
+    }
+    let raw: unknown;
+    try {
+      raw = JSON.parse(readFileSync(configPath, "utf8"));
+    } catch {
+      push(result, root, configPath, "project-config", "project config is unreadable or malformed JSON");
+      continue;
+    }
+    if (!raw || typeof raw !== "object" || Array.isArray(raw)) {
+      push(result, root, configPath, "project-config", "project config must be a JSON object");
+      continue;
+    }
+    const config = raw as Record<string, unknown>;
+    const loaded = ts.readConfigFile(configPath, ts.sys.readFile);
+    const parsed = loaded.error
+      ? undefined
+      : ts.parseJsonConfigFileContent(loaded.config, ts.sys, dirname(configPath));
+    if (loaded.error || parsed?.errors.length)
+      push(result, root, configPath, "project-config", "project config or extends graph cannot be resolved");
+    const references = config.references;
+    if (references !== undefined && !Array.isArray(references))
+      push(result, root, configPath, "project-config", "references must be an array");
+    for (const reference of Array.isArray(references) ? references : []) {
+      const target =
+        reference && typeof reference === "object" ? (reference as Record<string, unknown>).path : undefined;
+      if (typeof target !== "string") {
+        push(result, root, configPath, "project-config", "project reference must have a string path");
+        continue;
+      }
+      const owner = owningPackage(root, configPath);
+      const resolvedOwner = owningPackage(root, join(dirname(configPath), target));
+      if (
+        owner &&
+        resolvedOwner &&
+        owner !== resolvedOwner &&
+        !ALLOWED_WORKSPACE_EDGES[owner].includes(EXPECTED_NAMES[resolvedOwner])
+      )
+        push(
+          result,
+          root,
+          configPath,
+          "workspace-edge",
+          `forbidden project reference ${owner} -> ${resolvedOwner}`,
+        );
+    }
+  }
 }
 
 function checkKernelCompiler(root: string, result: Violation[]): void {
@@ -787,12 +1015,20 @@ function checkKernelCompiler(root: string, result: Violation[]): void {
     );
 }
 
-export function scanWorkspace(root: string): Violation[] {
+function scan(root: string, mutation?: ScanMutation): Violation[] {
+  if (mutation?.replaceScan) return mutation.replaceScan(root);
   const result: Violation[] = [];
   const packagesRoot = join(root, "packages");
-  const discovered = discover(root, result);
+  const discovered = enabled(mutation, "G0-A-INVENTORY")
+    ? discover(root, result)
+    : { production: new Map<PackageName, string[]>(PACKAGES.map((name) => [name, []])), tests: [] };
   for (const name of PACKAGES) {
     const packageRoot = join(packagesRoot, name);
+    const options = compilerOptions(root, name);
+    const files = discovered.production.get(name) ?? [];
+    const program = ts.createProgram([...files], options);
+    for (const file of files) analyzeFile(root, name, file, result, options, program, mutation);
+    if (!enabled(mutation, "G0-F-MANIFEST-EXPORTS")) continue;
     const manifestPath = join(packageRoot, "package.json");
     const manifestInfo = inspect(manifestPath);
     if (!manifestInfo) {
@@ -805,14 +1041,42 @@ export function scanWorkspace(root: string): Violation[] {
     }
     let value: Manifest;
     try {
-      value = manifest(manifestPath);
+      const parsed: unknown = manifest(manifestPath);
+      if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) throw new TypeError("shape");
+      value = parsed as Manifest;
     } catch {
-      push(result, root, manifestPath, "package-manifest", "manifest is not valid JSON");
+      push(result, root, manifestPath, "package-manifest", "manifest is not a valid JSON object");
       continue;
     }
     if (value.name !== EXPECTED_NAMES[name])
       push(result, root, manifestPath, "package-name", `expected ${EXPECTED_NAMES[name]}`);
-    const dependencies = runtimeDependencies(value);
+    for (const field of ["dependencies", "peerDependencies", "optionalDependencies"] as const) {
+      const candidate = value[field];
+      if (
+        candidate !== undefined &&
+        (!candidate || typeof candidate !== "object" || Array.isArray(candidate))
+      )
+        push(result, root, manifestPath, "package-manifest", `${field} must be an object when present`);
+    }
+    const dependencies = runtimeDependencies({
+      ...value,
+      dependencies:
+        value.dependencies && typeof value.dependencies === "object" && !Array.isArray(value.dependencies)
+          ? value.dependencies
+          : undefined,
+      peerDependencies:
+        value.peerDependencies &&
+        typeof value.peerDependencies === "object" &&
+        !Array.isArray(value.peerDependencies)
+          ? value.peerDependencies
+          : undefined,
+      optionalDependencies:
+        value.optionalDependencies &&
+        typeof value.optionalDependencies === "object" &&
+        !Array.isArray(value.optionalDependencies)
+          ? value.optionalDependencies
+          : undefined,
+    } as Manifest);
     if (name === "kernel" && dependencies.length)
       push(
         result,
@@ -843,6 +1107,7 @@ export function scanWorkspace(root: string): Violation[] {
     const expected = EXPECTED_EXPORTS[name];
     const actualExports = value.exports ?? {};
     const sameExports =
+      actualExports !== null &&
       typeof actualExports === "object" &&
       !Array.isArray(actualExports) &&
       JSON.stringify(Object.entries(actualExports).sort(([left], [right]) => left.localeCompare(right))) ===
@@ -855,19 +1120,23 @@ export function scanWorkspace(root: string): Violation[] {
       if (!targetInfo || targetInfo.isSymbolicLink() || !targetInfo.isFile())
         push(result, root, manifestPath, "package-exports", `export ${key} target does not exist: ${target}`);
     }
-    const options = compilerOptions(root, name);
-    const files = discovered.production.get(name) ?? [];
-    const program = ts.createProgram([...files], options);
-    for (const file of files) analyzeFile(root, name, file, result, options, program);
   }
-  checkKernelCompiler(root, result);
+  if (enabled(mutation, "G0-E-CONFIG-GRAPH")) checkConfigGraph(root, result);
+  if (enabled(mutation, "G0-E-COMPILER")) checkKernelCompiler(root, result);
   return result.sort((left, right) =>
     `${left.path}:${left.rule}:${left.detail}`.localeCompare(`${right.path}:${right.rule}:${right.detail}`),
   );
 }
-/** Test-only mutation seam; the CLI always calls the unmodified authority. */
+export function scanWorkspace(root: string): Violation[] {
+  return scan(root);
+}
+
+/** Test-only pre-execution mutation seam; the CLI always calls the complete registry. */
 export function scanWorkspaceWithDisabledCheckForTest(root: string, disabled: BoundaryCheckId): Violation[] {
-  return scanWorkspace(root).filter((violation) => RULE_CHECK[violation.rule] !== disabled);
+  return scan(root, { disabled: new Set([disabled]) });
+}
+export function scanWorkspaceWithTrivialMutantForTest(root: string): Violation[] {
+  return scan(root, { replaceScan: () => [] });
 }
 
 export function formatViolations(violations: readonly Violation[]): string {
