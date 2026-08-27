@@ -11,8 +11,13 @@ that asymmetry with `@loredu/kernel` is the point of the boundary. It depends on
 
 ## State
 
-Scaffold. Only store-root path resolution exists. The append path, replay,
-lock-file + atomic-rename durability, and the conformance run against
-`@loredu/kernel/testing` land with M1 (catalog T10–T18) — including the parts of
-store-root resolution this file deliberately leaves out (existence errors,
-`--store` precedence: T17). T19 is M0 application/reference evidence; PlainFileStore is semantics-ignorant and does not validate record relationships.
+M1-F implements the public strict Markdown/frontmatter codec, filename-derived
+contiguous positions, canonical replay, and `PlainFileStore` append/get/scan/stream/head.
+The unchanged `@loredu/kernel/testing` conformance suite runs against this adapter;
+provider tests own T11, T12, and T14, including valid hand additions.
+
+M1-D still owns initialization/root resolution (T17), append-scoped locking (T16),
+and the temp-file/fsync/atomic-rename/crash-prefix protocol (T18). Until that slice
+lands, tests establish an exact existing layout explicitly and append does not claim
+durable-before-return behavior. T19 remains M0 application/reference evidence;
+`PlainFileStore` is semantics-ignorant and does not validate record relationships.
