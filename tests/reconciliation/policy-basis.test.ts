@@ -300,6 +300,50 @@ describe("M0 ClaimPolicy seam", () => {
       expect(() => createRulesetIdentity(malformed as ClaimPolicy)).toThrow(LoreduError);
   });
 
+  test("custom policy shape validation rejects accessors without invoking them", () => {
+    const custom: ClaimPolicy = {
+      id: "consumer.policy",
+      version: "1",
+      validateClaimKey() {
+        return Object.freeze([]);
+      },
+      semantics() {
+        return "exclusive";
+      },
+    };
+
+    for (const field of ["id", "version", "validateClaimKey", "semantics"] as const) {
+      let getterCalls = 0;
+      const accessorPolicy = { ...custom };
+      Object.defineProperty(accessorPolicy, field, {
+        enumerable: true,
+        get() {
+          getterCalls++;
+          return Reflect.get(custom, field);
+        },
+      });
+
+      for (const create of [
+        () => createRulesetIdentity(accessorPolicy),
+        () =>
+          createLoreduApplication({
+            store: new InMemoryStore(),
+            clock: new FixedClock(createInstant(0)),
+            randomSource: new SeededRandomSource(1),
+            claimPolicy: accessorPolicy,
+          }),
+      ]) {
+        expect(create).toThrow(
+          expect.objectContaining({
+            code: "VALIDATION_FAILED",
+            issues: expect.arrayContaining([expect.objectContaining({ code: "TYPE", path: `/${field}` })]),
+          }),
+        );
+        expect(getterCalls).toBe(0);
+      }
+    }
+  });
+
   test("normal and testing runtime export allowlists are exact after M0-P", () => {
     expect(Object.keys(kernel).sort()).toEqual(
       [

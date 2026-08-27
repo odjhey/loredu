@@ -68,6 +68,27 @@ function rejectUnknown(
   }
 }
 
+function readDataProperty(value: object, key: string, path: string, issues: LoreduIssue[]): unknown {
+  try {
+    let current: object | null = value;
+    while (current !== null) {
+      const descriptor = Reflect.getOwnPropertyDescriptor(current, key);
+      if (descriptor) {
+        if (!("value" in descriptor)) {
+          issues.push(makeIssue("TYPE", path, "must be a data property"));
+          return undefined;
+        }
+        return descriptor.value;
+      }
+      current = Reflect.getPrototypeOf(current);
+    }
+    return undefined;
+  } catch {
+    issues.push(makeIssue("TYPE", path, "could not inspect ClaimPolicy field"));
+    return undefined;
+  }
+}
+
 function validateClaimKey(key: unknown): readonly LoreduIssue[] {
   const issues: LoreduIssue[] = [];
   const data = inspectObject(key, "", issues);
@@ -154,18 +175,10 @@ export function validateClaimPolicy(policy: unknown): ValidatedClaimPolicy {
     }
   }
 
-  let id: unknown;
-  let version: unknown;
-  let validator: unknown;
-  let semantics: unknown;
-  try {
-    id = Reflect.get(policy, "id");
-    version = Reflect.get(policy, "version");
-    validator = Reflect.get(policy, "validateClaimKey");
-    semantics = Reflect.get(policy, "semantics");
-  } catch {
-    issues.push(makeIssue("TYPE", "", "could not read ClaimPolicy fields"));
-  }
+  const id = readDataProperty(policy, "id", "/id", issues);
+  const version = readDataProperty(policy, "version", "/version", issues);
+  const validator = readDataProperty(policy, "validateClaimKey", "/validateClaimKey", issues);
+  const semantics = readDataProperty(policy, "semantics", "/semantics", issues);
   const parsedId = validateToken(id, "/id", issues);
   const parsedVersion = validateToken(version, "/version", issues);
   if (typeof validator !== "function")
