@@ -116,7 +116,7 @@ const CASES = [
     name: "T-number accounted for nowhere",
     script: "check-catalog.mjs",
     expect: "unaccounted",
-    mutate: (root) => editJson(root, STATUS, (d) => delete d.deferred.T01),
+    mutate: (root) => editJson(root, STATUS, (d) => delete d.deferred.T03),
   },
   {
     name: "T-number both implemented and deferred",
@@ -126,7 +126,7 @@ const CASES = [
       write(
         root,
         "tests/records/entry.test.ts",
-        'import { test, expect } from "bun:test"\n\n// @covers T01\ntest("entry accepted", () => { expect(1).toBe(1) })\n',
+        'import { test, expect } from "bun:test"\n\n// @covers T03\ntest("claim validation", () => { expect(1).toBe(1) })\n',
       ),
   },
   {
@@ -143,11 +143,11 @@ const CASES = [
     script: "check-catalog.mjs",
     expect: "placeholder",
     mutate: (root) => {
-      editJson(root, STATUS, (d) => delete d.deferred.T01);
+      editJson(root, STATUS, (d) => delete d.deferred.T03);
       write(
         root,
         "tests/records/entry.test.ts",
-        'import { test } from "bun:test"\n\n// @covers T01\ntest("entry accepted", () => {})\n',
+        'import { test } from "bun:test"\n\n// @covers T03\ntest("claim validation", () => {})\n',
       );
     },
   },
@@ -156,11 +156,11 @@ const CASES = [
     script: "check-catalog.mjs",
     expect: "placeholder",
     mutate: (root) => {
-      editJson(root, STATUS, (d) => delete d.deferred.T01);
+      editJson(root, STATUS, (d) => delete d.deferred.T03);
       write(
         root,
         "tests/records/entry.test.ts",
-        'import { test, expect } from "bun:test"\n\n// @covers T01\ntest.skip("entry accepted", () => { expect(1).toBe(1) })\n',
+        'import { test, expect } from "bun:test"\n\n// @covers T03\ntest.skip("claim validation", () => { expect(1).toBe(1) })\n',
       );
     },
   },
@@ -170,7 +170,7 @@ const CASES = [
     expect: "status",
     mutate: (root) =>
       editJson(root, STATUS, (d) => {
-        d.deferred.T01 = { reason: "no milestone given" };
+        d.deferred.T03 = { reason: "no milestone given" };
       }),
   },
 ];
@@ -180,7 +180,7 @@ for (const testCase of CASES) {
   const root = mkdtempSync(join(tmpdir(), "loredu-selftest-"));
   try {
     // Copy everything the corpus links into, so a clean copy really is clean.
-    for (const dir of ["docs", ".github", ".agents"]) {
+    for (const dir of ["docs", ".github", ".agents", "tests"]) {
       cpSync(join(REPO_ROOT, dir), join(root, dir), { recursive: true });
     }
     for (const rootFile of ["AGENTS.md", "README.md"]) {

@@ -1,7 +1,9 @@
 # records — M0, records and application append
 
-Catalog rows **T01–T08, T19, T80, T83–T85, T87** live here. Drive only public
-`@loredu/kernel` and `@loredu/kernel/testing` exports.
+Catalog rows **T01–T08, T19, T80, T83–T85, T87** live here. The live
+`public-entry-append.test.ts` suite currently implements T01, T02, T84, and T87;
+the rest remain deferred. Drive only public `@loredu/kernel` and
+`@loredu/kernel/testing` exports.
 
 Cover all five exact family shapes; closed envelopes and reserved/excess fields;
 portable JSON rejection/equality; detached deep freezing; canonical timestamps;
@@ -17,4 +19,5 @@ noncatalog adversarial vectors land in M0.
 
 Contracts: [records](../../docs/architecture/contracts/records.md),
 [clock/identity](../../docs/architecture/contracts/clock-and-identity.md),
-[ADR 0020](../../docs/decisions/0020-m0-public-contract-closure.md).
+[ADR 0020](../../docs/decisions/0020-m0-public-contract-closure.md),
+[ADR 0021](../../docs/decisions/0021-strict-rfc3339-instant-domain.md).
