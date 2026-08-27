@@ -1,8 +1,8 @@
-import type { PersistedRecord, RecordId, RecordKind } from "../src/domain/entry";
+import type { PersistedRecord, RecordKind } from "../src/domain/entry";
 import { jsonValuesEqual } from "../src/domain/portable-json";
 import { decodePersistedRecord, encodePersistedRecord } from "../src/domain/records";
 import { LoreduError } from "../src/errors";
-import type { PositionedRecord, RecordScan, RecordStore, StreamPosition } from "../src/ports/capabilities";
+import type { PositionedRecord, RecordStore, StreamPosition } from "../src/ports/capabilities";
 
 export interface RecordStoreFixture {
   readonly store: RecordStore;
@@ -24,6 +24,8 @@ const ids = {
   entry1: "ent_0000000000000001",
   claim0: "clm_0000000000000000",
   relation0: "rel_0000000000000000",
+  resolution0: "res_0000000000000000",
+  verification0: "ver_0000000000000000",
 } as const;
 
 const actor = Object.freeze({ type: "agent" as const, id: "loredu.conformance" });
@@ -76,10 +78,44 @@ function relation(): PersistedRecord {
   });
 }
 
+function resolution(): PersistedRecord {
+  return decodePersistedRecord({
+    schema: "loredu.record/v1",
+    kind: "resolution",
+    id: ids.resolution0,
+    recorded_at: "1970-01-01T00:00:00.003Z",
+    actor,
+    targets: [ids.claim0, ids.relation0],
+    decision: "prefer",
+    reason: "The fixtures agree.",
+    scope: {},
+    metadata: {},
+    sources: [],
+  });
+}
+
+function verification(): PersistedRecord {
+  return decodePersistedRecord({
+    schema: "loredu.record/v1",
+    kind: "verification",
+    id: ids.verification0,
+    recorded_at: "1970-01-01T00:00:00.004Z",
+    actor,
+    targets: [ids.claim0],
+    verified_against: [{ ref: "https://example.test/conformance", snapshot: "fixture-1" }],
+    result: "confirmed",
+    scope: {},
+    metadata: {},
+    sources: [],
+  });
+}
+
 const fixtures = Object.freeze([
   entry(ids.entry0, "first fixture"),
   claim(),
   relation(),
+  resolution(),
+  verification(),
   entry(ids.entry1, "later fixture"),
 ]);
 
@@ -135,12 +171,8 @@ async function collect(iterable: AsyncIterable<PositionedRecord>): Promise<reado
   return records;
 }
 
-function idsOf(scan: RecordScan): readonly RecordId[] {
-  return scan.records.map(({ record }) => record.id);
-}
-
 function expectedForKinds(kinds: readonly RecordKind[]): readonly PersistedRecord[] {
-  return fixtures.slice(0, 3).filter((record) => kinds.includes(record.kind));
+  return fixtures.slice(0, 5).filter((record) => kinds.includes(record.kind));
 }
 
 function conformanceCase(
@@ -197,27 +229,33 @@ export function recordStoreConformance(subject: StoreUnderTest): readonly Record
       assertPosition(appendedAt, 3, "concurrent append");
       assertPositioned(concurrent.records, fixtures.slice(0, captured), "atomic concurrent scan");
 
+      for (const record of fixtures.slice(3, 5)) await store.append(record);
+
       const all = await store.scan();
-      assertPosition(all.head, 3, "unfiltered scan head");
-      assertPositioned(all.records, fixtures.slice(0, 3), "unfiltered scan");
+      assertPosition(all.head, 5, "unfiltered scan head");
+      assertPositioned(all.records, fixtures.slice(0, 5), "unfiltered scan");
       const absentKinds = await store.scan({});
-      assertPosition(absentKinds.head, 3, "absent-kinds scan head");
-      assertPositioned(absentKinds.records, fixtures.slice(0, 3), "absent-kinds scan");
+      assertPosition(absentKinds.head, 5, "absent-kinds scan head");
+      assertPositioned(absentKinds.records, fixtures.slice(0, 5), "absent-kinds scan");
 
       const none = await store.scan({ kinds: [] });
-      assertPosition(none.head, 3, "empty-filter scan head");
+      assertPosition(none.head, 5, "empty-filter scan head");
       assert(none.records.length === 0, "empty kind list matched records");
+
+      for (const kind of ["entry", "claim", "relation", "resolution", "verification"] as const) {
+        const filtered = await store.scan({ kinds: [kind] });
+        assertPosition(filtered.head, 5, `${kind}-filtered scan head`);
+        assertPositioned(filtered.records, expectedForKinds([kind]), `${kind}-filtered scan`);
+      }
 
       for (const kinds of [
         ["claim", "entry", "claim"],
-        ["entry", "claim"],
+        ["verification", "entry", "resolution", "verification"],
       ] as const) {
         const filtered = await store.scan({ kinds });
-        assertPosition(filtered.head, 3, "filtered scan head");
-        assertPositioned(filtered.records, expectedForKinds(kinds), "kind-filtered scan");
+        assertPosition(filtered.head, 5, "mixed-filter scan head");
+        assertPositioned(filtered.records, expectedForKinds(kinds), "mixed-filtered scan");
       }
-      const relationOnly = await store.scan({ kinds: ["relation"] });
-      assertPositioned(relationOnly.records, expectedForKinds(["relation"]), "relation-filtered scan");
     }),
 
     conformanceCase(subject, "stream uses exclusive after and a first-iteration snapshot", async (store) => {
@@ -268,11 +306,14 @@ export function recordStoreConformance(subject: StoreUnderTest): readonly Record
       "duplicate ids preserve the original, positions, scan, and head",
       async (store) => {
         const original = fixtures[0] as PersistedRecord;
+        const replacement = entry(original.id, "replacement fixture");
         await store.append(original);
         const before = await store.scan();
+        assertPositioned(before.records, [original], "scan before duplicate");
+        assertRecord(await store.get(original.id), original, "original before duplicate");
         let duplicate: unknown;
         try {
-          await store.append(original);
+          await store.append(replacement);
         } catch (error) {
           duplicate = error;
         }
@@ -283,11 +324,7 @@ export function recordStoreConformance(subject: StoreUnderTest): readonly Record
         const after = await store.scan();
         assertPosition(await store.head(), 1, "head after duplicate");
         assertPosition(after.head, Number(before.head), "scan head after duplicate");
-        assert(idsOf(after).length === idsOf(before).length, "duplicate changed scan length");
-        assert(
-          idsOf(after).every((id, index) => id === idsOf(before)[index]),
-          "duplicate changed scan records",
-        );
+        assertPositioned(after.records, [original], "scan after duplicate");
         assertRecord(await store.get(original.id), original, "original after duplicate");
         assertPosition(await store.append(fixtures[1] as PersistedRecord), 2, "append after duplicate");
       },
