@@ -1,5 +1,7 @@
 import { RECORD_SCHEMA_ID } from "@loredu/kernel";
 
+export { PLAIN_FILE_FORMAT, PlainFileStore, recordFileName } from "./plain-file-store";
+export { decodePlainFileRecord, encodePlainFileRecord } from "./record-codec";
 export {
   DEFAULT_STORE_NAME,
   defaultLoreduHome,

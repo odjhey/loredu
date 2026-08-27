@@ -6,6 +6,7 @@
       "name": "@loredu/workspace",
       "dependencies": {
         "@loredu/kernel": "workspace:*",
+        "@loredu/store-plainfile": "workspace:*",
       },
       "devDependencies": {
         "@biomejs/biome": "^2.3.14",
