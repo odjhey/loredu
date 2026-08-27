@@ -318,9 +318,9 @@ describe("M0 record/draft family foundation", () => {
       ]),
     });
     const oversizedName = `x.${"n".repeat(129)}`;
-    await expect(
-      app.append({ ...entryDraft, metadata: { [oversizedName]: true } }),
-    ).rejects.toMatchObject({ code: "VALIDATION_FAILED" });
+    await expect(app.append({ ...entryDraft, metadata: { [oversizedName]: true } })).rejects.toMatchObject({
+      code: "VALIDATION_FAILED",
+    });
 
     const boundaryKey = `${"n".repeat(128)}.${"m".repeat(128)}`;
     const accepted = await app.append({ ...entryDraft, metadata: { [boundaryKey]: true } });
