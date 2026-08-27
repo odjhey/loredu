@@ -305,9 +305,7 @@ describe("public strict record codec", () => {
     });
     const bytes = encodePlainFileRecord(claim);
 
-    expect(textDecoder.decode(bytes)).toContain(
-      'value: {"10":"ten","2":"two","nested":{"10":10,"2":2}}\n',
-    );
+    expect(textDecoder.decode(bytes)).toContain('value: {"10":"ten","2":"two","nested":{"10":10,"2":2}}\n');
     expect(encodePersistedRecord(decodePlainFileRecord(bytes))).toEqual(encodePersistedRecord(claim));
   });
 

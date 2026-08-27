@@ -67,8 +67,7 @@ function compareUnicodeScalars(left: string, right: string): number {
   const rightScalars = [...right];
   const length = Math.min(leftScalars.length, rightScalars.length);
   for (let index = 0; index < length; index++) {
-    const difference =
-      (leftScalars[index]?.codePointAt(0) ?? 0) - (rightScalars[index]?.codePointAt(0) ?? 0);
+    const difference = (leftScalars[index]?.codePointAt(0) ?? 0) - (rightScalars[index]?.codePointAt(0) ?? 0);
     if (difference !== 0) return difference;
   }
   return leftScalars.length - rightScalars.length;
@@ -95,9 +94,7 @@ function canonicalJson(value: unknown, shape: JsonShape = "dynamic"): string {
   } else {
     keys = Object.keys(object).sort(compareUnicodeScalars);
   }
-  return `{${keys
-    .map((key) => `${JSON.stringify(key)}:${canonicalJson(object[key])}`)
-    .join(",")}}`;
+  return `{${keys.map((key) => `${JSON.stringify(key)}:${canonicalJson(object[key])}`).join(",")}}`;
 }
 
 function jsonLine(field: string, value: unknown): string {
