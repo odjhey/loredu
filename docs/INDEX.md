@@ -52,6 +52,7 @@ created_at: 2026-08-26T12:10:00+08:00
 | [0022: M1 store and plain-file contract closure](./decisions/0022-m1-store-and-plain-file-contract.md) | Exact full-port/conformance forms plus provider codec, layout, replay, lock, durability, and root choices |
 | [0023: Repository-local no-mistakes pipeline](./decisions/0023-repository-no-mistakes-pipeline.md) | Deterministic static/corpus commands, targeted Test evidence, trusted path guidance, bounded repair, and protected CI as landing authority |
 | [0024: M0 policy and Basis runtime boundaries](./decisions/0024-m0-policy-and-basis-runtime-boundaries.md) | Closed policy assembly, callback-free ruleset snapshots, canonical Basis construction, and structural equality |
+| [0025: M0 application append phase boundaries](./decisions/0025-m0-application-append-phase-boundaries.md) | Custom-policy result validation, ordered reference failures, all-family stamping, and detached in-memory snapshots |
 | [0018: Capability ports for time and identity](./decisions/0018-capability-ports.md) | `Clock` and `RandomSource` injected; the application stamps `id`/`recorded_at`, the store assigns only the position |
 | [0017: Branch protection posture](./decisions/0017-branch-protection-posture.md) | `ci-required` the only required status, zero reviews, squash-only, no bypass actors, up-to-date-before-merge on |
 

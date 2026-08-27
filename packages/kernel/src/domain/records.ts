@@ -504,7 +504,11 @@ function fail(issues: LoreduIssue[], persisted: boolean): never {
   );
 }
 
-function decode(input: unknown, persisted: boolean): RecordDraft | PersistedRecord {
+function decode(
+  input: unknown,
+  persisted: boolean,
+  requireMatchingIdKind = true,
+): RecordDraft | PersistedRecord {
   const issues: LoreduIssue[] = [];
   const data = inspectObject(input, "", issues);
   if (!data) fail(issues, persisted);
@@ -525,7 +529,12 @@ function decode(input: unknown, persisted: boolean): RecordDraft | PersistedReco
     if (schemaInput === RECORD_SCHEMA_ID) schema = RECORD_SCHEMA_ID;
     else if (schemaInput !== MISSING)
       issues.push(makeIssue("UNKNOWN_SCHEMA", "/schema", "must be the known loredu.record/v1 schema"));
-    id = parseRecordId(ownValue(data, "id", "/id", issues), "/id", issues, [kind]);
+    id = parseRecordId(
+      ownValue(data, "id", "/id", issues),
+      "/id",
+      issues,
+      requireMatchingIdKind ? [kind] : undefined,
+    );
     recordedAt = normalizeTimestamp(
       ownValue(data, "recorded_at", "/recorded_at", issues),
       "/recorded_at",
@@ -715,6 +724,9 @@ export function decodeRecordDraft(input: unknown): RecordDraft {
 }
 export function decodePersistedRecord(input: unknown): PersistedRecord {
   return decode(input, true) as PersistedRecord;
+}
+export function decodeReferencedRecord(input: unknown): PersistedRecord {
+  return decode(input, true, false) as PersistedRecord;
 }
 export function encodePersistedRecord(record: PersistedRecord): JsonObject {
   return decodePersistedRecord(record) as unknown as JsonObject;

@@ -48,11 +48,6 @@
       "group": "M1 — plain-file store",
       "reason": "plain-file store adapter not implemented yet"
     },
-    "T19": {
-      "milestone": "M0",
-      "group": "M0 — records and validation",
-      "reason": "application reference validation and in-memory test support not implemented yet"
-    },
     "T20": {
       "milestone": "M2",
       "group": "M2 — reconciliation, resolution, projections",
@@ -257,16 +252,6 @@
       "milestone": "M1.5",
       "group": "Pagination and link-following (ADR 0009)",
       "reason": "pagination and affordance links not implemented yet"
-    },
-    "T80": {
-      "milestone": "M0",
-      "group": "Kernel invariants and the policy seam (issue #6)",
-      "reason": "kernel invariants and ClaimPolicy seam not implemented yet"
-    },
-    "T83": {
-      "milestone": "M0",
-      "group": "Kernel invariants and the policy seam (issue #6)",
-      "reason": "kernel invariants and ClaimPolicy seam not implemented yet"
     },
     "T86": {
       "milestone": "M2",

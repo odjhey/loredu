@@ -4,7 +4,7 @@ This repository uses `AGENTS.md` as the cross-harness entry point for agent beha
 
 Loredu is an embedded operational knowledge kernel — a utility our own products build on, not a standalone product. Activities append what they learn as immutable, provenance-carrying records; claims declare identity keys so knowledge about the same fact meets instead of piling up. The kernel is strictly mechanical: it detects duplicates, conflicts, divergence, and staleness deterministically and never judges. Humans and agents make the judgments, and every judgment is itself a record.
 
-The repo is agent-first and design-first, and currently holds **no source tree**: contracts, decision records, and the v0.x plan are the artifact until the application contracts settle. Treat docs as the thing being built, and the maintenance rules in `docs/README.md` as its build system.
+The repo is agent-first and design-first. Contracts, decision records, plans, and implementation evolve together. Treat docs as part of the thing being built, and the maintenance rules in `docs/README.md` as its build system.
 
 ## Source of truth
 
@@ -43,7 +43,7 @@ The corpus checks are zero-dependency, so `bun docs/scripts/check-docs.mjs` and 
 
 The kernel's purity is a compiler fact, not a convention: `tsconfig.base.json` sets `"types": []`, adapters opt in with `"types": ["bun"]`, and `packages/kernel` never does — so `process`, `Bun.*`, `Buffer`, `__dirname`, and `node:*` fail `bun run typecheck` inside the kernel (`docs/decisions/0016-workspace-scaffold-and-kernel-type-isolation.md`).
 
-Boundaries that will be enforced once code exists (see ADRs 0011 and 0012): the kernel takes zero runtime dependencies and no `node:*`/`bun:*` imports or ambient Bun/Node globals; the package DAG is one-way (kernel ← store-plainfile ← cli); a T-number is either covered by an executable test or explicitly deferred, never both, and never faked with a placeholder test.
+Enforced boundaries (see ADRs 0011 and 0012): the kernel takes zero runtime dependencies and no `node:*`/`bun:*` imports or ambient Bun/Node globals; the package DAG is one-way (kernel ← store-plainfile ← cli); a T-number is either covered by an executable test or explicitly deferred, never both, and never faked with a placeholder test.
 
 ## Default discovery sequence
 

@@ -41,7 +41,7 @@ The kind prefix is `ent|clm|rel|res|ver`; suffixes carry no structure. Store dup
 
 One application append call performs:
 
-1. inspect and aggregate all safely discoverable draft validation issues;
+1. complete descriptor-safe structural validation and, for a structurally valid Claim, the custom-policy validation/semantics phase specified by the [kernel API contract](./kernel-api.md);
 2. read and aggregate record references in deterministic field/index order;
 3. call `RandomSource.nextBytes(10)` exactly once and format the id;
 4. call `Clock.now()` exactly once and render canonical time;
@@ -58,4 +58,4 @@ Two fresh applications with the same draft, fixed Instant, and identically initi
 
 M0 exports `FixedClock` and `SeededRandomSource`, alongside `InMemoryStore`, only from `@loredu/kernel/testing`. Production code cannot import the testing subpath. CLI and future embedded consumers provide host capabilities at their composition roots; no dedicated clock/random package exists.
 
-Related: [records](./records.md), [store](./store.md), [ADR 0018](../../decisions/0018-capability-ports.md), [ADR 0020](../../decisions/0020-m0-public-contract-closure.md), [ADR 0021](../../decisions/0021-strict-rfc3339-instant-domain.md), [ADR 0022](../../decisions/0022-m1-store-and-plain-file-contract.md).
+Related: [records](./records.md), [store](./store.md), [ADR 0018](../../decisions/0018-capability-ports.md), [ADR 0020](../../decisions/0020-m0-public-contract-closure.md), [ADR 0021](../../decisions/0021-strict-rfc3339-instant-domain.md), [ADR 0022](../../decisions/0022-m1-store-and-plain-file-contract.md), [ADR 0025](../../decisions/0025-m0-application-append-phase-boundaries.md).

@@ -1,5 +1,6 @@
 import { LoreduError } from "../src/application";
 import type { PersistedRecord, RecordId } from "../src/domain/entry";
+import { decodePersistedRecord } from "../src/domain/records";
 import {
   type Clock,
   createInstant,
@@ -47,14 +48,16 @@ export class InMemoryStore implements RecordStore {
   readonly #records = new Map<string, PersistedRecord>();
   #position = 0;
   async append(record: PersistedRecord): Promise<StreamPosition> {
-    if (this.#records.has(record.id))
-      throw new LoreduError("DUPLICATE_RECORD_ID", `record id already exists: ${record.id}`);
+    const snapshot = decodePersistedRecord(record);
+    if (this.#records.has(snapshot.id))
+      throw new LoreduError("DUPLICATE_RECORD_ID", `record id already exists: ${snapshot.id}`);
     const next = createStreamPosition(this.#position + 1);
-    this.#records.set(record.id, record);
+    this.#records.set(snapshot.id, snapshot);
     this.#position = next;
     return next;
   }
   async get(id: RecordId): Promise<PersistedRecord | undefined> {
-    return this.#records.get(id);
+    const record = this.#records.get(id);
+    return record === undefined ? undefined : decodePersistedRecord(record);
   }
 }

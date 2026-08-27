@@ -428,7 +428,7 @@ describe("public Entry assembly", () => {
       const { body: _body, ...withoutBody } = draft;
       await expect(assembly().app.append(withoutBody as EntryDraft)).rejects.toMatchObject({
         code: "VALIDATION_FAILED",
-        issues: [{ code: "TYPE", path: "/body" }],
+        issues: [{ code: "REQUIRED", path: "/body" }],
       });
     } finally {
       delete (Object.prototype as { body?: unknown }).body;

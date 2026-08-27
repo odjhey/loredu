@@ -93,7 +93,7 @@ confidence: observed
 derived_from: [ent_0123456789abcdef]
 ```
 
-The exact declared ClaimKey is `(scope, subject.type, subject.id, predicate, perspective?)`. Core constructs it from persisted fields. A ClaimPolicy may validate or reject it but cannot normalize, replace, merge, split, or return another key. The M0 runtime rejects an `identity` member at policy assembly and ruleset construction rather than retaining a remapping callback ([decision 0024](../../decisions/0024-m0-policy-and-basis-runtime-boundaries.md)). The built-in policy validates this closed declared shape and selects `exclusive`; custom callback execution belongs to generic Claim append in M0-A. Reconciliation never crosses exact keys. Unkeyed knowledge is an Entry.
+The exact declared ClaimKey is `(scope, subject.type, subject.id, predicate, perspective?)`. Core constructs it from persisted fields. A ClaimPolicy may validate or reject it but cannot normalize, replace, merge, split, or return another key. The M0 runtime rejects an `identity` member at policy assembly and ruleset construction rather than retaining a remapping callback ([decision 0024](../../decisions/0024-m0-policy-and-basis-runtime-boundaries.md)). The built-in policy validates this closed declared shape and selects `exclusive`; generic Claim append executes custom validation and semantics before reference reads under the [kernel API contract](./kernel-api.md). Reconciliation never crosses exact keys. Unkeyed knowledge is an Entry.
 
 ### Relation
 
@@ -139,7 +139,7 @@ A source or projection is not a persisted Verification target in `loredu.record/
 
 ## Reference and append rules
 
-Before stamping, application append validates every record id for complete shape and field-specific kind, then reads references in deterministic field/index order. It checks Claim `derived_from`; Relation `from` then `to`; Resolution `targets` then `replacement`; and Verification `targets`. Every referent must already exist and have the required kind. SourceRefs are external evidence and are never RecordStore lookups.
+Before stamping, application append validates every record id for complete shape and field-specific kind, then reads references sequentially in deterministic field/index order. It checks Claim `derived_from`; Relation `from` then `to`; Resolution `targets` then `replacement`; and Verification `targets`. Every referent must already exist. After a present value is decoded, its returned id is compared with the requested id before any family classification; a different id stops the phase as a fresh `REFERENCE_CHECK_FAILED`. Only matching identity proceeds to required-family and complete-id-prefix checks, including on Relation fields that otherwise permit every family. Missing and wrong-kind results aggregate in traversal order. A store-read throw or malformed returned record also stops this phase as a fresh `REFERENCE_CHECK_FAILED` without leaking foreign details. SourceRefs are external evidence and are never RecordStore lookups ([decision 0025](../../decisions/0025-m0-application-append-phase-boundaries.md)).
 
 Application append succeeds with exactly `{record, position}`. Validation, reference, capability, duplicate, lock, and pre-publication store failures publish and return no record. M1 durable providers have one unavoidable uncertain-outcome exception: host failure after atomic whole-record publication but before acknowledgement returns no result, while replay may expose that complete record; recovery checks the attempted id as fixed by [decision 0022](../../decisions/0022-m1-store-and-plain-file-contract.md). Full capability order and consumption are in [clock and identity](./clock-and-identity.md); the store/application split is in [store](./store.md).
 
@@ -149,7 +149,7 @@ Kernel public failures are structured `LoreduError` values with readonly top-lev
 
 Stable M0 top-level codes are `VALIDATION_FAILED`, `REFERENCE_CHECK_FAILED`, `DUPLICATE_RECORD_ID`, `RANDOM_SOURCE_FAILED`, `CLOCK_FAILED`, and `STORE_APPEND_FAILED`. Stable issue codes include `REQUIRED`, `TYPE`, `FORMAT`, `RANGE`, `UNKNOWN_FIELD`, `RESERVED_FIELD`, `DUPLICATE`, `UNKNOWN_SCHEMA`, `REFERENCE_NOT_FOUND`, and `REFERENCE_KIND_MISMATCH`.
 
-Structural validation collects all safely discoverable issues and sorts by pointer then code. A duplicate complete SourceRef reports `DUPLICATE` at the later element pointer such as `/sources/1`, never `FORMAT`. If any issues exist, no reference/capability/store call occurs. Reference validation then aggregates missing/wrong-kind issues in deterministic field/index order. Operational failures carry one top-level failure.
+Structural validation collects all safely discoverable issues and sorts by pointer then code. A duplicate complete SourceRef reports `DUPLICATE` at the later element pointer such as `/sources/1`, never `FORMAT`. If any issues exist, no policy/reference/capability/store call occurs. For a structurally valid Claim, custom-policy validation and semantics are part of this pre-reference validation phase under the exact callback/result rules in the [kernel API contract](./kernel-api.md). Reference validation then aggregates missing/wrong-kind issues in deterministic field/index order. Operational failures carry one top-level failure.
 
 ## Invariants
 
