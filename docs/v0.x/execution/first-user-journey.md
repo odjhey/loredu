@@ -24,7 +24,7 @@ The exact [application and CLI contract](../../architecture/contracts/applicatio
   "reconciliation": {
     "state": "conflict-candidate",
     "key": {"scope": {"repo": "rozoro"}, "subject": {"type": "code-area", "id": "command-registration"}, "predicate": "location"},
-    "related_count": 1,
+    "related_count": 2,
     "related": [{"id": "clm_1111111111111111", "kind": "claim", "affordances": []}],
     "claims": {"rel": "list", "action": "claims.list", "params": {"query": {"scope": {"repo": "rozoro"}, "scope_match": "exact", "subject_type": "code-area", "subject": "command-registration", "predicate": "location", "perspective": null}}, "why": "inspect the complete exact-key group", "run": "lor claims --scope repo=rozoro --exact-scope --subject-type code-area --subject command-registration --predicate location --without-perspective"}
   },
@@ -113,7 +113,7 @@ A later run finds the world changed:
 
 ```text
 $ lor add claim ... --predicate location --value src/cli/commands ...
-clm_3333333333333333  conflict candidate under key with 1 earlier differing claim
+clm_3333333333333333  conflict candidate under key with 2 earlier differing claims
 advice: lor claims --scope repo=rozoro --exact-scope --subject-type code-area --subject command-registration --predicate location --without-perspective
 advice: lor show clm_1111111111111111
 advice: lor show clm_3333333333333333
@@ -123,10 +123,21 @@ Nothing is deleted or overwritten. The advice is executable mechanics: inspect b
 
 ## Journey 3b — chain until healthy
 
-The agent follows the advice in the same session: inspect, verify against the source, resolve, then check overall health:
+The agent follows the exact-key list and every continuation, inspects and verifies all three Claims, resolves the complete current group, then checks health:
 
 ```text
-$ lor status
+$ lor claims --scope repo=rozoro --exact-scope --subject-type code-area \
+    --subject command-registration --predicate location --without-perspective
+clm_1111111111111111
+clm_2222222222222222
+clm_3333333333333333
+$ lor resolve --actor agent:example.agent \
+    --target clm_1111111111111111 --target clm_2222222222222222 \
+    --target clm_3333333333333333 --decision prefer \
+    --replacement clm_3333333333333333 \
+    --reason "verified against snapshot 9f21c44; registration moved"
+res_4444444444444444
+$ lor status --check
 healthy: true
 open exclusive groups: 0    dangling record refs: 0
 advisories: 0
@@ -156,36 +167,24 @@ The shell is the rest of the query engine; lor does not need to grow one.
 
 ## Journey 4 — M3 Working Lore reflects it
 
-This journey begins only when M3 lands. On an empty matching scope, the same command returns a definitive empty packet with Basis and exit 0. With the earlier records:
+This journey begins only when M3 lands. On an empty matching scope, the same command returns a definitive empty packet with Basis and exit 0. After the complete Resolution in journey 3b, the current packet reflects that judgment:
 
 ```text
 $ lor lore --activity investigate --scope repo=rozoro
 current:
-  (code-area command-registration) location = src/commands   [clm_1111111111111111, corroborated]
-attention:
-  conflict: location = src/commands vs src/cli/commands      [clm_1111111111111111 ~ clm_3333333333333333]
+  (code-area command-registration) location = src/cli/commands   [clm_3333333333333333, resolved]
+attention: none
 basis:
-  stream_position: 4
+  stream_position: 5
   ruleset: { core: loredu.reconciliation/v1, claim_policy: { id: loredu.default, version: "1" } }
   query: { activity: investigate, scope: { repo: rozoro } }
 ```
 
 Bounded, ranked, with stable handles — not a record dump.
 
-## Journey 5 — resolve in M1.5; project in M2
+## Journey 5 — M2 projects the M1.5 Resolution
 
-M1.5 records the judgment and then proves mechanical health:
-
-```text
-$ lor resolve --actor agent:example.agent --target clm_1111111111111111 --target clm_3333333333333333 \
-    --decision prefer --replacement clm_3333333333333333 \
-    --reason "verified against snapshot 9f21c44; registration moved"
-res_4444444444444444
-$ lor status --check
-healthy: true
-```
-
-M2 adds the projection command; it is not accepted by an M1.5 binary:
+Journey 3b already recorded the complete-group judgment and proved M1.5 health. M2 adds the projection command; it is not accepted by an M1.5 binary:
 
 ```text
 $ lor current --scope repo=rozoro
@@ -307,7 +306,7 @@ Grouped by milestone; **AC n** = acceptance criterion in [goal and scope](../sco
 | T60 | every mutation response (`--json`) contains exact bounded `ok`, `result`, `reconciliation`, rendered `advice`, and `basis`; each application affordance becomes runnable without CLI strings in the application, and committed feedback failure never looks like mutation failure | ADR 0008/0026 |
 | T61 | second claim, same key + same value → corroboration feedback, no attention raised | journey 3 |
 | T62 | second claim, same key + different value → conflict-candidate feedback with related count, one representative, exact-key list drill-down, and bounded `advice` naming both ids | journey 3 |
-| T63 | agent chain: execute both show commands from T62, make the manual judgment using the embedded skill's resolve grammar, then `lor status` reports healthy and `--check` exits 0 | journey 3b, ADR 0026 |
+| T63 | agent chain: paginate the exact-key list from T62, inspect all Claims, repeat `--target` for every current member, record judgment, then `lor status --check` exits 0 | journey 3b, ADR 0026 |
 | T64 | bounded `lor status` counts every absent/forward persisted reference and unresolved exclusive group; only an eligible Resolution whose record references all point backward and whose targets cover all current members closes a group, while malformed canonical files fail as store corruption rather than partial health | journey 3b, ADR 0026 |
 | T65 | text `lor skill` equals frontmatter-stripped embedded source bytes and needs no store; a fresh store using only its M1.5 commands completes orientation, record/query/disclosure/manual-resolution, and healthy exit | journey 9, ADR 0026 |
 | T66 | for the same pinned state, corrective/navigational affordance fields and order are identical; healthy state has no corrective advice, though record handles and list continuation remain navigational | ADR 0008/0026 |
