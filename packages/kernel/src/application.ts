@@ -147,6 +147,8 @@ async function checkReferences(store: RecordStore, references: readonly Referenc
     }
     if (found === undefined) {
       issues.push(makeIssue("REFERENCE_NOT_FOUND", reference.path, `record does not exist: ${reference.id}`));
+    } else if (found.id !== reference.id) {
+      throw new LoreduError("REFERENCE_CHECK_FAILED", "Record reference read returned a different id");
     } else if (
       !reference.kinds.includes(found.kind) ||
       recordKindOfIdPrefix(reference.id.slice(0, 3)) !== found.kind
@@ -158,8 +160,6 @@ async function checkReferences(store: RecordStore, references: readonly Referenc
           `record kind ${found.kind} is not valid for this reference`,
         ),
       );
-    } else if (found.id !== reference.id) {
-      throw new LoreduError("REFERENCE_CHECK_FAILED", "Record reference read returned a different id");
     }
   }
   if (issues.length > 0)

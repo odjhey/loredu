@@ -281,7 +281,7 @@ describe("generic M0 application append", () => {
       {
         async get(reference) {
           mismatchedIdCalls.push(`get:${reference}`);
-          return persisted("entry");
+          return persisted("claim");
         },
         async append() {
           mismatchedIdCalls.push("append");
