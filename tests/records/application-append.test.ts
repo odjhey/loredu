@@ -78,6 +78,13 @@ function persisted(kind: "entry" | "claim" | "relation"): PersistedRecord {
   });
 }
 
+function persistedWithId(
+  kind: "entry" | "claim" | "relation",
+  recordId: PersistedRecord["id"],
+): PersistedRecord {
+  return { ...persisted(kind), id: recordId } as PersistedRecord;
+}
+
 function inertCapabilities(store: RecordStore, calls: string[]) {
   return createLoreduApplication({
     store,
@@ -195,7 +202,7 @@ describe("generic M0 application append", () => {
       },
       {
         draft: { ...claimDraft(), derived_from: [id.entry0 as never, id.entry1 as never] },
-        returned: [undefined, persisted("claim")],
+        returned: [undefined, persistedWithId("claim", id.entry1 as never)],
         expectedGets: [id.entry0, id.entry1],
         expectedIssues: [
           { code: "REFERENCE_NOT_FOUND", path: "/derived_from/0" },
@@ -210,7 +217,7 @@ describe("generic M0 application append", () => {
           from: id.entry0 as never,
           to: id.claim0 as never,
         },
-        returned: [undefined, persisted("entry")],
+        returned: [undefined, persistedWithId("entry", id.claim0 as never)],
         expectedGets: [id.entry0, id.claim0],
         expectedIssues: [
           { code: "REFERENCE_NOT_FOUND", path: "/from" },
@@ -226,7 +233,11 @@ describe("generic M0 application append", () => {
           decision: "prefer",
           reason: "fixture",
         },
-        returned: [undefined, persisted("entry"), persisted("relation")],
+        returned: [
+          undefined,
+          persistedWithId("entry", id.relation0 as never),
+          persistedWithId("relation", id.claim1 as never),
+        ],
         expectedGets: [id.claim0, id.relation0, id.claim1],
         expectedIssues: [
           { code: "REFERENCE_NOT_FOUND", path: "/targets/0" },
@@ -242,7 +253,7 @@ describe("generic M0 application append", () => {
           verified_against: [{ ref: "source", snapshot: "v1" }],
           result: "confirmed",
         },
-        returned: [undefined, persisted("entry")],
+        returned: [undefined, persistedWithId("entry", id.claim1 as never)],
         expectedGets: [id.claim0, id.claim1],
         expectedIssues: [
           { code: "REFERENCE_NOT_FOUND", path: "/targets/0" },

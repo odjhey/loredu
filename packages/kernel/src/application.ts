@@ -9,7 +9,7 @@ import {
 } from "./domain/entry";
 import { compareUnicodeScalars, makeIssue } from "./domain/portable-json";
 import { RECORD_ID_PREFIX, recordKindOfIdPrefix } from "./domain/record-kind";
-import { decodePersistedRecord, decodeRecordDraft } from "./domain/records";
+import { decodePersistedRecord, decodeRecordDraft, decodeReferencedRecord } from "./domain/records";
 import { LoreduError, type LoreduIssue } from "./errors";
 import {
   type Clock,
@@ -141,7 +141,7 @@ async function checkReferences(store: RecordStore, references: readonly Referenc
     let found: PersistedRecord | undefined;
     try {
       const value = await store.get(reference.id);
-      if (value !== undefined) found = decodePersistedRecord(value);
+      if (value !== undefined) found = decodeReferencedRecord(value);
     } catch {
       throw new LoreduError("REFERENCE_CHECK_FAILED", "Record reference read failed");
     }
