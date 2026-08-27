@@ -17,7 +17,8 @@
     "spell": "cspell --no-progress \"docs/**/*.md\" \"*.md\" \".agents/**/*.md\" \".github/**/*.md\"",
     "check:docs": "bun docs/scripts/check-docs.mjs",
     "check:catalog": "bun docs/scripts/check-catalog.mjs",
-    "check:gates": "bun docs/scripts/check-selftest.mjs"
+    "check:gates": "bun docs/scripts/check-selftest.mjs",
+    "check:boundaries": "bun scripts/check-workspace-boundaries.ts"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.3.14",

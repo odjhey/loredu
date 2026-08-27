@@ -1,110 +1,138 @@
-/**
- * Structural guardrails for the workspace scaffold itself.
- *
- * These assert the dependency law and the kernel boundary from
- * ADR 0011 as facts about the repository, not behavior of the product, so they
- * claim no catalog T-number. They are deliberately narrow: manifest edges plus a
- * source scan for environment imports. The full import/dependency checker
- * (dependency-cruiser or a purpose-built scanner) is a separate spike — issue #9
- * Phase C — and supersedes the scanning half of this file when it lands.
- */
-
-import { describe, expect, test } from "bun:test";
-import { readdirSync, readFileSync } from "node:fs";
-import { join, relative } from "node:path";
+import { afterEach, describe, expect, test } from "bun:test";
+import { cpSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { scanWorkspace } from "../scripts/check-workspace-boundaries";
 
 const REPO_ROOT = new URL("..", import.meta.url).pathname;
-const PACKAGES = join(REPO_ROOT, "packages");
+const temporaryRoots: string[] = [];
 
-interface Manifest {
-  readonly name?: string;
-  readonly dependencies?: Record<string, string>;
-  readonly peerDependencies?: Record<string, string>;
-  readonly optionalDependencies?: Record<string, string>;
-  readonly exports?: Record<string, string>;
+function fixture(): string {
+  const root = mkdtempSync(join(tmpdir(), "loredu-boundary-"));
+  temporaryRoots.push(root);
+  mkdirSync(join(root, "packages"), { recursive: true });
+  for (const packageName of ["kernel", "store-plainfile", "cli"]) {
+    cpSync(
+      join(REPO_ROOT, "packages", packageName, "package.json"),
+      join(root, "packages", packageName, "package.json"),
+      { recursive: true },
+    );
+    mkdirSync(join(root, "packages", packageName, "src"), { recursive: true });
+  }
+  mkdirSync(join(root, "packages", "cli", "bin"), { recursive: true });
+  return root;
 }
 
-function manifest(pkgDir: string): Manifest {
-  return JSON.parse(readFileSync(join(PACKAGES, pkgDir, "package.json"), "utf8")) as Manifest;
+function plant(root: string, relativePath: string, content: string): void {
+  const path = join(root, relativePath);
+  mkdirSync(join(path, ".."), { recursive: true });
+  writeFileSync(path, content);
 }
 
-function runtimeDeps(m: Manifest): string[] {
-  return [
-    ...Object.keys(m.dependencies ?? {}),
-    ...Object.keys(m.peerDependencies ?? {}),
-    ...Object.keys(m.optionalDependencies ?? {}),
-  ].sort();
+function rules(root: string): string[] {
+  return scanWorkspace(root).map((violation) => `${violation.path}:${violation.rule}:${violation.detail}`);
 }
 
-function sourceFiles(dir: string): string[] {
-  return readdirSync(dir, { recursive: true, encoding: "utf8" })
-    .filter((entry) => entry.endsWith(".ts"))
-    .map((entry) => join(dir, entry));
-}
-
-/** Every `import`/`export ... from "…"` specifier in a source file. */
-function importSpecifiers(file: string): string[] {
-  const text = readFileSync(file, "utf8");
-  return [
-    ...text.matchAll(/\bfrom\s+["']([^"']+)["']/g),
-    ...text.matchAll(/\bimport\s+["']([^"']+)["']/g),
-  ].map((match) => match[1] as string);
-}
-
-describe("package manifests", () => {
-  test("packages are named per ADR 0011", () => {
-    expect(manifest("kernel").name).toBe("@loredu/kernel");
-    expect(manifest("store-plainfile").name).toBe("@loredu/store-plainfile");
-    expect(manifest("cli").name).toBe("@loredu/cli");
-  });
-
-  test("the kernel declares zero runtime dependencies", () => {
-    expect(runtimeDeps(manifest("kernel"))).toEqual([]);
-  });
-
-  test("runtime dependencies form the one-way DAG kernel <- store-plainfile <- cli", () => {
-    expect(runtimeDeps(manifest("store-plainfile"))).toEqual(["@loredu/kernel"]);
-    expect(runtimeDeps(manifest("cli"))).toEqual(["@loredu/kernel", "@loredu/store-plainfile"]);
-  });
-
-  test("the kernel publishes the test-only /testing subpath separately from its runtime export", () => {
-    const exports = manifest("kernel").exports ?? {};
-    expect(Object.keys(exports).sort()).toEqual([".", "./testing"]);
-  });
+afterEach(() => {
+  for (const root of temporaryRoots.splice(0)) rmSync(root, { recursive: true, force: true });
 });
 
-describe("kernel boundary", () => {
-  const kernelProduction = sourceFiles(join(PACKAGES, "kernel", "src"));
-
-  test("the kernel has production sources to check", () => {
-    expect(kernelProduction.length).toBeGreaterThan(0);
+describe("authoritative workspace boundary guard", () => {
+  test("the real workspace is clean", () => {
+    expect(scanWorkspace(REPO_ROOT)).toEqual([]);
   });
 
-  test("no kernel production source imports an environment module", () => {
-    const offenders: string[] = [];
-    for (const file of kernelProduction) {
-      for (const specifier of importSpecifiers(file)) {
-        const environmentModule =
-          specifier.startsWith("node:") ||
-          specifier.startsWith("bun:") ||
-          ["fs", "path", "os", "crypto", "child_process", "util", "url", "process", "buffer"].includes(
-            specifier,
-          );
-        if (environmentModule) offenders.push(`${relative(REPO_ROOT, file)} imports ${specifier}`);
-      }
-    }
-    expect(offenders).toEqual([]);
+  test.each([
+    ["node protocol", 'import "node:fs";'],
+    ["bare Node builtin", 'import "crypto";'],
+    ["Bun module", 'import "bun:sqlite";'],
+    ["adapter", 'import "@loredu/store-plainfile";'],
+    ["CLI", 'import "@loredu/cli";'],
+    ["database SDK", 'import "@prisma/client";'],
+    ["model SDK", 'import "openai";'],
+  ])("rejects a kernel %s import", (_label, source) => {
+    const root = fixture();
+    plant(root, "packages/kernel/src/nested/new-feature.ts", source);
+    expect(rules(root)).toContainEqual(expect.stringContaining("kernel-import"));
   });
 
-  test("no production source in any package imports @loredu/kernel/testing", () => {
-    const offenders: string[] = [];
-    for (const pkg of ["kernel/src", "store-plainfile/src", "cli/src", "cli/bin"]) {
-      for (const file of sourceFiles(join(PACKAGES, pkg))) {
-        if (importSpecifiers(file).some((s) => s.includes("@loredu/kernel/testing"))) {
-          offenders.push(relative(REPO_ROOT, file));
-        }
-      }
-    }
-    expect(offenders).toEqual([]);
+  test.each([
+    ["Date.now", "export const value = Date.now();"],
+    ["zero-argument Date", "export const value = new Date();"],
+    ["Math.random", "export const value = Math.random();"],
+    ["Bun ambient", "export const value = Bun.version;"],
+    ["process ambient", "export const value = process.pid;"],
+    ["Buffer ambient", 'export const value = Buffer.from("x");'],
+  ])("rejects production ambient capability use: %s", (_label, source) => {
+    const root = fixture();
+    plant(root, "packages/kernel/src/deep/capability.ts", source);
+    expect(rules(root)).toContainEqual(expect.stringContaining("ambient-capability"));
+  });
+
+  test("allows explicit-value temporal construction", () => {
+    const root = fixture();
+    plant(
+      root,
+      "packages/kernel/src/deep/time.ts",
+      'export const value = new Date("2026-01-01T00:00:00.000Z");',
+    );
+    expect(scanWorkspace(root)).toEqual([]);
+  });
+
+  test("rejects the testing seam from every production package but allows test surfaces", () => {
+    const root = fixture();
+    plant(root, "packages/store-plainfile/src/nested/bad.ts", 'import "@loredu/kernel/testing";');
+    plant(root, "packages/cli/bin/bad.ts", 'import "@loredu/kernel/testing";');
+    plant(root, "packages/kernel/testing/helper.ts", 'import "@loredu/kernel/testing";');
+    plant(root, "packages/store-plainfile/src/accepted.test.ts", 'import "@loredu/kernel/testing";');
+    const found = rules(root).filter((line) => line.includes("testing-import"));
+    expect(found).toHaveLength(2);
+    expect(found.join("\n")).toContain("store-plainfile/src/nested/bad.ts");
+    expect(found.join("\n")).toContain("cli/bin/bad.ts");
+  });
+
+  test("fails closed on an unrecognized package source location", () => {
+    const root = fixture();
+    plant(root, "packages/kernel/lib/new-production.ts", "export const nested = true;");
+    expect(rules(root)).toContainEqual(expect.stringContaining("source-location"));
+  });
+
+  test("discovers manifest dependency and new-package boundary violations", () => {
+    const root = fixture();
+    const kernelManifest = join(root, "packages/kernel/package.json");
+    const manifest = JSON.parse(readFileSync(kernelManifest, "utf8"));
+    manifest.dependencies = { openai: "1.0.0" };
+    writeFileSync(kernelManifest, JSON.stringify(manifest));
+    plant(root, "packages/unclassified/package.json", JSON.stringify({ name: "@loredu/unclassified" }));
+    const found = rules(root);
+    expect(found).toContainEqual(expect.stringContaining("runtime-dependencies"));
+    expect(found).toContainEqual(expect.stringContaining("package-location"));
+  });
+
+  test("the kernel compiler boundary rejects Bun, process, Buffer, and node imports", async () => {
+    const root = mkdtempSync(join(tmpdir(), "loredu-type-isolation-"));
+    temporaryRoots.push(root);
+    plant(
+      root,
+      "fixture.ts",
+      'import { readFileSync } from "node:fs";\nreadFileSync("x");\nBun.version;\nprocess.pid;\nBuffer.from("x");\n',
+    );
+    plant(
+      root,
+      "tsconfig.json",
+      JSON.stringify({ extends: join(REPO_ROOT, "tsconfig.base.json"), include: ["fixture.ts"] }),
+    );
+    const process = Bun.spawn([join(REPO_ROOT, "node_modules/.bin/tsc"), "-p", root], {
+      stdout: "pipe",
+      stderr: "pipe",
+    });
+    const [exitCode, stdout, stderr] = await Promise.all([
+      process.exited,
+      new Response(process.stdout).text(),
+      new Response(process.stderr).text(),
+    ]);
+    expect(exitCode).not.toBe(0);
+    const diagnostics = `${stdout}\n${stderr}`;
+    for (const name of ["node:fs", "Bun", "process", "Buffer"]) expect(diagnostics).toContain(name);
   });
 });
