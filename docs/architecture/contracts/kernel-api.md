@@ -1,9 +1,9 @@
 ---
 name: kernel_api_contract
-description: "Exact M0 TypeScript entrypoints, exports, ports, constructors, and application assembly API."
+description: "Exact M0 kernel surface plus the additive M1 RecordStore and reusable testing-conformance exports."
 type: contract
 tags: [contracts, kernel, api, typescript]
-generated: "OpenAI coding agent, 2026-08-27"
+generated: "OpenAI coding agent and ChatGPT GPT-5.6 Sol, 2026-08-28"
 created_at: 2026-08-27T12:30:00+08:00
 ---
 
@@ -133,3 +133,66 @@ new SeededRandomSource(seed: number)
 Seed is a nonnegative safe integer. Equal initialized instances are deterministic within a released implementation, but the PRNG bytes are not a cross-implementation fixture. Helpers implement normal-entrypoint interfaces. They are absent from the normal entrypoint and production packages cannot import `./testing`. `StoreUnderTest` and reusable conformance exports arrive in M1.
 
 Scaffold-only `AppendResult`, `RecordRef`, `stream`, `head`, and `StoreUnderTest` are not M0 public API.
+
+## Additive M1 surface
+
+[Decision 0022](../../decisions/0022-m1-store-and-plain-file-contract.md) adds no entrypoint and no normal-entrypoint runtime value. It adds these type-only normal exports exactly:
+
+```text
+RecordFilter PositionedRecord RecordScan RecordStreamOptions
+```
+
+At M1, `RecordStore` is replaced by its additive full-port shape:
+
+```ts
+interface RecordFilter {
+  readonly kinds?: readonly RecordKind[]
+}
+interface PositionedRecord {
+  readonly position: StreamPosition
+  readonly record: PersistedRecord
+}
+interface RecordScan {
+  readonly head: StreamPosition
+  readonly records: readonly PositionedRecord[]
+}
+interface RecordStreamOptions {
+  readonly after?: StreamPosition
+}
+interface RecordStore {
+  append(record: PersistedRecord): Promise<StreamPosition>
+  get(id: RecordId): Promise<PersistedRecord | undefined>
+  scan(filter?: RecordFilter): Promise<RecordScan>
+  stream(options?: RecordStreamOptions): AsyncIterable<PositionedRecord>
+  head(): Promise<StreamPosition>
+}
+```
+
+The complete snapshot/filter/replay semantics are in the [store contract](./store.md). Stable M1 top-level error-code additions are `STREAM_POSITION_OUT_OF_RANGE`, `STORE_NOT_FOUND`, `STORE_ALREADY_EXISTS`, `STORE_LOCKED`, `STORE_CORRUPT`, and `STORE_IO_FAILED`; adapter methods report them as structured `LoreduError` values. Application append continues to pass through only exact `DUPLICATE_RECORD_ID` and normalizes other append-phase provider failures to `STORE_APPEND_FAILED` at the application boundary. The fresh failure's M1 human message identifies the attempted stamped id for uncertain-outcome recovery without leaking provider code/cause/message; message wording remains non-stable.
+
+M1 adds exactly one testing runtime value:
+
+```ts
+function recordStoreConformance(
+  subject: StoreUnderTest,
+): readonly RecordStoreConformanceCase[]
+```
+
+and exactly three testing type exports:
+
+```ts
+interface RecordStoreFixture {
+  readonly store: RecordStore
+  dispose(): Promise<void>
+}
+interface StoreUnderTest {
+  readonly name: string
+  create(): Promise<RecordStoreFixture>
+}
+interface RecordStoreConformanceCase {
+  readonly name: string
+  run(): Promise<void>
+}
+```
+
+`recordStoreConformance` is runner-neutral: it returns bound named async cases and imports no Bun/Node runner API. Each case owns a fresh empty fixture and always disposes it. `InMemoryStore` becomes M1-complete under the same `RecordStore` interface; `FixedClock` and `SeededRandomSource` are unchanged. No conformance or helper value moves to the normal entrypoint.

@@ -3,7 +3,7 @@ name: decisions_index
 description: "Format and index for durable Loredu architecture and product decisions."
 type: index
 tags: [decisions]
-generated: "ChatGPT GPT-5.6 Sol, 2026-08-26"
+generated: "ChatGPT GPT-5.6 Sol, 2026-08-28"
 created_at: 2026-08-26T12:10:00+08:00
 ---
 
@@ -34,3 +34,4 @@ Initial decisions:
 - [0019: M0 validation rules](./0019-m0-validation-rules.md)
 - [0020: Close the M0 public contract before implementation](./0020-m0-public-contract-closure.md) — partially supersedes only identified ADR 0010 identity/advice wording, ADR 0016 helper timing, and ADR 0019 §3 string-whitespace wording; §5's TimeClip range is partially superseded by ADR 0021
 - [0021: Keep every Instant within strict RFC3339](./0021-strict-rfc3339-instant-domain.md) — narrows Instant to the four-digit-year epoch-millisecond range and partially supersedes ADR 0020 §5
+- [0022: Close the M1 store and plain-file contract](./0022-m1-store-and-plain-file-contract.md) — exact full RecordStore/conformance surface and plain-file codec, layout, replay, locking, durability, and root resolution; narrowly supersedes ADR 0020's no-publication wording for post-publication/pre-acknowledgement durable-provider failure

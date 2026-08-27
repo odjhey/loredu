@@ -3,7 +3,7 @@ name: ubiquitous_language
 description: "Canonical Loredu terms for records, activities, temporal queries, reconciliation, resolution, projections, and Working Lore."
 type: glossary
 tags: [architecture, language]
-generated: "ChatGPT GPT-5.6 Sol, 2026-08-26"
+generated: "ChatGPT GPT-5.6 Sol, 2026-08-28"
 created_at: 2026-08-26T12:10:00+08:00
 ---
 
@@ -32,14 +32,18 @@ created_at: 2026-08-26T12:10:00+08:00
 | **Pattern** | Reusable operational knowledge that helps a future activity investigate more effectively. It is represented as a class/purpose of claim, not a separate storage engine. |
 | **Instant** | Opaque safe-integer epoch milliseconds in inclusive `-62_167_219_200_000..253_402_300_799_999`; supplied by Clock and always rendered by the kernel as strict four-digit-year RFC3339. |
 | **Canonical timestamp** | UTC RFC3339 text with exactly four year digits and millisecond precision: `YYYY-MM-DDTHH:mm:ss.sssZ`; normalized caller timestamps remain inside the Instant range. |
-| **recorded_at** | Canonical timestamp sampled after entropy and immediately before store append, never caller-authoritative. It becomes history only if append succeeds; stream position is the commit fact. |
+| **recorded_at** | Canonical timestamp sampled after entropy and immediately before store append, never caller-authoritative. It becomes acknowledged history when append returns; after an M1 uncertain durable-provider failure, replay by attempted id determines whether whole-record publication committed it. Stream position is the commit fact. |
 | **valid_from / valid_until** | When the claim is believed to apply in the external world. Either may be unknown. |
 | **as_of** | Query boundary limiting knowledge to records available at that time. |
 | **valid_at** | Query asking what a projection believes applied at that external-world time. |
 | **Capability port** | Collaborator the kernel needs but cannot reach for itself, injected when the application is assembled: `Clock` and `RandomSource`. Distinct from `RecordStore`, which is a persistence boundary rather than an environment capability. |
 | **Clock** | Injected source of the instant stamped as `recorded_at`. A fixed clock in tests makes `as_of` behavior reproducible. |
 | **RandomSource** | Injected source of entropy for record ids. Supplies bytes only — the kernel owns id format, so no adapter can substitute an id scheme. |
-| **Stream position** | Opaque nonnegative safe integer at the public TS boundary. Successful append positions are positive and strictly increase; `0` is the future empty-head value. |
+| **Stream position** | Opaque nonnegative safe integer at the public TS boundary. Successful M1 appends form the contiguous positive commit sequence `1..head`; `0` is the empty-head value. |
+| **Head** | Latest committed stream position captured by a store read; `0` for an empty store. A scan returns its captured head even when its filter matches nothing. |
+| **Positioned record** | Detached immutable pair of one committed stream position and its canonical record. Scan and stream order these by ascending position. |
+| **Record filter** | Provider-neutral M1 scan selector, closed to exact record-kind membership. Claim/query semantics remain application-owned. |
+| **Store root** | One explicitly selected physical directory containing an isolated canonical record stream plus provider control state; never discovered by walking cwd parents. |
 | **Basis** | Exactly stream position, structural RulesetIdentity, and canonical JSON query. `computed_at` is outside Basis and equality. |
 | **Handle** | Stable, runnable reference embedded in a response — an identifier plus the command that expands it. The unit of progressive disclosure. |
 | **Cursor** | Opaque continuation token for a paginated result, pinned to the basis position so a page chain stays consistent while records append. |
