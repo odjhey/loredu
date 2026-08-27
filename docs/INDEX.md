@@ -50,6 +50,7 @@ created_at: 2026-08-26T12:10:00+08:00
 | [0020: M0 public contract closure](./decisions/0020-m0-public-contract-closure.md) | Exact M0 semantics/API; partial supersession of identified ADR 0010, ADR 0016, and ADR 0019 §3 wording; its §5 TimeClip range is partially superseded by ADR 0021 |
 | [0021: Strict RFC3339 Instant domain](./decisions/0021-strict-rfc3339-instant-domain.md) | Safe-integer epoch-millisecond bounds that always render strict four-digit-year RFC3339; partial supersession of ADR 0020 §5 |
 | [0022: M1 store and plain-file contract closure](./decisions/0022-m1-store-and-plain-file-contract.md) | Exact full-port/conformance forms plus provider codec, layout, replay, lock, durability, and root choices |
+| [0023: Repository-local no-mistakes pipeline](./decisions/0023-repository-no-mistakes-pipeline.md) | Deterministic static/corpus commands, targeted Test evidence, trusted path guidance, bounded repair, and protected CI as landing authority |
 | [0018: Capability ports for time and identity](./decisions/0018-capability-ports.md) | `Clock` and `RandomSource` injected; the application stamps `id`/`recorded_at`, the store assigns only the position |
 | [0017: Branch protection posture](./decisions/0017-branch-protection-posture.md) | `ci-required` the only required status, zero reviews, squash-only, no bypass actors, up-to-date-before-merge on |
 
