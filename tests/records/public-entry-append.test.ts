@@ -283,6 +283,10 @@ describe("public Entry assembly", () => {
     await accept(crossRealm, "ent_zzzzzzzzzzzzzzzz");
     await accept(ownAt, "ent_0000000000000000");
     await accept(new Uint8Array(10), "ent_0000000000000000");
+    await accept(new (class extends Uint8Array {})(10), "ent_0000000000000000");
+    const nonzeroView = new Uint8Array(new ArrayBuffer(14), 2, 10);
+    nonzeroView.set([0x00, 0x44, 0x32, 0x14, 0xc7, 0x42, 0x54, 0xb6, 0x35, 0xcf]);
+    await accept(nonzeroView, "ent_0123456789abcdef");
 
     for (const entropy of [new MisleadingLength(1), proxy, detached, spoof, new Uint8ClampedArray(10)]) {
       const calls: string[] = [];
@@ -310,6 +314,109 @@ describe("public Entry assembly", () => {
       await expect(app.append(draft)).rejects.toMatchObject({ code: "RANDOM_SOURCE_FAILED", issues: [] });
       expect(calls).toEqual(["random"]);
     }
+  });
+
+  test("post-import intrinsic pollution cannot observe or alter entropy snapshots", async () => {
+    const bytes = new Uint8Array([0x00, 0x44, 0x32, 0x14, 0xc7, 0x42, 0x54, 0xb6, 0x35, 0xcf]);
+    const appendWith = async () => {
+      const calls: string[] = [];
+      const app = createLoreduApplication({
+        randomSource: {
+          nextBytes: () => {
+            calls.push("random");
+            return bytes;
+          },
+        },
+        clock: {
+          now: () => {
+            calls.push("clock");
+            return createInstant(0);
+          },
+        },
+        store: {
+          get: async () => undefined,
+          append: async () => {
+            calls.push("store");
+            return createStreamPosition(1);
+          },
+        },
+      });
+      const result = await app.append(draft);
+      return { id: String(result.record.id), calls };
+    };
+    const restore = (target: object, key: PropertyKey, descriptor: PropertyDescriptor | undefined) => {
+      if (descriptor) Object.defineProperty(target, key, descriptor);
+      else Reflect.deleteProperty(target, key);
+    };
+
+    const atDescriptor = Object.getOwnPropertyDescriptor(Uint8Array.prototype, "at");
+    Object.defineProperty(Uint8Array.prototype, "at", { configurable: true, value: () => 255 });
+    let result: Awaited<ReturnType<typeof appendWith>>;
+    try {
+      result = await appendWith();
+    } finally {
+      restore(Uint8Array.prototype, "at", atDescriptor);
+    }
+    expect(result).toEqual({ id: "ent_0123456789abcdef", calls: ["random", "clock", "store"] });
+
+    const intrinsicConstructor = Uint8Array;
+    const intrinsicPrototype = intrinsicConstructor.prototype;
+    const globalDescriptor = Object.getOwnPropertyDescriptor(globalThis, "Uint8Array");
+    const speciesDescriptor = Object.getOwnPropertyDescriptor(intrinsicConstructor, Symbol.species);
+    const callDescriptor = Object.getOwnPropertyDescriptor(Function.prototype, "call");
+    const applyDescriptor = Object.getOwnPropertyDescriptor(Function.prototype, "apply");
+    const prototypeKeys = ["at", Symbol.iterator, "slice", "subarray", "set", "0"] as const;
+    const prototypeDescriptors = prototypeKeys.map(
+      (key) => [key, Object.getOwnPropertyDescriptor(intrinsicPrototype, key)] as const,
+    );
+    const typedArrayPrototype = Object.getPrototypeOf(intrinsicPrototype);
+    const callTargets = new Set([
+      Object.getOwnPropertyDescriptor(typedArrayPrototype, Symbol.toStringTag)?.get,
+      Object.getOwnPropertyDescriptor(typedArrayPrototype, "length")?.get,
+      atDescriptor?.value,
+    ]);
+    try {
+      Object.defineProperty(globalThis, "Uint8Array", {
+        configurable: true,
+        get() {
+          throw new Error("global constructor lookup");
+        },
+      });
+      Object.defineProperty(intrinsicConstructor, Symbol.species, {
+        configurable: true,
+        get() {
+          throw new Error("species lookup");
+        },
+      });
+      for (const key of prototypeKeys)
+        Object.defineProperty(intrinsicPrototype, key, {
+          configurable: true,
+          get() {
+            throw new Error(`prototype hook ${String(key)}`);
+          },
+        });
+      Object.defineProperty(Function.prototype, "call", {
+        configurable: true,
+        value: function (this: (...args: unknown[]) => unknown, receiver: unknown, ...args: unknown[]) {
+          if (callTargets.has(this)) throw new Error("call lookup");
+          return Reflect.apply(this, receiver, args);
+        },
+      });
+      Object.defineProperty(Function.prototype, "apply", {
+        configurable: true,
+        value: () => {
+          throw new Error("apply lookup");
+        },
+      });
+      result = await appendWith();
+    } finally {
+      restore(Function.prototype, "apply", applyDescriptor);
+      restore(Function.prototype, "call", callDescriptor);
+      for (const [key, descriptor] of prototypeDescriptors) restore(intrinsicPrototype, key, descriptor);
+      restore(intrinsicConstructor, Symbol.species, speciesDescriptor);
+      restore(globalThis, "Uint8Array", globalDescriptor);
+    }
+    expect(result).toEqual({ id: "ent_0123456789abcdef", calls: ["random", "clock", "store"] });
   });
 
   test("inherited descriptor-map pollution cannot fabricate absent schema fields", async () => {

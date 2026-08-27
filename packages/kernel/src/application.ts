@@ -374,28 +374,45 @@ function validateEntry(input: unknown): EntryDraft {
     sources: Object.freeze(sources),
   };
 }
-const typedArrayPrototype = Object.getPrototypeOf(Uint8Array.prototype);
+// Capture every entropy-boundary operation while this module's realm is still trusted. Append
+// must not rediscover these through mutable globals or prototypes after consumer code runs.
+const intrinsicUint8Array = Uint8Array;
+const intrinsicReflectApply = Reflect.apply;
+const typedArrayPrototype = Object.getPrototypeOf(intrinsicUint8Array.prototype);
 const typedArrayTag = Object.getOwnPropertyDescriptor(typedArrayPrototype, Symbol.toStringTag)?.get;
 const typedArrayLength = Object.getOwnPropertyDescriptor(typedArrayPrototype, "length")?.get;
+const typedArraySet = Object.getOwnPropertyDescriptor(typedArrayPrototype, "set")?.value;
+
+function applyIntrinsic(target: (...args: never[]) => unknown, receiver: unknown, argumentsList: unknown[]) {
+  return intrinsicReflectApply(target, receiver, argumentsList);
+}
 
 function idFrom(bytes: unknown): RecordId {
   try {
-    // These intrinsic getters consult typed-array internal slots. They are cross-realm safe,
-    // reject proxies/spoofs, and cannot be influenced by own or subclass properties.
-    if (typedArrayTag?.call(bytes) !== "Uint8Array") throw new TypeError("not Uint8Array");
-    // The intrinsic constructor's typed-array path copies represented elements without using
-    // caller length, indexed properties, iteration, at, slice, or subarray hooks.
-    const owned = new Uint8Array(bytes as Uint8Array);
-    if (typedArrayLength?.call(owned) !== 10) throw new RangeError("wrong length");
-    const byteAt = (index: number) => Uint8Array.prototype.at.call(owned, index) ?? 0;
+    // Intrinsic internal-slot getters are cross-realm safe and reject proxies, spoofs, detached
+    // storage, and every non-Uint8 typed-array element kind without consulting caller hooks.
+    if (!typedArrayTag || !typedArrayLength || !typedArraySet) throw new TypeError("missing intrinsic");
+    if (applyIntrinsic(typedArrayTag, bytes, []) !== "Uint8Array") throw new TypeError("not Uint8Array");
+    if (applyIntrinsic(typedArrayLength, bytes, []) !== 10) throw new RangeError("wrong length");
+
+    // Allocate in the trusted realm and copy through %TypedArray%.prototype.set's typed-array
+    // path. The resulting exact-size snapshot is the only storage read during encoding.
+    const owned = new intrinsicUint8Array(10);
+    applyIntrinsic(typedArraySet, owned, [bytes]);
+    if (applyIntrinsic(typedArrayLength, owned, []) !== 10) throw new RangeError("wrong snapshot length");
+    const ownedByte = (index: number) => {
+      const byte = owned[index];
+      if (byte === undefined) throw new RangeError("missing snapshot byte");
+      return byte;
+    };
     let suffix = "";
     for (let index = 0; index < 10; index += 5) {
       const number =
-        byteAt(index) * 2 ** 32 +
-        byteAt(index + 1) * 2 ** 24 +
-        byteAt(index + 2) * 2 ** 16 +
-        byteAt(index + 3) * 2 ** 8 +
-        byteAt(index + 4);
+        ownedByte(index) * 2 ** 32 +
+        ownedByte(index + 1) * 2 ** 24 +
+        ownedByte(index + 2) * 2 ** 16 +
+        ownedByte(index + 3) * 2 ** 8 +
+        ownedByte(index + 4);
       for (let shift = 35; shift >= 0; shift -= 5) suffix += ALPHABET[Math.floor(number / 2 ** shift) & 31];
     }
     return `ent_${suffix}` as RecordId;
