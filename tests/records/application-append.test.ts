@@ -276,6 +276,26 @@ describe("generic M0 application append", () => {
       expect(calls).toEqual(item.expectedGets.map((reference) => `get:${reference}`));
     }
 
+    const mismatchedIdCalls: string[] = [];
+    const mismatchedId = inertCapabilities(
+      {
+        async get(reference) {
+          mismatchedIdCalls.push(`get:${reference}`);
+          return persisted("entry");
+        },
+        async append() {
+          mismatchedIdCalls.push("append");
+          return createStreamPosition(1);
+        },
+      },
+      mismatchedIdCalls,
+    );
+    await expect(mismatchedId.append(claimDraft(id.entry1))).rejects.toMatchObject({
+      code: "REFERENCE_CHECK_FAILED",
+      issues: [],
+    });
+    expect(mismatchedIdCalls).toEqual([`get:${id.entry1}`]);
+
     const calls: string[] = [];
     const sourceOnly = inertCapabilities(
       {

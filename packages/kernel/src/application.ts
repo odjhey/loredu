@@ -141,7 +141,7 @@ async function checkReferences(store: RecordStore, references: readonly Referenc
     let found: PersistedRecord | undefined;
     try {
       const value = await store.get(reference.id);
-      found = value === undefined ? undefined : decodePersistedRecord(value);
+      if (value !== undefined) found = decodePersistedRecord(value);
     } catch {
       throw new LoreduError("REFERENCE_CHECK_FAILED", "Record reference read failed");
     }
@@ -158,6 +158,8 @@ async function checkReferences(store: RecordStore, references: readonly Referenc
           `record kind ${found.kind} is not valid for this reference`,
         ),
       );
+    } else if (found.id !== reference.id) {
+      throw new LoreduError("REFERENCE_CHECK_FAILED", "Record reference read returned a different id");
     }
   }
   if (issues.length > 0)
