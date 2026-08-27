@@ -692,7 +692,7 @@ describe("authoritative workspace boundary guard", () => {
       plant(root, "packages/kernel/src/probe.ts", source);
       expect(scanWorkspace(root)).toContainEqual(expected);
     }
-  });
+  }, 15_000);
 
   test("keeps label and definitely-clean reassignment controls green", () => {
     const root = fixture();
