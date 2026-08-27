@@ -4,8 +4,12 @@ export type Instant = number & { readonly __brand: "Instant" };
 export type StreamPosition = number & { readonly __brand: "StreamPosition" };
 
 export function createInstant(epochMilliseconds: number): Instant {
-  if (!Number.isSafeInteger(epochMilliseconds) || Math.abs(epochMilliseconds) > 8_640_000_000_000_000) {
-    throw new RangeError("instant must be a safe integer within the ECMAScript TimeClip range");
+  if (
+    !Number.isSafeInteger(epochMilliseconds) ||
+    epochMilliseconds < -62_167_219_200_000 ||
+    epochMilliseconds > 253_402_300_799_999
+  ) {
+    throw new RangeError("instant must be an integer in the strict RFC3339-renderable range");
   }
   return epochMilliseconds as Instant;
 }

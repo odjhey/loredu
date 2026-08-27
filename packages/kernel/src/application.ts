@@ -11,6 +11,7 @@ import {
 } from "./domain/entry";
 import {
   type Clock,
+  createInstant,
   createStreamPosition,
   type RandomSource,
   type RecordStore,
@@ -23,7 +24,14 @@ export type LoreduErrorCode =
   | "RANDOM_SOURCE_FAILED"
   | "CLOCK_FAILED"
   | "STORE_APPEND_FAILED";
-export type LoreduIssueCode = "REQUIRED" | "TYPE" | "FORMAT" | "RANGE" | "UNKNOWN_FIELD" | "RESERVED_FIELD";
+export type LoreduIssueCode =
+  | "REQUIRED"
+  | "TYPE"
+  | "FORMAT"
+  | "RANGE"
+  | "UNKNOWN_FIELD"
+  | "RESERVED_FIELD"
+  | "DUPLICATE";
 export interface LoreduIssue {
   readonly code: LoreduIssueCode;
   readonly path: string;
@@ -65,6 +73,16 @@ function pointer(value: string): string {
 }
 function scalarLength(value: string): number {
   return [...value].length;
+}
+function compareUnicodeScalars(left: string, right: string): number {
+  const leftScalars = [...left];
+  const rightScalars = [...right];
+  const length = Math.min(leftScalars.length, rightScalars.length);
+  for (let index = 0; index < length; index++) {
+    const difference = (leftScalars[index]?.codePointAt(0) ?? 0) - (rightScalars[index]?.codePointAt(0) ?? 0);
+    if (difference !== 0) return difference;
+  }
+  return leftScalars.length - rightScalars.length;
 }
 function isScalarText(value: string): boolean {
   for (let index = 0; index < value.length; index++) {
@@ -186,14 +204,19 @@ function copyJson(
     return Object.freeze(result);
   }
   const data = inspectObject(value, path, issues);
-  const result: Record<string, JsonValue> = {};
+  const result = Object.create(null) as Record<string, JsonValue>;
   if (data) {
-    for (const key of Object.keys(data).sort()) {
+    for (const key of Object.keys(data).sort(compareUnicodeScalars)) {
       if (!isScalarText(key))
         issues.push(
           issue("FORMAT", `${path}/${pointer(key)}`, "property name must contain only Unicode scalar values"),
         );
-      result[key] = copyJson(dataValue(data, key), `${path}/${pointer(key)}`, issues, ancestors) as JsonValue;
+      Object.defineProperty(result, key, {
+        value: copyJson(dataValue(data, key), `${path}/${pointer(key)}`, issues, ancestors) as JsonValue,
+        enumerable: true,
+        configurable: false,
+        writable: false,
+      });
     }
   }
   ancestors.delete(value);
@@ -211,26 +234,21 @@ function validateSource(value: unknown, path: string, issues: LoreduIssue[]): So
     ["locator", 1024],
     ["snapshot", 256],
   ] as const) {
+    const present = Object.hasOwn(data, key);
     const field = dataValue(data, key);
-    if (key === "ref" && !Object.hasOwn(data, key))
-      issues.push(issue("REQUIRED", `${path}/ref`, "is required"));
-    else if (field !== undefined) {
-      if (typeof field !== "string") issues.push(issue("TYPE", `${path}/${key}`, "must be a string"));
-      else if (
-        !isScalarText(field) ||
-        field !== field.trim() ||
-        scalarLength(field) === 0 ||
-        scalarLength(field) > maximum
-      )
-        issues.push(
-          issue(
-            "FORMAT",
-            `${path}/${key}`,
-            `must be trimmed Unicode scalar text of 1..${maximum} characters`,
-          ),
-        );
-      else result[key] = field;
-    }
+    if (!present) {
+      if (key === "ref") issues.push(issue("REQUIRED", `${path}/ref`, "is required"));
+    } else if (typeof field !== "string") issues.push(issue("TYPE", `${path}/${key}`, "must be a string"));
+    else if (
+      !isScalarText(field) ||
+      field !== field.trim() ||
+      scalarLength(field) === 0 ||
+      scalarLength(field) > maximum
+    )
+      issues.push(
+        issue("FORMAT", `${path}/${key}`, `must be trimmed Unicode scalar text of 1..${maximum} characters`),
+      );
+    else result[key] = field;
   }
   return result.ref === undefined ? undefined : Object.freeze(result as SourceRef);
 }
@@ -276,7 +294,7 @@ function validateEntry(input: unknown): EntryDraft {
   if (Object.hasOwn(data, "scope")) {
     const scopeData = inspectObject(dataValue(data, "scope"), "/scope", issues);
     if (scopeData)
-      for (const key of Object.keys(scopeData)) {
+      for (const key of Object.keys(scopeData).sort(compareUnicodeScalars)) {
         const value = dataValue(scopeData, key);
         if (
           !isScalarText(key) ||
@@ -295,7 +313,7 @@ function validateEntry(input: unknown): EntryDraft {
   if (Object.hasOwn(data, "metadata")) {
     const metadataData = inspectObject(dataValue(data, "metadata"), "/metadata", issues);
     if (metadataData)
-      for (const key of Object.keys(metadataData)) {
+      for (const key of Object.keys(metadataData).sort(compareUnicodeScalars)) {
         if (!METADATA_KEY.test(key) || key.startsWith("loredu."))
           issues.push(issue("FORMAT", `/metadata/${pointer(key)}`, "must be a non-reserved namespaced key"));
         else
@@ -315,33 +333,32 @@ function validateEntry(input: unknown): EntryDraft {
         const source = validateSource(sourceInput[index], `/sources/${index}`, issues);
         if (source) {
           if (sources.some((existing) => sourceEqual(existing, source)))
-            issues.push(issue("FORMAT", `/sources/${index}`, "duplicates an earlier SourceRef"));
+            issues.push(issue("DUPLICATE", `/sources/${index}`, "duplicates an earlier SourceRef"));
           else sources.push(source);
         }
       }
   }
   const title = dataValue(data, "title");
-  if (
-    title !== undefined &&
-    (typeof title !== "string" ||
+  if (Object.hasOwn(data, "title")) {
+    if (typeof title !== "string") issues.push(issue("TYPE", "/title", "must be a string"));
+    else if (
       !isScalarText(title) ||
       title !== title.trim() ||
       scalarLength(title) === 0 ||
-      scalarLength(title) > 256)
-  )
-    issues.push(issue("FORMAT", "/title", "must be trimmed Unicode scalar text of 1..256 characters"));
+      scalarLength(title) > 256
+    )
+      issues.push(issue("FORMAT", "/title", "must be trimmed Unicode scalar text of 1..256 characters"));
+  }
   const entryType = dataValue(data, "entry_type");
-  if (
-    entryType !== undefined &&
-    (typeof entryType !== "string" ||
-      !isScalarText(entryType) ||
-      !TOKEN.test(entryType) ||
-      scalarLength(entryType) > 128)
-  )
-    issues.push(issue("FORMAT", "/entry_type", "must be a token"));
+  if (Object.hasOwn(data, "entry_type")) {
+    if (typeof entryType !== "string") issues.push(issue("TYPE", "/entry_type", "must be a string"));
+    else if (!isScalarText(entryType) || !TOKEN.test(entryType) || scalarLength(entryType) > 128)
+      issues.push(issue("FORMAT", "/entry_type", "must be a token"));
+  }
   if (issues.length > 0 || !actor || typeof body !== "string") {
     const ordered = issues.sort(
-      (left, right) => left.path.localeCompare(right.path) || left.code.localeCompare(right.code),
+      (left, right) =>
+        compareUnicodeScalars(left.path, right.path) || compareUnicodeScalars(left.code, right.code),
     );
     throw new LoreduError("VALIDATION_FAILED", "Entry draft validation failed", Object.freeze(ordered));
   }
@@ -349,16 +366,16 @@ function validateEntry(input: unknown): EntryDraft {
     kind: "entry",
     actor,
     body,
-    ...(title === undefined ? {} : { title: title as string }),
-    ...(entryType === undefined ? {} : { entry_type: entryType as string }),
+    ...(Object.hasOwn(data, "title") ? { title: title as string } : {}),
+    ...(Object.hasOwn(data, "entry_type") ? { entry_type: entryType as string } : {}),
     scope: Object.freeze(scope),
     metadata: Object.freeze(metadata),
     sources: Object.freeze(sources),
   };
 }
-function idFrom(bytes: Uint8Array): RecordId {
-  if (bytes.length !== 10)
-    throw new LoreduError("RANDOM_SOURCE_FAILED", "RandomSource must return exactly 10 bytes");
+function idFrom(bytes: unknown): RecordId {
+  if (!(bytes instanceof Uint8Array) || bytes instanceof Uint8ClampedArray || bytes.length !== 10)
+    throw new LoreduError("RANDOM_SOURCE_FAILED", "RandomSource must return exactly 10 Uint8 bytes");
   const byteAt = (index: number) => bytes.at(index) ?? 0;
   let suffix = "";
   for (let index = 0; index < 10; index += 5) {
@@ -383,13 +400,13 @@ export function createLoreduApplication({
       let id: RecordId;
       try {
         id = idFrom(randomSource.nextBytes(10));
-      } catch (error) {
-        if (error instanceof LoreduError) throw error;
+      } catch {
         throw new LoreduError("RANDOM_SOURCE_FAILED", "RandomSource failed");
       }
       let recordedAt: string;
       try {
-        recordedAt = new Date(clock.now()).toISOString();
+        const instant = createInstant(clock.now());
+        recordedAt = new Date(instant).toISOString();
       } catch {
         throw new LoreduError("CLOCK_FAILED", "Clock failed");
       }
@@ -404,7 +421,7 @@ export function createLoreduApplication({
         if (position === 0) throw new RangeError("append position must be positive");
         return Object.freeze({ record, position }) as AppendRecordResult<PersistedRecordFor<D>>;
       } catch (error) {
-        if (error instanceof LoreduError) throw error;
+        if (error instanceof LoreduError && error.code === "DUPLICATE_RECORD_ID") throw error;
         throw new LoreduError("STORE_APPEND_FAILED", "Store append failed");
       }
     },
