@@ -102,6 +102,7 @@ jobs:
 
   workspace-suite:
     name: workspace suite
+    timeout-minutes: 10
     needs: select
     if: needs.select.outputs.docs_only != 'true'
     runs-on: ubuntu-latest
@@ -130,10 +131,13 @@ jobs:
       - name: gates fire on synthetic violations
         run: bun run check:gates
 
+      - name: workspace boundaries (hard watchdog)
+        run: bun run check:boundaries
+
       - name: typecheck
         run: bun run typecheck
-      - name: tests
-        run: bun test
+      - name: tests (hard watchdog)
+        run: bun run test
 
       # `bun run build` compiles the CLI to a single binary; running it proves
       # the artifact is executable, not merely that the bundler succeeded.

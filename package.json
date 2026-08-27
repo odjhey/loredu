@@ -9,7 +9,7 @@
     "bun": ">=1.4.0"
   },
   "scripts": {
-    "test": "bun test",
+    "test": "bun scripts/run-with-watchdog.ts 180 bun test",
     "typecheck": "tsc -p packages/kernel && tsc -p packages/store-plainfile && tsc -p packages/cli && tsc -p tests",
     "lint": "biome check .",
     "format": "biome check --write .",
@@ -17,7 +17,9 @@
     "spell": "cspell --no-progress \"docs/**/*.md\" \"*.md\" \".agents/**/*.md\" \".github/**/*.md\"",
     "check:docs": "bun docs/scripts/check-docs.mjs",
     "check:catalog": "bun docs/scripts/check-catalog.mjs",
-    "check:gates": "bun docs/scripts/check-selftest.mjs"
+    "check:gates": "bun docs/scripts/check-selftest.mjs",
+    "check:boundaries": "bun scripts/run-with-watchdog.ts 60 bun scripts/check-workspace-boundaries.ts",
+    "test:boundaries": "bun scripts/run-with-watchdog.ts 60 bun test tests/workspace-structure.test.ts"
   },
   "dependencies": {
     "@loredu/kernel": "workspace:*"
