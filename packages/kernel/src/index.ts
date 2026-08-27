@@ -4,6 +4,13 @@ export type {
   LoreduApplicationDependencies,
 } from "./application";
 export { createLoreduApplication } from "./application";
+export type { Basis, RulesetIdentity } from "./domain/basis";
+export {
+  basisEquals,
+  createBasis,
+  createRulesetIdentity,
+  DEFAULT_RULESET_IDENTITY,
+} from "./domain/basis";
 export { claimKeyOf, claimKeysEqual } from "./domain/claim-key";
 export type {
   Actor,
@@ -50,3 +57,5 @@ export type { LoreduErrorCode, LoreduIssue, LoreduIssueCode } from "./errors";
 export { LoreduError } from "./errors";
 export type { Clock, Instant, RandomSource, RecordStore, StreamPosition } from "./ports/capabilities";
 export { createInstant, createStreamPosition } from "./ports/capabilities";
+export type { ClaimPolicy, ClaimSemantics } from "./ports/claim-policy";
+export { DEFAULT_CLAIM_POLICY } from "./ports/claim-policy";

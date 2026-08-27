@@ -118,7 +118,9 @@ The runtime port boundary enforces the declared `Uint8Array` return: entropy is 
 
 Assembly captures exactly one store, clock, random source, and policy. Omitted policy selects `DEFAULT_CLAIM_POLICY`; there is no singleton lookup or per-append override. M0 application exposes only generic `append`, preserving family-specific result narrowing. M0 ClaimPolicy has no `advise`; later policy advice is additive, while generic key-divergence remains core M1.5 mechanics.
 
-`RulesetIdentity` is closed with literal core `loredu.reconciliation/v1` and `{claim_policy:{id,version}}`. `Basis` is closed to `stream_position`, `ruleset`, and `query: JsonObject`; `createBasis` validates, detaches, canonicalizes, and freezes it and rejects `computed_at`.
+Policy assembly and `createRulesetIdentity` are runtime validation boundaries ([decision 0024](../../decisions/0024-m0-policy-and-basis-runtime-boundaries.md)). Policy `id` and `version` are identifier-safe tokens, both callbacks are callable, and public own fields are closed to the four interface fields. An `identity` field rejects without invocation rather than restoring the superseded remapping seam; `advise`/`advisories` fields likewise reject in M0. Ruleset construction snapshots id/version and invokes no callback. The default policy is frozen, validates the closed declared ClaimKey shape into frozen ordered issues, always selects `exclusive`, and has no identity or advice member. Generic Claim append executes custom key validation and semantics later in M0-A; M0-P does not pull that append phase forward.
+
+`RulesetIdentity` is closed with literal core `loredu.reconciliation/v1` and `{claim_policy:{id,version}}`. `Basis` is closed to `stream_position`, `ruleset`, and `query: JsonObject`; `createBasis` validates descriptors and exact nested shapes, detaches, canonicalizes, and freezes it and rejects `computed_at` with `VALIDATION_FAILED`. `basisEquals` compares constructed values across stream position, both structural ruleset components, and portable-JSON query equality; it does not repair forged malformed values.
 
 ## Testing entrypoint
 
