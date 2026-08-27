@@ -112,7 +112,9 @@ function basisEquals(left: Basis, right: Basis): boolean
 
 `recordKindOfIdPrefix` accepts only the exact prefix strings `ent`, `clm`, `rel`, `res`, and `ver`, returning respectively `entry`, `claim`, `relation`, `resolution`, and `verification`. Every other string returns `undefined`; the function does not accept a trailing underscore and performs no case folding, trimming, or other normalization.
 
-`createInstant` enforces safe-integer epoch milliseconds inside TimeClip range. `createStreamPosition` enforces a nonnegative safe integer; `0` is valid for future empty head, while successful append positions are positive. These constructors let host adapters implement ports without unsafe casts.
+`createInstant` enforces safe-integer epoch milliseconds in inclusive `-62_167_219_200_000..253_402_300_799_999`, the exact range that renders canonical four-digit-year RFC3339 from `0000-01-01T00:00:00.000Z` through `9999-12-31T23:59:59.999Z`. Application append validates the actual runtime return from every custom Clock against the same domain; branding is not a runtime trust grant. `createStreamPosition` enforces a nonnegative safe integer; `0` is valid for future empty head, while successful append positions are positive. These constructors let host adapters implement ports without unsafe casts.
+
+The runtime port boundary enforces the declared `Uint8Array` return: entropy is an actual Uint8 element typed array of exactly the requested length, without array or typed-array coercion. Capability and store failures are normalized to their phase-owned operational codes; only an exact store `DUPLICATE_RECORD_ID` passes through.
 
 Assembly captures exactly one store, clock, random source, and policy. Omitted policy selects `DEFAULT_CLAIM_POLICY`; there is no singleton lookup or per-append override. M0 application exposes only generic `append`, preserving family-specific result narrowing. M0 ClaimPolicy has no `advise`; later policy advice is additive, while generic key-divergence remains core M1.5 mechanics.
 

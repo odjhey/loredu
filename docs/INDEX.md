@@ -46,7 +46,8 @@ created_at: 2026-08-26T12:10:00+08:00
 | [0015: Catalog accounting and the docs gate](./decisions/0015-catalog-accounting-and-docs-gate.md) | Every T-number implemented via `@covers` or deferred in `catalog-status.json`; structural gate over the corpus; both gates self-tested |
 | [0016: Workspace scaffold and kernel type isolation](./decisions/0016-workspace-scaffold-and-kernel-type-isolation.md) | Bun workspaces with TypeScript sources as exports; kernel purity enforced as a typecheck error |
 | [0019: M0 validation rules](./decisions/0019-m0-validation-rules.md) | Identifier-safe token shape, scope structure and identity, value equality, closed vs open vocabularies, metadata namespacing, schema acceptance |
-| [0020: M0 public contract closure](./decisions/0020-m0-public-contract-closure.md) | Exact M0 semantics/API; partial supersession of identified ADR 0010, ADR 0016, and ADR 0019 §3 wording |
+| [0020: M0 public contract closure](./decisions/0020-m0-public-contract-closure.md) | Exact M0 semantics/API; partial supersession of identified ADR 0010, ADR 0016, and ADR 0019 §3 wording; its §5 TimeClip range is partially superseded by ADR 0021 |
+| [0021: Strict RFC3339 Instant domain](./decisions/0021-strict-rfc3339-instant-domain.md) | Safe-integer epoch-millisecond bounds that always render strict four-digit-year RFC3339; partial supersession of ADR 0020 §5 |
 | [0018: Capability ports for time and identity](./decisions/0018-capability-ports.md) | `Clock` and `RandomSource` injected; the application stamps `id`/`recorded_at`, the store assigns only the position |
 | [0017: Branch protection posture](./decisions/0017-branch-protection-posture.md) | `ci-required` the only required status, zero reviews, squash-only, no bypass actors, up-to-date-before-merge on |
 
