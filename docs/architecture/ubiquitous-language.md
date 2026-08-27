@@ -51,8 +51,8 @@ created_at: 2026-08-26T12:10:00+08:00
 | **ok** | Envelope field stating whether execution produced a semantic result. Ordinary unhealthy status remains `ok: true`; `--check` changes only the process exit. |
 | **Advice** | Deterministic follow-up affordance with `rel`, stable application `action`, typed `params`, and `why`; a surface may add a runnable rendering. Never speculative. |
 | **Page** | Bounded collection slice with this page's returned count, the pinned snapshot's total matching count, and a cursor exactly when more exists. |
-| **Health** | Blocking M1.5 condition: an exclusive exact-key group without a Resolution covering every current member, or a reference with no matching record at a lower position. Provider corruption prevents a health result rather than becoming partial health data. |
-| **Advisory** | Non-blocking mechanical hint. Generic same-scope, canonically equal-value, different-key divergence is M1.5 versioned core mechanics, can be connected by explicit duplicate Relations, is never ClaimPolicy advice, and never reconciles across keys. |
+| **Health** | Blocking M1.5 condition: an exclusive exact-key group without an eligible Resolution whose record references all point backward and whose targets cover every current member, or a reference with no matching record at a lower position. Provider corruption prevents a health result rather than becoming partial health data. |
+| **Advisory** | Non-blocking mechanical hint. Generic same-scope, canonically equal-value, different-key divergence is M1.5 versioned core mechanics, can be connected by eligible explicit duplicate Relations whose endpoints point backward, is never ClaimPolicy advice, and never reconciles across keys. |
 | **Scope** | Caller-declared namespace a claim key belongs to (e.g. `repo=rozoro`); the consumer owns its vocabulary. |
 | **Perspective** | Optional claim-key component distinguishing coexisting views of the same subject/predicate, e.g. `documented_process` vs `observed_process`. |
 | **Confidence** | Claim field grading evidential strength: `candidate`, `observed`, `corroborated`, `confirmed`, `authoritative`. |

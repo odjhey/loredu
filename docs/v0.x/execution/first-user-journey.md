@@ -136,7 +136,7 @@ page: returned=0 total=0
 `lor status` is the "am I done?" check that terminates the chain. It has two tiers:
 
 - **health** (blocks `--check`): unresolved `exclusive` exact-key groups and dangling persisted record references;
-- **advisories** (reported, never blocking): generic equal-value/different-key divergence within one exact scope, suppressible by explicit `duplicates` Relations connecting the key components.
+- **advisories** (reported, never blocking): generic equal-value/different-key divergence within one exact scope, suppressible by eligible explicit `duplicates` Relations whose endpoints point backward and connect the key components.
 
 Malformed canonical files are provider corruption: status fails with the store-error envelope rather than claiming partial health. All successful checks are mechanical and available before full reconciliation. `lor status --check` exits 5 only when health is false; advisories alone exit 0.
 
@@ -308,11 +308,11 @@ Grouped by milestone; **AC n** = acceptance criterion in [goal and scope](../sco
 | T61 | second claim, same key + same value → corroboration feedback, no attention raised | journey 3 |
 | T62 | second claim, same key + different value → conflict-candidate feedback with related count, one representative, exact-key list drill-down, and bounded `advice` naming both ids | journey 3 |
 | T63 | agent chain: execute both show commands from T62, make the manual judgment using the embedded skill's resolve grammar, then `lor status` reports healthy and `--check` exits 0 | journey 3b, ADR 0026 |
-| T64 | bounded `lor status` counts every absent/forward persisted reference and unresolved exclusive group; a Resolution covering all current members closes it, while malformed canonical files fail as store corruption rather than partial health | journey 3b, ADR 0026 |
+| T64 | bounded `lor status` counts every absent/forward persisted reference and unresolved exclusive group; only an eligible Resolution whose record references all point backward and whose targets cover all current members closes a group, while malformed canonical files fail as store corruption rather than partial health | journey 3b, ADR 0026 |
 | T65 | text `lor skill` equals frontmatter-stripped embedded source bytes and needs no store; a fresh store using only its M1.5 commands completes orientation, record/query/disclosure/manual-resolution, and healthy exit | journey 9, ADR 0026 |
 | T66 | for the same pinned state, corrective/navigational affordance fields and order are identical; healthy state has no corrective advice, though record handles and list continuation remain navigational | ADR 0008/0026 |
 | T67 | `lor claims` AND-composes scope subset/exact + key/present-or-absent-perspective/value/actor/since filters, orders by stream position, and returns the contract page under `--json` | key hygiene, ADR 0026 |
-| T68 | versioned core mechanics (not ClaimPolicy advice) finds canonically equal values under different exact keys in one exact scope → non-blocking advisory, never cross-key reconciliation; duplicate Relations connecting components suppress it | key hygiene, ADR 0026 |
+| T68 | versioned core mechanics (not ClaimPolicy advice) finds canonically equal values under different exact keys in one exact scope → non-blocking advisory, never cross-key reconciliation; only eligible backward-pointing duplicate Relations connecting components suppress it | key hygiene, ADR 0026 |
 
 ### Pagination and link-following (ADR 0009)
 
