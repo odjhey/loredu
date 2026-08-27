@@ -15,22 +15,25 @@ The implementation sequence starts from the application contracts. The `lor` CLI
 
 Scaffold the workspace per [decision 0011](../../decisions/0011-repo-package-architecture.md) (`packages/kernel`, `packages/store-plainfile`, `packages/cli`, central catalog-shaped `tests/`) and establish the repository guardrails from [decision 0012](../../decisions/0012-dx-and-ci-gating.md), then implement and test the kernel only:
 
-- immutable record envelope with explicit schema version;
-- the draft/record split: callers construct drafts with no `id` or `recorded_at`; the append application path assigns both — the type model makes canonical-history backdating unrepresentable;
-- Entry, Claim, Relation, Resolution, Verification shapes in draft and persisted forms;
-- opaque, kind-prefixed ID generation/validation;
+- detached, recursively frozen immutable records over the strict portable JSON domain, with public encode-to-JSON-value/decode-from-unknown and structural equality;
+- the closed draft/record split: drafts omit `schema`, `id`, and `recorded_at`; runtime rejects stamps/excess/accessors/custom containers; application supplies fixed schema/id/time and canonical `scope`, `metadata`, `sources`;
+- exact Entry, Claim, binary directed Relation, Resolution, and Claim-targeted Verification field/cardinality/reference shapes;
+- exact RFC3339 millisecond normalization, validity ordering, and kind-prefixed MSB-first Crockford ID fixtures;
 - claim-key declaration and **shape validation only** ([decision 0004](../../decisions/0004-claim-identity-key.md)): identifier-safe subject/predicate/perspective fields, with vocabulary and namespacing left to consumers/policy rather than normalized by the kernel;
-- the versioned `ClaimPolicy` port and built-in default policy ([decision 0010](../../decisions/0010-claim-policy-seam.md)): identity = declared key, value semantics = `exclusive`, no custom advisories beyond built-in generic mechanics;
-- the `RecordStore` port shape required by the append application path, without any durable provider assumptions;
+- the versioned `ClaimPolicy` port and default: policy validates but cannot transform declared identity, values are `exclusive`, policy advice is empty; generic key-divergence ownership is versioned core mechanics but its execution remains M1.5;
+- structural RulesetIdentity/Basis construction, validation, and equality primitives, excluding `computed_at`, without claiming projections;
+- the M0 RecordStore slice: typed append returning only opaque monotonic position and get returning a typed record; application append returns exactly `{record, position}`; full scan/stream/head/durability/conformance remains M1;
 - the `Clock` and `RandomSource` capability ports ([decision 0018](../../decisions/0018-capability-ports.md), [clock and identity contract](../../architecture/contracts/clock-and-identity.md)): injected at application assembly, deterministic substitutes in tests, kernel-owned id format over supplied entropy; `RandomSource` supplies qualified bytes rather than ids, and production code may not substitute `Math.random()` for the id contract;
-- application append orchestration: the single stamping point for `id` and `recorded_at`, validation, reference-before-referrer checks, and returning persisted record identity/position — `recorded_at` is sampled immediately before the store append attempt, while the store receives a complete record and assigns only the stream position;
-- test-only `InMemoryStore`, `FixedClock`, and `SeededRandomSource` support under `@loredu/kernel/testing` so the application path is exercised without filesystem/storage-provider dependencies;
+- application append orchestration in exact validation → ordered reference reads → one entropy call → one clock call → freeze → immediate store append order, with deterministic structured errors/capability consumption and no collision retry; T19 covers every record-reference family in M0;
+- the exact frozen two-entrypoint surface in the [kernel API contract](../../architecture/contracts/kernel-api.md), including dependency-object assembly, family-narrowed generic append, branded `createInstant`/`createStreamPosition`, no deep imports, and only `InMemoryStore`, `FixedClock`, `SeededRandomSource` under testing;
 - optional validity fields, scope, actor, provenance/source references, namespaced metadata preservation rules, and schema replay compatibility ([decision 0005](../../decisions/0005-embedded-kernel-compatibility.md));
 - kernel boundary enforcement from [decision 0011](../../decisions/0011-repo-package-architecture.md): zero external runtime dependencies, no environment-specific imports, a kernel TypeScript environment that does not expose Bun/Node ambient globals, and a structural capability-bypass check rejecting ambient wall-time/randomness access (`Date.now()`, zero-argument `new Date()`, `Math.random()`) in production kernel sources.
 
 Supervised bootstrap/M0 work may proceed while the repository-readiness tracker proves its guardrails. **Unattended fleet fan-out waits for that tracker to demonstrate every required gate both green and red.** Dependency-cruiser remains a spike until its Bun-workspace/TypeScript behavior is demonstrated; capability-bypass checks do not wait for it because import-graph tooling cannot see ambient calls with no import.
 
-Exit: through public kernel APIs, drafts can be validated and appended into the in-memory test store; returned records have kernel-assigned IDs and `recorded_at`; malformed keys/references fail with actionable errors; the default ClaimPolicy reproduces the declared-key/exclusive behavior; deterministic capability substitutes reproduce the same first stamped record across fresh assemblies while repeated appends consume fresh entropy; attempts to introduce environment-specific or ambient time/randomness kernel APIs fail the configured boundary/type checks.
+Acceptance ownership without graph changes: P0 owns T87 assembly, exact export allowlists, all-family public imports, branded positions, and failure non-advancement. R1 owns all family/subtype positive and negative shapes; Verification nonempty/snapshotted basis and duplicates; timestamp TimeClip/safe-integer/calendar/offset/fraction/validity boundaries; repeated JSON arrays, order, aliases, cycles, every rejected JS-only value, nested accessors/prototypes/symbols/excess fields; and codec detachment. R2 owns every capability failure, exact calls/order, no retries, every reference path/kind, store failure publication, and collision behavior. P1 owns exact closed Basis acceptance/rejection, equality and inequality across each component, `computed_at` rejection, default/custom policy validation, and remap rejection. F0 audits exact normal/testing export sets, no deep imports, no testing imports from production, and all-family external package consumption.
+
+Exit: through public kernel/testing exports, every draft family validates and appends into InMemoryStore with exact `{record, position}`; JSON transport round-trips; malformed values/keys/family fields and all missing/wrong-kind record references produce stable code/pointer issues before stamping; call order/collision behavior is exact; default declared-key/exclusive/no-policy-advice and structural Basis identities pass T81/T82; T87 proves assembly/position/export boundaries; deterministic helpers reproduce the first record while sequential appends consume entropy; every assurance vector above passes; boundary/type checks reject host and ambient capability leaks.
 
 ## M1 — Durable plain-file persistence
 
@@ -57,7 +60,7 @@ Pulled ahead of full reconciliation ([decision 0008](../../decisions/0008-cli-fi
 - the agent-reactive response envelope (`ok`, `result`, `reconciliation`, `advice`, `basis`) in text and `--json`, with stable exit codes;
 - surface-neutral affordances from the application layer rendered by the CLI as runnable commands; literal `lor ...` strings remain CLI-adapter behavior ([decision 0009](../../decisions/0009-hypermedia-pagination.md));
 - cursor pagination on every list command (`--limit`/`--cursor`, basis-pinned, explicit `returned`/`total`, continuation affordance/advice) and disclosure handles on every printed id;
-- the mechanical key-overlap slice through the **default ClaimPolicy**: same exact key + same value → corroboration feedback; same exact key + different value under `exclusive` semantics → conflict candidate + advice; unresolved same-key groups, dangling refs, and malformed records surfaced by `status` as health failures, plus generic non-blocking key-divergence advisories;
+- the mechanical key-overlap slice using default ClaimPolicy semantics: same exact key + same value → corroboration; same key + different value under `exclusive` → conflict candidate; health checks plus the generic non-blocking key-divergence advisory, which is core-ruleset behavior rather than policy advice;
 - namespacing stays consumer-imposed: the kernel/default policy validates shape and exact identity, while examples and agent guidance encourage discovering existing vocabulary before inventing keys;
 - the CLI composition root supplies the production `Clock` and secure `RandomSource` implementations when assembling the application; no dedicated clock/random package is introduced;
 - embedded agent guide printed by `lor skill` ([draft](./agent-skill.md));
@@ -78,7 +81,7 @@ Implement deterministic baseline rules, mediated by the active versioned ClaimPo
 - mechanical temporal precedence where inputs are sufficient;
 - explicit Resolution application;
 - current, `as_of`, `valid_at`, and combined temporal projections;
-- a versioned ruleset identity that includes the active ClaimPolicy version and stamps every projection `basis`;
+- derived content under the M0 structural ruleset/Basis identity, with `computed_at` separate from Basis;
 - evidence/history lookup by record identity.
 
 The CLI's feedback upgrades in place: the envelope shape is unchanged, but `reconciliation` is now filled by the full deterministic ruleset instead of the early key-overlap slice, and `current`/`--as-of` queries appear.

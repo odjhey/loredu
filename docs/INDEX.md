@@ -17,9 +17,10 @@ created_at: 2026-08-26T12:10:00+08:00
 | [Product architecture](./architecture/product-architecture.md) | Product thesis, boundaries, ports, flows, and non-goals |
 | [Ubiquitous language](./architecture/ubiquitous-language.md) | Canonical domain terms |
 | [Contracts](./architecture/contracts/README.md) | Published core contract index |
-| [Record contract](./architecture/contracts/records.md) | Immutable Entry, Claim, Relation, Resolution, and Verification records |
-| [Store port](./architecture/contracts/store.md) | Provider-neutral append/read/scan persistence boundary |
+| [Record contract](./architecture/contracts/records.md) | Exact immutable envelopes, five families, JSON/time/reference validation, codec, and errors |
+| [Store port](./architecture/contracts/store.md) | Staged M0 append/get boundary and M1 durable/query extension |
 | [Clock and identity ports](./architecture/contracts/clock-and-identity.md) | Capability ports for `recorded_at` and record id entropy, and the single stamping point in the append path |
+| [Kernel API contract](./architecture/contracts/kernel-api.md) | Exact M0 TypeScript entrypoints, exports, signatures, branded constructors, and assembly |
 | [Projection contract](./architecture/contracts/projection.md) | Current and historical temporal views |
 | [Working Lore contract](./architecture/contracts/working-lore.md) | Bounded progressive-disclosure context for an activity |
 
@@ -45,6 +46,7 @@ created_at: 2026-08-26T12:10:00+08:00
 | [0015: Catalog accounting and the docs gate](./decisions/0015-catalog-accounting-and-docs-gate.md) | Every T-number implemented via `@covers` or deferred in `catalog-status.json`; structural gate over the corpus; both gates self-tested |
 | [0016: Workspace scaffold and kernel type isolation](./decisions/0016-workspace-scaffold-and-kernel-type-isolation.md) | Bun workspaces with TypeScript sources as exports; kernel purity enforced as a typecheck error |
 | [0019: M0 validation rules](./decisions/0019-m0-validation-rules.md) | Identifier-safe token shape, scope structure and identity, value equality, closed vs open vocabularies, metadata namespacing, schema acceptance |
+| [0020: M0 public contract closure](./decisions/0020-m0-public-contract-closure.md) | Exact M0 semantics/API; partial supersession of identified ADR 0010, ADR 0016, and ADR 0019 §3 wording |
 | [0018: Capability ports for time and identity](./decisions/0018-capability-ports.md) | `Clock` and `RandomSource` injected; the application stamps `id`/`recorded_at`, the store assigns only the position |
 | [0017: Branch protection posture](./decisions/0017-branch-protection-posture.md) | `ci-required` the only required status, zero reviews, squash-only, no bypass actors, up-to-date-before-merge on |
 

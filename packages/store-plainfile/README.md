@@ -13,6 +13,6 @@ that asymmetry with `@loredu/kernel` is the point of the boundary. It depends on
 
 Scaffold. Only store-root path resolution exists. The append path, replay,
 lock-file + atomic-rename durability, and the conformance run against
-`@loredu/kernel/testing` land with M1 (catalog T10–T19) — including the parts of
+`@loredu/kernel/testing` land with M1 (catalog T10–T18) — including the parts of
 store-root resolution this file deliberately leaves out (existence errors,
-`--store` precedence: T17).
+`--store` precedence: T17). T19 is M0 application/reference evidence; PlainFileStore is semantics-ignorant and does not validate record relationships.

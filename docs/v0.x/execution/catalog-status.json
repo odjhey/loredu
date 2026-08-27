@@ -89,9 +89,9 @@
       "reason": "plain-file store adapter not implemented yet"
     },
     "T19": {
-      "milestone": "M1",
-      "group": "M1 — plain-file store",
-      "reason": "plain-file store adapter not implemented yet"
+      "milestone": "M0",
+      "group": "M0 — records and validation",
+      "reason": "application reference validation and in-memory test support not implemented yet"
     },
     "T20": {
       "milestone": "M2",
@@ -332,6 +332,11 @@
       "milestone": "M2",
       "group": "M2 — reconciliation, resolution, projections",
       "reason": "value canonicalization lands with the kernel in M0; its use in conflict detection is M2"
+    },
+    "T87": {
+      "milestone": "M0",
+      "group": "M0 — records and validation",
+      "reason": "public application assembly, branded position, failure non-advancement, and exact export boundaries are not implemented yet"
     }
   }
 }

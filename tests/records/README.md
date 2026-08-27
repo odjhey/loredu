@@ -1,18 +1,20 @@
-# records — M0, records and validation
+# records — M0, records and application append
 
-Catalog rows **T01–T08**: an entry is accepted and gets an id; every record carries
-`schema`, `recorded_at`, and an actor; a claim missing a key field or carrying prose
-in `subject.id` is rejected with a message naming the field; records are
-value-immutable; unknown namespaced metadata round-trips; the same logical input
-twice yields two records; ids carry the three-letter kind prefix and a record whose
-prefix disagrees with its `kind` is rejected.
+Catalog rows **T01–T08, T19, T80, T83–T85, T87** live here. Drive only public
+`@loredu/kernel` and `@loredu/kernel/testing` exports.
 
-Also the draft/record split (**T83**) and `recorded_at` ownership (**T80**) once the
-append path exists — see `../reconciliation/README.md` for the rest of the kernel
-invariants.
+Cover all five exact family shapes; closed envelopes and reserved/excess fields;
+portable JSON rejection/equality; detached deep freezing; canonical timestamps;
+JSON-value encode/stringify/parse/decode; exact id fixtures/collisions; and structured
+code + RFC6901 paths. T19 checks every record-reference field through application
+append against InMemoryStore, including missing and wrong-kind refs before stamping;
+SourceRefs are never lookups. T87 proves exact assembly/imports, branded positive increasing positions, `createStreamPosition`, no failure advancement, and helper separation. Spy failures prove validation → references → entropy → Clock → append and exact consumption.
 
-Drive `@loredu/kernel`'s public exports with the in-memory reference store from
-`@loredu/kernel/testing`. No filesystem, no `lor`.
+Supplemental vectors cover all family/subtype shapes; Verification basis snapshots/nonempty/duplicates; every timestamp range/calendar/offset/fraction/validity edge; repeated/order-sensitive JSON arrays and repeated aliases; cycles and every JS-only value; nested accessors, symbols, custom prototypes and excess fields; codec detachment; every capability failure/reference kind/path/collision; and final exact export allowlists. No filesystem or provider codec belongs here.
+
+T86 remains M2 conflict evidence even though its canonical equality primitive and
+noncatalog adversarial vectors land in M0.
 
 Contracts: [records](../../docs/architecture/contracts/records.md),
-[ADR 0004](../../docs/decisions/0004-claim-identity-key.md).
+[clock/identity](../../docs/architecture/contracts/clock-and-identity.md),
+[ADR 0020](../../docs/decisions/0020-m0-public-contract-closure.md).

@@ -1,20 +1,16 @@
-# reconciliation — M2, plus the kernel invariants
+# reconciliation — M0 identity primitives and M2 behavior
 
-Catalog rows **T20–T30**: corroboration and candidate conflicts under one declared
-key; perspective gaps that are not conflicts; claims under different keys never
-auto-reconciling; `resolve --decision prefer` flipping projection preference while
-mutating no record; `as_of` / `valid_at` and their combination; replay reproducing an
-identical projection for the same basis; and every projection carrying its `basis`.
+M0 rows **T81–T82** cover public primitives only: Basis equality contains exactly
+stream position, structural core+policy ruleset identity, and canonical query while
+separate computed times do not participate; exact-shape tests reject missing/excess/`computed_at`, and inequality covers each stream/ruleset/query component. Default ClaimPolicy validates the exact declared key, selects `exclusive`, emits no policy advice, and rejects remapping; custom-policy validation/rejection is deterministic.
 
-Also rows **T80–T83** — the kernel invariants and the ClaimPolicy seam:
-`recorded_at` stamped at commit and never open to backdating, `computed_at` outside basis
-identity, the default policy being byte-identical with M1.5 behavior while naming
-its version in `basis.ruleset`, and the draft/record split enforced at both compile
-time and runtime.
+M2 rows **T20–T30 and T86** cover actual corroboration/conflict, cross-key guards,
+Resolution application, temporal projections, deterministic replayed content, and
+ruleset invalidation. T86 uses the M0 structural JSON equality primitive but remains
+M2 because duplicate/conflict classification does not exist in M0. M1.5 T68 owns
+execution of the generic cross-key hint as versioned core mechanics, not policy advice.
 
-Drive the application API directly; projections are pure functions of the record
-stream, so these tests want the in-memory store and no filesystem.
-
+Drive application/public primitives with InMemoryStore and no filesystem.
 Contracts: [projection](../../docs/architecture/contracts/projection.md),
-[ADR 0006](../../docs/decisions/0006-explicit-version-basis.md),
-[ADR 0010](../../docs/decisions/0010-claim-policy-seam.md).
+[ADR 0010](../../docs/decisions/0010-claim-policy-seam.md),
+[ADR 0020](../../docs/decisions/0020-m0-public-contract-closure.md).

@@ -45,21 +45,31 @@ Reconciliation does not rewrite claims.
 
 Resolution records may alter which claims a projection prefers, supersede, retract, or leave disputed. Historical records remain addressable.
 
-## Basis
+## Basis and ruleset identity
 
-Every projection is stamped with the basis it was computed from ([decision 0006](../../decisions/0006-explicit-version-basis.md)):
+The structural ruleset identity is exact ([decision 0020](../../decisions/0020-m0-public-contract-closure.md)):
 
 ```yaml
-basis:
-  stream_position: position of the last record included
-  ruleset: reconciliation ruleset version
-  query: { as_of: ..., valid_at: ..., scope: ... }
-computed_at: timestamp
+ruleset:
+  core: loredu.reconciliation/v1
+  claim_policy:
+    id: loredu.default
+    version: "1"
 ```
 
-`computed_at` is informational and excluded from basis identity: two projections with identical basis are identical, whenever computed. The `ruleset` names the versioned rule bundle including any active claim policy version ([decision 0010](../../decisions/0010-claim-policy-seam.md)).
+Policy id and version are identifier-safe tokens. Structural composition avoids ambiguous concatenated versions. Core behavior is covered by `core`; policy behavior by `claim_policy`. A generic same-value/different-key hint belongs to core mechanics, not default-policy advice.
 
-A consumer compares `basis.stream_position` against the store head to detect staleness without replaying history. In v0.x this check is conservatively **store-wide** — the comparison is against the global `head()`, so a packet may be flagged stale by records outside its scope; scope-filtered watermarks are a future optimization, not a required new port. Same basis must reproduce the same projection.
+`Basis` is exactly:
+
+```yaml
+stream_position: opaque nonnegative safe position
+ruleset: { core: loredu.reconciliation/v1, claim_policy: { id: loredu.default, version: "1" } }
+query: { as_of: ..., valid_at: ..., scope: ... }
+```
+
+`query` is a closed `JsonObject` value with object-order-insensitive structural identity. `computed_at` is a separate projection field, never a Basis field and rejected by `createBasis`. M0 exports `createRulesetIdentity(policy)`, `createBasis(input)`, and `basisEquals(left, right)` plus `DEFAULT_RULESET_IDENTITY`. `createBasis` validates, detaches, canonicalizes, and freezes the exact closed shape. M0 supplies these primitives only. It does not claim a projection, cache, advice envelope, or deterministic derived bytes; those remain later milestones.
+
+Once projections exist, a consumer compares `basis.stream_position` against store head to detect staleness without replaying history. In v0.x this check is conservatively store-wide. Same basis reproducing the same derived content is an M2 projection guarantee, not an M0 primitive claim.
 
 ## Changes since a point
 

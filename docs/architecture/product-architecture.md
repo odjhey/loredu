@@ -61,7 +61,8 @@ Extraction and resolution are capabilities, not assumptions about an LLM. Either
 
 Loredu owns:
 
-- immutable knowledge records and their identities;
+- immutable knowledge records and their exact caller-declared identities; a ClaimPolicy may validate but never remap a ClaimKey;
+- generic key-divergence detection as versioned core mechanics; default policy advice is empty;
 - provenance links from claims back to entries and sources;
 - deterministic reconciliation semantics;
 - explicit resolution records;
@@ -108,7 +109,7 @@ Loredu does not own:
 
 `Ranker` follows the same pattern as `Extractor` and `Resolver`: the core ships a deterministic baseline for Working Lore selection; a consumer may plug in lexical search, embeddings, or model reranking without the core knowing.
 
-The domain and application layers must not depend on a CLI, agent harness, model SDK, crawler, or persistence vendor. Provider-native types stop at adapters.
+The domain and application layers must not depend on a CLI, agent harness, model SDK, crawler, or persistence vendor. Provider-native types stop at adapters. M0's RecordStore boundary is intentionally only typed `append(PersistedRecord) → StreamPosition` and `get(RecordId) → PersistedRecord|undefined`; full scan/stream/head, durable replay, and conformance remain M1. Application append owns validation, references, stamping, and the `{record, position}` result.
 
 ## Progressive disclosure
 
