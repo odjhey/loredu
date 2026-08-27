@@ -3,76 +3,50 @@ name: record_store_contract
 description: "Provider-neutral persistence port for append-only Loredu records."
 type: contract
 tags: [contracts, storage, ports]
-generated: "ChatGPT GPT-5.6 Sol, 2026-08-26"
+generated: "ChatGPT GPT-5.6 Sol and OpenAI coding agent, 2026-08-27"
 created_at: 2026-08-26T12:10:00+08:00
 ---
 
 # Record store port
 
-The application core depends on record semantics, not a persistence technology.
+The application depends on record semantics, never provider paths, tables, SDK objects, or query languages. [Decision 0020](../../decisions/0020-m0-public-contract-closure.md) deliberately stages this port.
 
-A minimal store provides equivalent capabilities to:
+## M0 public slice
 
 ```text
-append(record) -> stream position
-get(id) -> record | not-found
+RecordStore.append(record: PersistedRecord) -> Promise<StreamPosition>
+RecordStore.get(id: RecordId) -> Promise<PersistedRecord | undefined>
+application.append(draft) -> Promise<{ record: PersistedRecord, position: StreamPosition }>
+```
+
+These typed semantics are public even if language spelling differs. Store append receives a complete validated, deeply frozen record and assigns only position; it never creates or rewrites schema, id, or time. Application success returns exactly record plus position. Failure publishes/returns no record, and stamped values are unobservable except through collaborator call counts.
+
+At the TypeScript boundary, `StreamPosition` is opaque/branded and is a nonnegative safe integer. Successful append positions are positive, strictly increase from the previous position in that store, and commit ordering. `0` is reserved for empty head when `head` arrives. Disk representation remains adapter-private.
+
+M0 append rejects duplicate ids without replacing the original and reports `DUPLICATE_RECORD_ID`. A generated-id collision surfaces; application append does not retry, draw entropy again, or sample another clock value. Reads return canonical deeply frozen records detached from caller/store aliases. Append-result and get object identity is not promised; structural identity is.
+
+`InMemoryStore` implements this exact slice in M0 and is exported only from `@loredu/kernel/testing`. It is test support, not a durable provider. It preserves duplicate, monotonic-position, and immutability semantics required by application tests.
+
+## Application-owned references
+
+Before stamping, application append validates and reads every record reference in the order fixed by the [record contract](./records.md). Missing or wrong-kind references produce `REFERENCE_CHECK_FAILED`; external SourceRefs never cause store lookups. The store is semantics-ignorant and does not enforce reference relationships. Writers append referents before referrers, preserving prefix validity.
+
+## M1 extension — not inferred from M0
+
+M1 extends the port with the settled forms of:
+
+```text
 scan(filter) -> ordered records
 stream(after-position?) -> ordered records
 head() -> current stream position
 ```
 
-Exact method names are language-specific and are not part of this contract.
+M1, not M0, owns filter shape, cursors, full reads, stream/head behavior, replay-stable positions, read-your-writes across those methods, reusable conformance, crash durability, atomic visibility, locking, and provider codecs/layout. The M0 two-method port makes no claim about them.
 
-## Required behavior
+For durable adapters, successful append is the single-record commit point: returned position means durable, reads reflect it, writers become visible in append order, and no torn record is visible. M1 conformance runs against InMemoryStore and PlainFileStore; it does not ask stores to validate domain references.
 
-- `append` never silently replaces a record with the same identity;
-- `append` returns a monotonic stream position; `head` exposes the latest position so derived views can be checked for staleness against their `basis` ([decision 0006](../../decisions/0006-explicit-version-basis.md));
-- how a position is represented is an adapter detail (the plain-file adapter may derive it from deterministic replay order), but positions must be stable across replays;
-- reads return the original canonical record, not a projected/mutated representation;
-- ordering/cursors are deterministic enough to replay projections;
-- store adapters preserve record data required by the published record schema;
-- application logic must not depend on provider-specific paths, tables, SDK objects, or query languages.
+v0.x remains single-writer. A durable adapter must fail loudly when safe access is unavailable. Multi-record transactions and multi-writer coordination are deferred; prefix validity makes interrupted workflows unfinished rather than corrupt.
 
-## Append is the commit point
+## Plain-file boundary
 
-There is no separate commit/transaction verb on the port. The unit of atomicity and durability is the single record:
-
-- when `append` returns a position, the record is durable — it survives a crash (the plain-file adapter fsyncs before returning; a database adapter commits);
-- `append` takes a **complete record** and assigns only the stream position. `id` and `recorded_at` are stamped earlier, by the application append path, from the injected clock and random source ([clock and identity contract](./clock-and-identity.md)) — a store adapter never fabricates or rewrites either, and needs neither a clock nor an id scheme. The API that takes a *draft* is the application append, not this port ([decision 0018](../../decisions/0018-capability-ports.md));
-- read-your-writes: after `append` returns, `get`, `scan`, and `head` reflect the record;
-- appends from a writer become visible in the order they were made.
-
-Multi-record workflows (e.g. supersede = claim + relation + resolution) stay crash-safe without transactions because of the **prefix-validity rule**: writers append referenced records before their referrers, so every prefix of a valid append sequence is itself a valid store. A crash mid-workflow leaves the store *unfinished*, never corrupt — and unfinished states are exactly what health checks surface and the advice envelope guides to completion.
-
-The application layer enforces reference-before-referrer at write time (a claim whose `derived_from` does not exist is rejected); the store itself stays ignorant of record semantics. A batched all-or-nothing `append_many` may later be added as an adapter optimization; nothing in v0.x requires it.
-
-Version control of a store directory (e.g. Git) is an external history/sync layer, not part of these semantics — the store must be correct with or without it.
-
-## Concurrency ownership
-
-The port defines the safety guarantees; each adapter implements them with whatever mechanism fits its medium:
-
-- appends are atomic — a reader never observes a torn or partial record;
-- positions remain monotonic under any interleaving the adapter permits;
-- a writer that cannot obtain safe access fails loudly; it never corrupts or silently drops a record.
-
-v0.x assumes a single writer at a time. The plain-file adapter satisfies the guarantees with lock-file + atomic-rename (the pattern the watchtower ledger — a [candidate consumer](../../reports/candidate-consumers.md) — already proved in its own codebase); a database-backed canonical store would use transactions. Multi-writer coordination beyond this is explicitly deferred.
-
-## Store roots
-
-A store is a self-contained directory; nothing about a store lives outside its root. Callers operate any number of named stores side by side under a relocatable home:
-
-- an explicit path flag always wins;
-- otherwise a store name resolves to `$LOREDU_HOME/stores/<name>` (`LOREDU_HOME` defaults to `~/.loredu`), keeping the home root free for configuration and other non-store concerns;
-- with neither flag, the default store name is `default`, resolved the same way (`$LOREDU_HOME/stores/default`) — it enjoys no special creation rules;
-- if the resolved store does not exist, the call **fails with an actionable error** — no upward discovery from the working directory, no silent creation outside `init`.
-
-Predictability over magic: resolution never depends on where a command happens to be run from. Test isolation is pointing `LOREDU_HOME` at a temp directory, not a mocking exercise.
-
-## Alpha adapter
-
-The first adapter is planned as plain Markdown files with YAML frontmatter. That representation is an adapter detail, not the domain model.
-
-An optional SQLite index/cache may later accelerate filtering, full-text search, joins, and projections. A derived index must be disposable and rebuildable from canonical records.
-
-A future SQLite/Postgres/other canonical `RecordStore` may be added behind the same port if scale or concurrency justifies it.
+The M1 adapter uses Markdown/YAML, locking, atomic rename, fsync, stable replay, and named store roots. These are provider rules, not M0 record transport. M0's public JSON-value encoder/decoder is storage-neutral evidence only. A future canonical provider or disposable index may use another representation without changing the kernel port.

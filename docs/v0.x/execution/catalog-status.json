@@ -89,9 +89,9 @@
       "reason": "plain-file store adapter not implemented yet"
     },
     "T19": {
-      "milestone": "M1",
-      "group": "M1 — plain-file store",
-      "reason": "plain-file store adapter not implemented yet"
+      "milestone": "M0",
+      "group": "M0 — records and validation",
+      "reason": "application reference validation and in-memory test support not implemented yet"
     },
     "T20": {
       "milestone": "M2",

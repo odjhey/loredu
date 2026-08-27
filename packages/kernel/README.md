@@ -20,14 +20,15 @@ Anything the kernel needs from its environment arrives through a port in
 ## Layout
 
 ```text
-src/domain/    records, ids, claim keys, validation
-src/ports/     RecordStore, and later ClaimPolicy, Extractor, Resolver, Ranker
-testing/       test-only reference store + store conformance suite,
+src/domain/    records, ids, JSON codec/equality, claim keys, Basis, validation
+src/ports/     M0 append/get RecordStore, Clock, RandomSource, ClaimPolicy
+testing/       M0 InMemoryStore, FixedClock, SeededRandomSource; M1 conformance,
                published only as @loredu/kernel/testing
 ```
 
 `@loredu/kernel/testing` is test support, never product surface: production code in
-any package must not import it.
+any package must not import it. M0's three helpers implement the public contracts;
+full scan/stream/head and reusable durable-store conformance remain M1.
 
 ## State
 

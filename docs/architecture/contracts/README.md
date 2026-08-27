@@ -11,10 +11,10 @@ created_at: 2026-08-26T12:10:00+08:00
 
 The v0.x contracts are intentionally language-neutral and provider-neutral.
 
-- [Records](./records.md) — immutable record envelope and initial record families
-- [Store](./store.md) — persistence port
-- [Clock and identity](./clock-and-identity.md) — capability ports for `recorded_at` and record id entropy
-- [Projection](./projection.md) — current and historical temporal views
+- [Records](./records.md) — exact closed envelopes, five families, portable JSON, time, references, codec, and errors
+- [Store](./store.md) — staged M0 append/get port and M1 durable/query extension
+- [Clock and identity](./clock-and-identity.md) — exact Instant, id encoding, and append capability order
+- [Projection](./projection.md) — structural ruleset/Basis primitives and later temporal views
 - [Working Lore](./working-lore.md) — bounded progressive-disclosure context
 
 Provider SDK types, Markdown-specific fields, SQL schemas, model APIs, and crawler implementation details do not belong in these contracts.

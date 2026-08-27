@@ -3,92 +3,56 @@ name: clock_and_identity_contract
 description: "Capability ports for deterministic recorded_at stamping and production-grade record-id entropy. Fixes where in the append path each is called."
 type: contract
 tags: [architecture, contracts, ports, kernel]
-generated: "Claude Opus 5 (Claude Code), 2026-08-26"
+generated: "Claude Opus 5 and OpenAI coding agent, 2026-08-27"
 created_at: 2026-08-26T21:00:00+08:00
 ---
 
 # Clock and identity ports
 
-Two values on every record are assigned by the kernel and by nothing else: `recorded_at` and `id` ([record contract](./records.md)). The kernel is isolated from host-specific capabilities — no `Bun.*`, no `process`, no `node:*`, and no host globals ([decision 0016](../../decisions/0016-workspace-scaffold-and-kernel-type-isolation.md)). Time and production-grade entropy therefore arrive as **capability ports**, supplied by the caller assembling the application.
+The kernel alone renders `recorded_at` and record ids, using injected capabilities:
 
 ```text
-Clock         now() -> Instant
-RandomSource  nextBytes(count) -> bytes
+Clock.now() -> Instant
+RandomSource.nextBytes(count) -> bytes
 ```
 
-Exact method names are language-specific and are not part of this contract.
+`Instant` is an integer number of milliseconds since Unix epoch, both a safe integer and inside the ECMAScript TimeClip range. The kernel renders it as canonical UTC RFC3339 with exactly three fractional digits: `YYYY-MM-DDTHH:mm:ss.sssZ`. The clock returns an instant, never formatted record text.
 
-## Why ports rather than direct access
-
-The two ports exist for different reasons, and conflating them causes implementations to drift:
-
-- **`RandomSource` is required by the id contract.** ECMAScript does expose `Math.random()`, but Loredu does not accept it as a production identity source: it does not provide the entropy-quality guarantee the record-id contract relies on. Host cryptographic randomness is outside the kernel type environment, so a production assembly must inject a source that can supply sufficiently strong random bytes.
-- **`Clock` is a discipline.** A language's own date facility is available without a host-specific import, so a careless implementation could read wall time directly. The port exists so that `recorded_at`, and therefore every `as_of` query, is reproducible under test rather than dependent on when the suite ran.
-
-## Guarantees
-
-- **The kernel owns id format; the port supplies only entropy.** `RandomSource` returns exactly the requested number of bytes or fails. It knows nothing about records. The kernel derives the id, including the three-letter kind prefix and the prefix-agrees-with-kind rule ([record contract](./records.md)). An adapter cannot substitute its own id scheme, because it is never asked for an id.
-- **Production entropy is an assembly responsibility.** A production `RandomSource` must provide cryptographically strong or equivalently qualified random bytes for record identity. Deterministic/seeded substitutes are for tests and controlled reproducibility, not a production default.
-- **`Clock` returns an instant, not a formatted record field.** Rendering `recorded_at` is kernel work, so a clock adapter cannot change the recorded shape.
-- **Both are injected once, at application assembly.** They are constructor/factory inputs to the application core, never global state, never looked up from ambient singletons.
-- **Deterministic substitutes use the same code path.** Two freshly assembled application instances given the same draft, the same fixed clock value, and random sources initialized to the same deterministic state produce the same first stamped record. Repeated appends in one running instance continue consuming entropy and therefore produce distinct ids; Loredu records are not content-addressed.
-- **Neither port is a storage concern.** A `RecordStore` adapter never receives, calls, or needs either one.
+RandomSource supplies exactly the requested bytes or fails and knows nothing about ids. Production assembly supplies qualified cryptographic entropy; seeded sources are test-only. Both ports are injected once at application assembly, are never ambient/global/store dependencies, and do not permit `Date.now()`, zero-argument `new Date()`, or `Math.random()` bypasses in production kernel source.
 
 ## Record id format
 
-The [record contract](./records.md) leaves suffix length and alphabet to implementation. Pinned here so independently-built adapters and fixtures agree:
-
 ```text
-<kind-prefix>_<16 symbols>       ent_3k9f2r7w4q8x5n6t
+<kind-prefix>_<16 symbols>
 ```
 
-- **Alphabet**: lowercase Crockford base32 — digits `0`–`9` and letters `a`–`z` excluding `i`, `l`, `o`, `u`. Thirty-two symbols, chosen so ids survive being read aloud, retyped, and pasted into paths and URLs without ambiguity.
-- **Length**: 16 symbols, 80 bits of entropy. Comfortably beyond collision concern at any store size this kernel targets, and short enough to appear in CLI output without wrapping.
-- **No structure in the suffix.** No timestamp, no counter, no shard hint. Ordering comes from `recorded_at` and stream positions; nothing may parse an id beyond its prefix.
-- **Duplicate ids are still rejected at the store boundary** ([store contract](./store.md)) — entropy is the first defense, not the only one.
-
-## Where each port is called
-
-The append path has exactly one stamping point. This is the boundary a caller can rely on:
+The alphabet by index is digits `0`–`9`, then `a b c d e f g h j k m n p q r s t v w x y z`. Treat the ten bytes as one unsigned 80-bit bit stream in byte order, most-significant byte and bit first. Emit consecutive 5-bit groups from most to least significant, without padding:
 
 ```text
-caller
-  │  EntryDraft            (no id, no recorded_at — the fields do not exist)
-  ▼
-application append
-  │  validate draft, check reference-before-referrer
-  │  recorded_at ← Clock.now()
-  │  id          ← kernel format over RandomSource.nextBytes()
-  ▼
-RecordStore.append(record)  ── complete record in, stream position out
-  │
-  ▼
-persisted record + stream position
+00 00 00 00 00 00 00 00 00 00 -> 0000000000000000
+ff ff ff ff ff ff ff ff ff ff -> zzzzzzzzzzzzzzzz
+00 44 32 14 c7 42 54 b6 35 cf -> 0123456789abcdef
 ```
 
-- The **application** layer stamps. The **store** receives a complete record and assigns only the stream position; it never fabricates or rewrites `id` or `recorded_at`, and reads return exactly what was appended.
-- `recorded_at` is the application timestamp sampled immediately before the durable append attempt. It becomes canonical only if `RecordStore.append` succeeds and returns a position. The timestamp is not the exact durability instant; the returned stream position is the canonical ordering/commit fact. A failed append leaves no canonical record, and the stamped values from that attempt are discarded.
-- A caller-supplied `recorded_at` is rejected by the application API rather than quietly overwritten — the draft type has no such field, and the runtime guard refuses objects carrying one anyway, because types erase.
+The kind prefix is `ent|clm|rel|res|ver`; suffixes carry no structure. Store duplicate rejection is the second defense. On a collision, append fails with `DUPLICATE_RECORD_ID`: no retry and no second entropy/clock call within that invocation. A new caller invocation is a new attempt.
 
-## Assembly and test placement
+## Exact append order and failure consumption
 
-Do not create dedicated clock/random packages for v0.x.
+One application append call performs:
 
-- `@loredu/kernel/testing` may provide deterministic helpers such as `FixedClock` and `SeededRandomSource` for kernel/application tests.
-- The `lor` CLI composition root supplies host implementations for wall time and secure randomness when it assembles the application.
-- An embedded M4 consumer supplies its own implementations at its composition boundary.
+1. inspect and aggregate all safely discoverable draft validation issues;
+2. read and aggregate record references in deterministic field/index order;
+3. call `RandomSource.nextBytes(10)` exactly once and format the id;
+4. call `Clock.now()` exactly once and render canonical time;
+5. perform only pure synchronous construction, detachment, and deep freezing;
+6. immediately call `RecordStore.append(record)`.
 
-These are capability implementations around the kernel, not new runtime dependencies of `@loredu/kernel`.
+No external capability or store operation occurs after Clock and before append. Validation failure consumes no reads, entropy, time, or append. Reference failure consumes reads but no entropy/time. Random failure consumes no clock/store call. Clock failure consumes entropy but no append. Store failure consumes both values, publishes no record, and does not retry. Operational errors map to `RANDOM_SOURCE_FAILED`, `CLOCK_FAILED`, or `STORE_APPEND_FAILED`; duplicate collision retains its specific code.
 
-## Capability bypass guard
+Two fresh applications with the same draft, fixed Instant, and identically initialized deterministic source produce the same first stamped record. Sequential appends consume new entropy. `SeededRandomSource` does not promise a cross-runtime PRNG sequence; the byte-to-id fixtures above are the public encoding contract.
 
-The port contract is only meaningful if production kernel code cannot silently bypass it. The existing workspace structural guard should reject direct ambient time/randomness access such as `Date.now()`, zero-argument `new Date()`, and `Math.random()` in `packages/kernel` production sources. This is separate from dependency-cruiser issue #18: import-graph tooling cannot see calls that require no import. Temporal parsing/construction from an explicit value (for example `new Date(value)` if implementation needs it) is not the same as reading ambient wall time.
+## Placement
 
-## Related
+M0 exports `FixedClock` and `SeededRandomSource`, alongside `InMemoryStore`, only from `@loredu/kernel/testing`. Production code cannot import the testing subpath. CLI and future embedded consumers provide host capabilities at their composition roots; no dedicated clock/random package exists.
 
-- [Record contract](./records.md) — envelope, the draft/persisted split, time ownership
-- [Store port](./store.md) — what the store does and does not assign
-- [Decision 0018](../../decisions/0018-capability-ports.md) — why these are ports, and the boundary it fixes
-- [Decision 0016](../../decisions/0016-workspace-scaffold-and-kernel-type-isolation.md) — the kernel type environment
-
-Parent index: [contracts](./README.md)
+Related: [records](./records.md), [store](./store.md), [ADR 0018](../../decisions/0018-capability-ports.md), [ADR 0020](../../decisions/0020-m0-public-contract-closure.md).

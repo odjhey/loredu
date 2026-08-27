@@ -205,17 +205,16 @@ Grouped by milestone; **AC n** = acceptance criterion in [goal and scope](../sco
 
 | # | Given / When / Then | Covers |
 |---|---|---|
-| T01 | valid entry (free text only, no claim) → accepted, id returned | AC 1, invariant 3 |
-| T02 | entry/claim carries `schema: loredu.record/v1`, `recorded_at`, actor | AC 1 |
-| T03 | claim missing `predicate` (or any key field) → rejected with an actionable message naming the field | AC 11, ADR 0004 |
-| T04 | claim with free prose in `subject.id` (violates normalization) → rejected | ADR 0004 |
-| T05 | records are value-immutable: no API mutates a created record | invariant 1 |
-| T06 | unknown namespaced metadata round-trips through serialize/parse | ADR 0005 |
+| T01 | valid exact-body Entry draft → application returns `{record, position}`; whitespace-only body rejects without stamping | AC 1, invariant 3 |
+| T02 | application supplies fixed schema/id/canonical millisecond `recorded_at`; actor plus canonical `scope`, `metadata`, `sources` are present | AC 1 |
+| T03 | all safely discoverable malformed Claim/plain-data issues aggregate as stable code + RFC6901 path without invoking accessors | AC 11, ADR 0004 |
+| T04 | missing/malformed declared-key fields, including free prose in `subject.id`, reject without normalization | ADR 0004 |
+| T05 | canonical records are detached recursive copies and deeply frozen; mutating every nested draft container or returned/store-read container cannot change history | invariant 1 |
+| T06 | public `encode → JSON.stringify → JSON.parse → decode` preserves recursive unknown non-`loredu.*` metadata semantically; malformed/excess persisted data rejects | ADR 0005 |
 | T07 | same logical input twice → distinct record ids (append, never replace) | store contract |
-| T08 | generated ids carry the three-letter kind prefix (`ent_`/`clm_`/`rel_`/`res_`/`ver_`); a record whose id prefix disagrees with its `kind` is rejected | record contract |
-| T84 | capability determinism without content-addressing: two freshly assembled applications given the same draft, same fixed clock value, and random sources initialized to the same deterministic state produce the same first stamped record (id and `recorded_at` included); two sequential appends of that same draft through one running application consume new entropy and produce distinct ids; caller-supplied `recorded_at` is refused | ADR 0018, clock-and-identity contract |
+| T08 | all family prefixes and MSB-first entropy fixtures match; prefix mismatch rejects; generated collision surfaces `DUPLICATE_RECORD_ID` without retry | record/identity contracts |
+| T19 | through kernel + testing only, missing/wrong-kind Claim `derived_from`, Relation `from`/`to`, Resolution `targets`/`replacement`, or Verification `targets` fails with ordered code/path issues before entropy, clock, or append; SourceRefs cause no lookup | store contract, ADR 0020 |
 | T85 | scope identity is order-insensitive: two claims whose scope maps differ only in pair order share a key; adding a pair yields a different key; absent scope and `{}` are the same key | ADR 0019, ADR 0004 |
-| T86 | value equality is structural over a canonical form and never coerces types: object key order does not affect equality, while `1` and `"1"` under one key are distinct values (conflict candidate, not duplicate) | ADR 0019, ADR 0010 |
 
 ### M1 — plain-file store
 
@@ -230,7 +229,6 @@ Grouped by milestone; **AC n** = acceptance criterion in [goal and scope](../sco
 | T16 | concurrent-writer safety: a second writer against a locked store fails loudly with no corruption; the store replays clean afterward | store contract |
 | T17 | store resolution: path flag as-is > name under `$LOREDU_HOME/stores/` > default store; nonexistent resolved store → actionable error (never created implicitly, never discovered from cwd); two named stores under one home are fully isolated (no reads or writes outside the resolved root) | journey 0 |
 | T18 | append is the commit point: a returned position implies the record survives a simulated crash (kill between staging and completion leaves either no record or a whole one, never a torn file); replay stays clean | store contract |
-| T19 | reference-before-referrer: a claim citing a nonexistent `derived_from` (or relation/resolution citing missing targets) is rejected at write time with an actionable error | store contract, ADR 0004 |
 
 ### M2 — reconciliation, resolution, projections
 
@@ -244,9 +242,10 @@ Grouped by milestone; **AC n** = acceptance criterion in [goal and scope](../sco
 | T25 | `as_of` before a record's `recorded_at` excludes it (S A: earlier belief reproduced) | AC 6, S A |
 | T26 | `valid_at` after an amendment's effective date returns amended value even if recorded late | AC 7, S B |
 | T27 | combined `as_of` + `valid_at` distinguishes historical knowledge from later correction | AC 7, S B |
-| T28 | delete derived state, replay → identical projection for same basis + query | AC 5, ADR 0006 |
-| T29 | every projection result carries `basis` (stream_position, ruleset, query, computed_at) | AC 14 |
-| T30 | ruleset version bump → cached view marked invalid without touching canonical records | ADR 0006 |
+| T28 | delete derived state, replay → identical derived content for same Basis + query | AC 5, ADR 0006 |
+| T29 | every projection carries exact Basis (`stream_position`, structural `ruleset`, canonical query) and separate `computed_at` | AC 14 |
+| T30 | core or policy ruleset version bump → cached view marked invalid without touching canonical records | ADR 0006 |
+| T86 | using the M0 canonical equality primitive, object key order does not affect value equality while `1` and `"1"` under one key become a conflict candidate, not duplicate | ADR 0019, ADR 0010 |
 
 ### M3 — Working Lore
 
@@ -285,7 +284,7 @@ Grouped by milestone; **AC n** = acceptance criterion in [goal and scope](../sco
 | T65 | `lor skill` prints the agent guide; a fresh store + only the guide's commands completes journeys 1–5 | journey 9 |
 | T66 | `advice` is deterministic: same store state → byte-identical advice; no advice on healthy state | ADR 0008 |
 | T67 | `lor claims` filters compose across fields (scope + predicate + value, etc.) and return stable ordering with `--json` | key hygiene |
-| T68 | same value recorded under two different keys in one scope → `status` advisory (non-blocking); `--check` still exits 0 | key hygiene |
+| T68 | versioned core mechanics (not ClaimPolicy advice) finds canonically equal values under different exact keys in one exact scope → non-blocking advisory, never cross-key reconciliation | key hygiene |
 
 ### Pagination and link-following (ADR 0009)
 
@@ -302,10 +301,11 @@ Grouped by milestone; **AC n** = acceptance criterion in [goal and scope](../sco
 
 | # | Given / When / Then | Covers |
 |---|---|---|
-| T80 | `recorded_at` is sampled by the application append path immediately before the durable store append attempt; it becomes canonical only when that append succeeds; a caller-supplied `recorded_at` is rejected — canonical history cannot be backdated | records contract, time ownership |
-| T81 | `computed_at` is outside basis identity: two computations of the same basis at different wall times compare equal and reproduce identical content | ADR 0006 |
-| T82 | default ClaimPolicy: identity = declared key, all values exclusive, no custom advisories — M1.5 behavior byte-identical with the policy layer in place; the active policy version appears in the basis `ruleset` | ADR 0010 |
-| T83 | draft/record split: draft types expose no `id` or `recorded_at` (compile-time), and the application append API rejects objects carrying them (runtime) — both values are kernel/application-stamped before the store receives a complete record | records contract |
+| T80 | spy/failure ports prove validation → references → entropy → Clock → immediate append; canonical time is sampled once and only successful append publishes history | records contract, time ownership |
+| T81 | M0 Basis primitives: same stream position, structural ruleset, and canonical query compare equal while separately held computed times differ; no projection/content claim | ADR 0006, ADR 0020 |
+| T82 | default policy validates exact declared key, selects exclusive, emits no policy advice, and contributes `{id: loredu.default, version: "1"}` beside core `loredu.reconciliation/v1`; remapping rejects | ADR 0010, ADR 0020 |
+| T83 | draft types omit `schema`, `id`, `recorded_at`; runtime rejects each reserved own property even `undefined`, excess/accessor/custom-prototype stamp attacks; store receives complete frozen record | records contract |
+| T84 | exact call counts/failure consumption; same initialized assembly inputs reproduce first record, sequential appends consume entropy, collision/store failure never retries | ADR 0018, clock-and-identity contract |
 
 ### Deliberately not tested yet
 
