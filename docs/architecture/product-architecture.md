@@ -3,7 +3,7 @@ name: product_architecture
 description: "Loredu product thesis, ownership boundaries, application ports, core flow, progressive-disclosure posture, and non-goals."
 type: architecture
 tags: [architecture, core, ports, progressive-disclosure]
-generated: "ChatGPT GPT-5.6 Sol, 2026-08-26"
+generated: "ChatGPT GPT-5.6 Sol, 2026-08-28"
 created_at: 2026-08-26T12:10:00+08:00
 ---
 
@@ -109,7 +109,7 @@ Loredu does not own:
 
 `Ranker` follows the same pattern as `Extractor` and `Resolver`: the core ships a deterministic baseline for Working Lore selection; a consumer may plug in lexical search, embeddings, or model reranking without the core knowing.
 
-The domain and application layers must not depend on a CLI, agent harness, model SDK, crawler, or persistence vendor. Provider-native types stop at adapters. M0's RecordStore boundary is intentionally only typed `append(PersistedRecord) → StreamPosition` and `get(RecordId) → PersistedRecord|undefined`; full scan/stream/head, durable replay, and conformance remain M1. Application append owns validation, references, stamping, and the `{record, position}` result.
+The domain and application layers must not depend on a CLI, agent harness, model SDK, crawler, or persistence vendor. Provider-native types stop at adapters. M0's RecordStore boundary is intentionally only typed `append(PersistedRecord) → StreamPosition` and `get(RecordId) → PersistedRecord|undefined`; application append owns validation, references, stamping, and the `{record, position}` result. M1 additively closes atomic snapshot `scan` with a kind-only provider filter, snapshot-bounded incremental `stream`, `head`, and reusable conformance in the [store contract](./contracts/store.md). Markdown bytes, roots, locks, and fsync stay in the [plain-file provider contract](./contracts/plain-file-store.md), outside the kernel/domain boundary.
 
 ## Progressive disclosure
 

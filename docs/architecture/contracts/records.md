@@ -3,7 +3,7 @@ name: record_contract
 description: "Immutable Loredu record envelope and the Entry, Claim, Relation, Resolution, and Verification record families."
 type: contract
 tags: [contracts, records, provenance]
-generated: "ChatGPT GPT-5.6 Sol and OpenAI coding agent, 2026-08-27"
+generated: "ChatGPT GPT-5.6 Sol and OpenAI coding agent, 2026-08-28"
 created_at: 2026-08-26T12:10:00+08:00
 ---
 
@@ -141,7 +141,7 @@ A source or projection is not a persisted Verification target in `loredu.record/
 
 Before stamping, application append validates every record id for complete shape and field-specific kind, then reads references in deterministic field/index order. It checks Claim `derived_from`; Relation `from` then `to`; Resolution `targets` then `replacement`; and Verification `targets`. Every referent must already exist and have the required kind. SourceRefs are external evidence and are never RecordStore lookups.
 
-Application append succeeds with exactly `{record, position}`. A failed append publishes and returns no record. Full capability order and consumption are in [clock and identity](./clock-and-identity.md); the store/application split is in [store](./store.md).
+Application append succeeds with exactly `{record, position}`. Validation, reference, capability, duplicate, lock, and pre-publication store failures publish and return no record. M1 durable providers have one unavoidable uncertain-outcome exception: host failure after atomic whole-record publication but before acknowledgement returns no result, while replay may expose that complete record; recovery checks the attempted id as fixed by [decision 0022](../../decisions/0022-m1-store-and-plain-file-contract.md). Full capability order and consumption are in [clock and identity](./clock-and-identity.md); the store/application split is in [store](./store.md).
 
 ## Public errors
 

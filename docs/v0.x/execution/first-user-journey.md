@@ -3,7 +3,7 @@ name: first_user_journey
 description: "The first real usage journey (human driver + agents via CLI) and the automated behavioral test catalog derived from it."
 type: plan
 tags: [v0.x, execution, journey, testing, cli]
-generated: "Claude Fable 5 (Claude Code), 2026-08-26"
+generated: "Claude Fable 5 (Claude Code) and ChatGPT GPT-5.6 Sol, 2026-08-28"
 created_at: 2026-08-26T00:00:00+08:00
 ---
 
@@ -59,7 +59,7 @@ initialized store at ~/.loredu/stores/rozoro-investigation
 
 One directory per store, human-inspectable, Git-friendly ([decision 0003](../../decisions/0003-plain-files-first.md)). No daemon, no config required to start.
 
-Store resolution is predictable, never cwd-dependent: `--store <path>` (used as-is) or `--store <name>` (resolved to `$LOREDU_HOME/stores/<name>`, `LOREDU_HOME` defaulting to `~/.loredu`); with no flag, the default store `$LOREDU_HOME/stores/default`. If the resolved store does not exist, the command fails with an actionable error suggesting `lor init` — no upward discovery, no silent creation. Stores live under `stores/` so the home root stays free for configuration and other concerns; multiple named stores coexist under one relocatable home, and tests isolate by pointing `LOREDU_HOME` at a temp directory.
+Store resolution is predictable and follows the [plain-file provider contract](../../architecture/contracts/plain-file-store.md): an explicit path is used outside Loredu home (an explicit relative path is intentionally resolved from cwd), a validated name resolves to `$LOREDU_HOME/stores/<name>` with `LOREDU_HOME` defaulting to `~/.loredu`, and with no selector resolution uses the default name `default`. A one-token `--store` value is path-like only when absolute, prefixed by `.` plus a platform separator, or containing a platform separator; every other token is a name. If the resolved store does not exist, the command fails with an actionable error suggesting `lor init`—no upward discovery or silent creation. Stores live under `stores/` so the home root stays free for configuration and other concerns; multiple named stores have disjoint roots/locks/positions, and tests isolate by pointing `LOREDU_HOME` at a temp directory.
 
 ## Journey 1 — first activity on an empty store
 
@@ -231,15 +231,15 @@ Grouped by milestone; **AC n** = acceptance criterion in [goal and scope](../sco
 
 | # | Given / When / Then | Covers |
 |---|---|---|
-| T10 | every adapter under the M1 reusable conformance kit, including PlainFileStore and M1-complete InMemoryStore, returns positive strictly increasing successful positions and matching latest `head` | ADR 0006, ADR 0020 |
-| T11 | write records → new store instance on same directory replays the identical ordered stream | AC 9 |
-| T12 | positions are stable across replays | ADR 0006 |
-| T13 | `append` with an existing id → error, original untouched | store contract |
-| T14 | store files are hand-inspectable Markdown + frontmatter; hand-added valid record is picked up on replay | ADR 0003 |
-| T15 | domain layer compiles/tests with a pure in-memory store (no Bun/fs import in core) | ADR 0001/0007 |
-| T16 | concurrent-writer safety: a second writer against a locked store fails loudly with no corruption; the store replays clean afterward | store contract |
-| T17 | store resolution: path flag as-is > name under `$LOREDU_HOME/stores/` > default store; nonexistent resolved store → actionable error (never created implicitly, never discovered from cwd); two named stores under one home are fully isolated (no reads or writes outside the resolved root) | journey 0 |
-| T18 | append is the commit point: a returned position implies the record survives a simulated crash (kill between staging and completion leaves either no record or a whole one, never a torn file); replay stays clean | store contract |
+| T10 | every adapter under the runner-neutral M1 conformance cases, including PlainFileStore and M1-complete InMemoryStore, returns contiguous positive successful positions; scan's captured head and latest `head()` match; duplicate and pre-publication failures do not advance | ADR 0006, ADR 0020, ADR 0022 |
+| T11 | write records → new store instance on the same root replays the identical ascending positioned stream and atomic scan snapshot | AC 9, ADR 0022 |
+| T12 | contiguous filename-derived positions and head are stable across replays and after derived/control leftovers are removed | ADR 0006, ADR 0022 |
+| T13 | `append` with an existing id → `DUPLICATE_RECORD_ID`; original bytes/record and scan/head are untouched | store contract |
+| T14 | files are inspectable strict JSON-valued YAML frontmatter + Markdown; an Entry body is exact and a hand-added valid next-position/matching-id record is picked up on replay | ADR 0003, ADR 0022 |
+| T15 | full RecordStore and runner-neutral conformance compile/test with pure InMemoryStore and no Bun/fs/test-runner import or ambient host types in kernel | ADR 0001/0007/0011/0022 |
+| T16 | while one append owns the append-scoped lock, a second writer fails immediately with `STORE_LOCKED`, allocates/mutates nothing, and clean replay succeeds after release; elapsed time alone cannot steal the lock | store contract, ADR 0022 |
+| T17 | root resolution is explicit path > validated name under `$LOREDU_HOME/stores/` > default name; missing roots fail actionably and are never created/discovered; two named roots have isolated files, locks, positions, and no symlink/traversal escape | journey 0, ADR 0022 |
+| T18 | append fsyncs temp bytes, atomically renames, and fsyncs directory entries before returning; kill/failure at each boundary replays old prefix or one whole next record, and a returned position survives reopen | store contract, ADR 0022 |
 
 ### M2 — reconciliation, resolution, projections
 

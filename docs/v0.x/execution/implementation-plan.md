@@ -3,7 +3,7 @@ name: v0x_implementation_plan
 description: "M0–M4 implementation sequence (including the M1.5 CLI milestone) for the Loredu domain kernel, plain-file store, projections, Working Lore, and the first real consumer."
 type: plan
 tags: [v0.x, execution]
-generated: "ChatGPT GPT-5.6 Sol, 2026-08-26"
+generated: "ChatGPT GPT-5.6 Sol, 2026-08-28"
 created_at: 2026-08-26T12:10:00+08:00
 ---
 
@@ -37,20 +37,21 @@ Exit: through public kernel/testing exports, every draft family validates and ap
 
 ## M1 — Durable plain-file persistence
 
-Implement:
+Implement [decision 0022](../../decisions/0022-m1-store-and-plain-file-contract.md) and its [provider-neutral store](../../architecture/contracts/store.md) / [plain-file provider](../../architecture/contracts/plain-file-store.md) contracts exactly:
 
-- the reusable `RecordStore` conformance kit under `@loredu/kernel/testing` from the published store guarantees;
-- `@loredu/store-plainfile` implementing the already-defined `RecordStore` port;
-- Markdown/frontmatter codec for canonical records with free-text Entry bodies;
-- append/get/scan/stream/head/replay semantics;
-- single-writer locking, atomic record visibility, durable-before-return/fsync behavior, and prefix-valid crash behavior;
-- monotonic stream positions stable across replays ([decision 0006](../../decisions/0006-explicit-version-basis.md));
-- deterministic filesystem layout and named-store resolution that do not leak into kernel/domain contracts;
-- conformance runs against both the in-memory reference store and `PlainFileStore`.
+- the runner-neutral `recordStoreConformance(subject)` cases under `@loredu/kernel/testing`, plus an M1-complete `InMemoryStore`, against the published full-port guarantees;
+- `RecordStore.scan` as an atomic `{head, records}` snapshot with kind-only `RecordFilter`, snapshot-bounded unfiltered `stream({after?})`, and empty/latest `head` semantics;
+- `@loredu/store-plainfile` using contiguous 16-digit filename positions as replay authority, never mtime/id/index ordering;
+- the strict JSON-valued YAML frontmatter codec, exact Entry-only free-text Markdown body, and empty body for structured families;
+- append/get/scan/stream/head and replay across new instances, including a correctly named next-position hand addition;
+- append-scoped exclusive locking with immediate loud contention failure and only proven-dead-owner stale recovery;
+- temp-file fsync → atomic rename → records/temp directory fsync before return, whole-record uncertain failure after rename, and prefix-valid crash behavior;
+- explicit initialization plus path > validated name > default root resolution, no upward discovery/implicit creation/symlink escape, and isolated named stores;
+- the unchanged conformance cases against both the in-memory reference store and `PlainFileStore`, with provider-specific crash/layout/locking tests beside them.
 
-Optional only if useful: a generated human-readable index. Do not make the index canonical.
+Optional only if useful: a generated human-readable index. It is disposable and never canonical.
 
-Exit: `PlainFileStore` passes the shared store conformance suite; deleting all derived state and replaying Markdown records reconstructs the same canonical record stream; crash/locking tests demonstrate the v0.x durability and single-writer guarantees.
+Exit: both adapters pass the shared full-port suite; deleting all derived/control leftovers and replaying canonical Markdown files reconstructs the same positioned record stream; hand addition, malformed-prefix rejection, root isolation, contention, atomic visibility, fsync-before-return, and simulated-crash tests demonstrate T10–T18 without making the provider representation part of the kernel domain.
 
 ## M1.5 — Agent-operable CLI (`lor`)
 
