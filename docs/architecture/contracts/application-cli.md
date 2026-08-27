@@ -124,16 +124,16 @@ interface ClaimItem {
 }
 interface HeadResult { readonly stream_position: StreamPosition }
 
-type ReconciliationState =
-  | "not-applicable"
-  | "new-key"
-  | "corroboration"
-  | "conflict-candidate"
-  | "coexisting"
-interface ReconciliationFeedback {
-  readonly state: ReconciliationState
-  readonly key?: ClaimKey
-  readonly related: readonly RecordHandle[]
+type ReconciliationFeedback =
+  | {readonly state: "not-applicable"; readonly related: readonly []}
+  | {readonly state: "new-key"; readonly key: ClaimKey;
+      readonly related: readonly []}
+  | {readonly state: "corroboration"; readonly key: ClaimKey;
+      readonly related: readonly RecordHandle[]}
+  | {readonly state: "conflict-candidate"; readonly key: ClaimKey;
+      readonly related: readonly RecordHandle[]}
+  | {readonly state: "coexisting"; readonly key: ClaimKey;
+      readonly related: readonly RecordHandle[]}
 }
 ```
 
@@ -148,7 +148,7 @@ Non-Claim additions and every read use `{state:"not-applicable", related:[]}`. A
 
 Top-level advice is exact at M1.5. A `conflict-candidate` addition emits one `record.show` affordance for each canonically different related Claim in ascending position, then one for the new Claim; `new-key`, `corroboration`, `coexisting`, and non-Claim additions emit no corrective advice. Status emits one show affordance per Claim in each unresolved group, then one for each dangling reference's referring record, deduplicated by the general rule. Generic divergence remains represented by its result handles and adds no corrective advice. Show and list reads add no top-level advice except list continuation. Every record handle still carries its ordinary nested show/history disclosure affordances.
 
-For every added, shown, history, or Claim item, `handles` contains its own record followed by every distinct record id referenced by its underlying record, in schema field/index order. `show` scans one snapshot so it can return the full record's position and basis atomically. Lists return summaries rather than Entry bodies or common metadata/sources; `show` is the full-record disclosure step. `history(id)` returns the target and every record in the pinned prefix that directly references it: Claim `derived_from`; Relation `from`/`to`; Resolution `targets`/`replacement`; and Verification `targets`. Results are unique and ascending by stream position; the target naturally occupies its committed position rather than being forced to index zero. External SourceRefs are terminal disclosure values, not Loredu record handles.
+For every added, shown, history, or Claim item, `handles` contains its own record followed by every distinct referenced record that exists in the same pinned prefix, in schema field/index order. A valid absent id in a persisted reference field remains visible in the full record or summary but receives no handle or affordance; it is an explicit terminal missing-reference diagnostic, never a promise that `show` can resolve it. `show` scans one snapshot so it can return the full record's position, handles, and basis atomically. Lists return summaries rather than Entry bodies or common metadata/sources; `show` is the full-record disclosure step. `history(id)` returns the target and every record in the pinned prefix that directly references it: Claim `derived_from`; Relation `from`/`to`; Resolution `targets`/`replacement`; and Verification `targets`. Results are unique and ascending by stream position; the target naturally occupies its committed position rather than being forced to index zero. `history` for an absent target still fails with `RECORD_NOT_FOUND`; it never turns dangling references into a successful dead-end result. External SourceRefs and explicit missing-reference diagnostics are terminal disclosure values, not Loredu record handles.
 
 ## Claim query and ordering
 
@@ -240,7 +240,7 @@ Health blocks `status --check`; advisories never do.
 
 An **unresolved exclusive group** is an exact ClaimKey group for which the assembled policy selects `exclusive` and at least two canonically different values exist at the basis. It is closed only by a Resolution in the same prefix whose unique `targets` include every Claim currently in that group. Any decision, including `leave_disputed`, records sufficient human judgment to close health. Adding a later Claim to the group reopens it until a later Resolution covers the enlarged group. Relations describe links but do not close an exclusive group. Group Claims and groups themselves order by earliest member position.
 
-A **dangling record reference** is any persisted Claim `derived_from`, Relation endpoint, Resolution target/replacement, or Verification target whose valid complete id is absent from the same pinned prefix. One item is emitted per field/index in ascending referring-record position and schema traversal order. Wrong-family ids make the persisted record invalid and therefore provider-corrupt rather than health data. Normal application appends prevent dangling references, but valid hand-authored records can expose them. `attention` lists unresolved groups first, then dangling references, each in its ordering above.
+A **dangling record reference** is any persisted Claim `derived_from`, Relation endpoint, Resolution target/replacement, or Verification target whose valid complete id is absent from the same pinned prefix. One item is emitted per field/index in ascending referring-record position and schema traversal order. Its `record` is the executable handle for inspecting the referring record; `target` reports the absent id as an explicit terminal diagnostic and never carries or produces an affordance. Wrong-family ids make the persisted record invalid and therefore provider-corrupt rather than health data. Normal application appends prevent dangling references, but valid hand-authored records can expose them. `attention` lists unresolved groups first, then dangling references, each in its ordering above.
 
 Malformed canonical files are not application health data. The M1 provider rejects them as `STORE_CORRUPT` before returning a `RecordScan`; `status` consequently fails with the store-error envelope and cannot truthfully return partial health. This preserves the RecordStore boundary rather than adding a filesystem inspection escape hatch.
 
@@ -250,9 +250,10 @@ M1.5 executes no ClaimPolicy advice callback. The M0 policy surface has no such 
 
 ## CLI grammar
 
-The executable is `lor`. Options are long-form, case-sensitive, accepted exactly once unless explicitly repeatable, and unknown options or extra positionals are usage errors. `--json` and `--store <selector>` may appear anywhere in argv outside an option value; command-specific options may appear in any order. Short options, bundled options, and an end-of-options `--` delimiter are not supported. `--help` must be the only command-specific option. Comma-separated lists are not accepted: repeat the singular option.
+The executable is `lor`. Options are long-form, case-sensitive, accepted exactly once unless explicitly repeatable, and unknown options or extra positionals are usage errors. `--json` and `--store <selector>` may appear anywhere in argv outside an option value; command-specific options may appear in any order. Short options other than the exact `-v` alias, bundled options, and an end-of-options `--` delimiter are not supported. `--help` must be the only option, global or command-specific, after a valid command path. Comma-separated lists are not accepted: repeat the singular option.
 
 ```text
+lor (--version | -v)
 lor [--store <selector>] [--json]
 lor init [<selector>] [--json]
 lor add entry --actor <type:id> --body <text|->
@@ -279,6 +280,10 @@ lor status [--check] [--json]
 lor skill [--json]
 lor <command-path> --help
 ```
+
+`--version` and `-v` are identical and accept no other option or positional. They write exactly `lor <cli-version> (schema <record-schema>, store <adapter-name>, home <default-home>)` plus LF to stdout and exit 0, preserving the existing compile-smoke metadata line. The four placeholders are the current build's CLI package version, record schema id, adapter name, and adapter-resolved default Loredu home. The command checks no store and consumes neither Clock nor RandomSource. Any combined form, including `lor --version --json`, is `CLI_USAGE`; when `--json` is present the normal JSON failure envelope is emitted and the exit is 2.
+
+For a valid command path, `--help` writes its concise direct help text plus LF to stdout and exits 0 without resolving a store or emitting an envelope. Combining it with `--json`, `--store`, or any command option is `CLI_USAGE`; a supplied `--json` therefore produces the JSON failure envelope and exit 2 rather than help text.
 
 `[common options]` means repeated `--scope <key=value>`, one `--metadata-json <object>`, and repeated `--source-json <SourceRef>`. Scope splits on the first `=` and both sides must satisfy token rules; duplicate keys reject. Actor splits on the first `:`; the left side is the closed Actor type and the right side is the complete id token. JSON options accept exactly one JSON text value and then pass through the public domain decoder; `--metadata-json` must be an object, `--source-json` one SourceRef object, and `--verified-against-json` one snapshotted SourceRef. `--value` is always a string; `--value-json` is required to distinguish `1`, `true`, `null`, arrays, objects, and a JSON-quoted string.
 
@@ -338,7 +343,7 @@ Stable process exits are:
 
 The CLI package is the production composition root. It creates one host `Clock` whose `now()` obtains current epoch milliseconds and validates them through `createInstant`, and one secure `RandomSource` whose `nextBytes(count)` returns a newly allocated `Uint8Array` filled by the host cryptographic random generator. There is no fallback to `Math.random`, time-derived bytes, seeded entropy, partial output, or retry in the adapter. Host capability failures flow through the application's existing `CLOCK_FAILED` or `RANDOM_SOURCE_FAILED` mapping. These host implementations are CLI-internal, are not exported by kernel or adapter packages, and no clock/random package is introduced.
 
-Read-only commands may assemble the application with these capabilities but cannot call them. `init`, skill, and help require neither capability.
+Read-only commands may assemble the application with these capabilities but cannot call them. `init`, version, skill, and help require neither capability.
 
 ## Embedded skill
 

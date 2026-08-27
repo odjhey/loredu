@@ -77,10 +77,10 @@ agent's) start from what you record now.
   `--derived-from` on claims. A claim you cannot trace is a claim nobody can
   trust later.
 - Reasons on resolutions state what you verified, not your reasoning chain.
-- Use `--json` when you need to parse; exit code 0 means the command
-  succeeded (check the `reconciliation` field for attention), nonzero means
-  it failed. Output is pipe-friendly — compose with jq/grep/sort for any
-  filtering the built-in flags do not cover.
+- Use `--json` when you need to parse. Exit 0 is ordinary success; exit 5 is
+  also successful execution but means `status --check` found unhealthy state.
+  Every other nonzero exit is a failed execution. Output is pipe-friendly —
+  compose with jq/grep/sort for filtering the built-in flags do not cover.
 
 ---
 

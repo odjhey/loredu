@@ -30,7 +30,7 @@ The exact [M1.5 application and CLI contract](../architecture/contracts/applicat
 
 M0 `append` remains exact. M1.5 additively exposes `add`, `show`, `history`, `claims`, `status`, and `readHead` on the assembled application. Successful operations return a frozen uniform response with `ok`, `result`, `reconciliation`, `advice`, and `basis`; list responses additionally carry exact page counts and an optional cursor. Application advice is a typed affordance. Only the CLI renders a shell-ready `lor ...` string.
 
-The CLI owns argv, store selection/init, text/JSON rendering, failure envelopes, exit categories, help, and embedded skill output. Stable exit classes distinguish validation/reference/cursor, not-found, provider/store, failed health check, and capability/internal failures. `status --check` reuses the successful status payload and changes only the process exit.
+The CLI owns argv, store selection/init, text/JSON rendering, failure envelopes, exit categories, version/help, and embedded skill output. The existing direct `--version` metadata line and its `-v` alias remain non-store commands; direct help accepts no global options, so `--help --json` is a usage failure rather than an ambiguous output mode. Stable exit classes distinguish validation/reference/cursor, not-found, provider/store, failed health check, and capability/internal failures. `status --check` reuses the successful status payload and changes only the process exit.
 
 ### Mechanical M1.5 semantics
 
@@ -46,7 +46,7 @@ Claim filters are exact AND-composed application predicates; scope is subset mat
 
 Cursors are opaque `loredu.cursor.v1.` base64url tokens whose semantic payload binds operation, normalized query, complete Basis, pinned-head record-id anchor, and exclusive last position. Continuation validates that anchor against current immutable history and rereads only the pinned prefix. Invalid or foreign tokens fail loudly; no continuation silently restarts. The anchor provides store-snapshot mismatch detection without introducing canonical store identity, secrets, or ambient cursor randomness.
 
-Every returned Loredu id is paired with show/history affordances. SourceRefs terminate Loredu disclosure. Working Lore section continuation obeys the same rule when M3 exists; it is not an M1.5 command.
+Every returned present Loredu record id is paired with show/history affordances. A valid absent id preserved in a hand-authored record reference or reported by dangling-reference health is an explicit terminal missing-reference diagnostic: the referring record remains inspectable, but the absent target receives no dead affordance and `show`/`history` for it returns `RECORD_NOT_FOUND`. SourceRefs likewise terminate Loredu disclosure. Working Lore section continuation obeys the same rule when M3 exists; it is not an M1.5 command.
 
 ### Composition and embedded guide
 
@@ -58,7 +58,7 @@ The build embeds the one source `agent-skill.md`. Text `lor skill` strips only d
 
 M1.5 has no `lore`, `current`, `--as-of`, or `--valid-at`. Its empty-store/orientation path is bare `lor`/`lor status` plus `lor claims`. M2 adds `current` and temporal projection journeys; M3 adds `lore`, bounded packet sections, and their continuation. T50–T75 are contract-ready now, but each catalog row retains its implementation milestone and deferred status until real executable coverage exists.
 
-This decision narrows ADR 0009's statement that the M1.5 exit starts from Working Lore: M1.5 link-following starts from its own status/query/add responses, while the packet-starting form arrives at M3. It clarifies, rather than changes, ADR 0008's explicit statement that `current` and Working Lore remain later. It also fixes ADR 0008's broad “every command” envelope wording: store-backed semantic commands and JSON mode use the envelope; text help and text `skill` are intentionally direct documentation output.
+This decision narrows ADR 0009's statement that the M1.5 exit starts from Working Lore: M1.5 link-following starts from its own status/query/add responses, while the packet-starting form arrives at M3. It clarifies, rather than changes, ADR 0008's explicit statement that `current` and Working Lore remain later. It also fixes ADR 0008's broad “every command” envelope wording: store-backed semantic commands and JSON mode use the envelope; version metadata, text help, and text `skill` are intentionally direct output.
 
 ## Consequences
 

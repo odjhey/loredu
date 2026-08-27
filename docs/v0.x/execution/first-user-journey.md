@@ -34,7 +34,7 @@ The exact [application and CLI contract](../../architecture/contracts/applicatio
 }
 ```
 
-List responses add `page: {returned,total,cursor?}`. Every list is ordered by stream position and bounded to 50 by default (maximum 200). A continuation command carries only its opaque `loredu.cursor.v1.` cursor; the token binds operation, normalized query, Basis, pinned-head record-id anchor, and last position. It rejects invalid/foreign snapshots rather than restarting. Every returned Loredu id is paired with show/history affordances; SourceRefs end Loredu disclosure.
+List responses add `page: {returned,total,cursor?}`. Every list is ordered by stream position and bounded to 50 by default (maximum 200). A continuation command carries only its opaque `loredu.cursor.v1.` cursor; the token binds operation, normalized query, Basis, pinned-head record-id anchor, and last position. It rejects invalid/foreign snapshots rather than restarting. Every present Loredu record id is paired with show/history affordances. Valid absent ids reported as missing-reference diagnostics and external SourceRefs explicitly end Loredu disclosure; neither receives a dead command.
 
 Application advice contains surface-neutral `{rel,action,params,why}`; only CLI JSON adds `run`. Advice is deterministic mechanics, never model output. Exact-key overlap and core key-divergence are not ClaimPolicy advice.
 
@@ -199,7 +199,7 @@ $ lor history clm_3333333333333333     # relations, resolution, verifications
 $ lor show ent_0123456789abcdef        # the original free text
 ```
 
-Every id printed anywhere is resolvable — the progressive-disclosure promise.
+Every printed present-record id is resolvable. A valid absent id can appear only as an explicit missing-reference diagnostic and is terminal rather than paired with a dead command.
 
 ## Journey 8 — M1.5 head; later projection staleness
 
@@ -311,8 +311,8 @@ Grouped by milestone; **AC n** = acceptance criterion in [goal and scope](../sco
 | T70 | any list beyond its effective limit → `page` with returned/total/cursor plus runnable continuation preserving a nondefault limit; at completion → counts and omitted cursor | ADR 0009/0026 |
 | T71 | append mid-pagination → `loredu.cursor.v1.` chain verifies pinned anchor and yields no duplicates/skips from that prefix; a fresh cursorless query reflects new head | ADR 0009/0006/0026 |
 | T72 | malformed, wrong-operation/query/ruleset, or foreign-snapshot cursor → actionable `INVALID_CURSOR`/`CURSOR_MISMATCH`, exit 2, never restart | ADR 0009/0026 |
-| T73 | M1.5 link-following starts from status/query/add responses and reaches record/history/entry/source using only affordances; once M3 lands the same path starts from `lor lore` | ADR 0009/0026, journey 7 |
-| T74 | no dead ends: every Loredu id returned by any command is paired with show/history affordances; SourceRefs are explicit terminal external values | ADR 0009/0026 |
+| T73 | M1.5 link-following starts from status/query/add responses and reaches record/history/entry/source using only affordances | ADR 0009/0026, journey 7 |
+| T74 | no dead ends: every present Loredu record id returned by any command is paired with show/history affordances; absent-reference diagnostics and SourceRefs are explicit terminal values with no dead command | ADR 0009/0026 |
 | T75 | when M3 lands, a Working Lore section hitting its budget states its full count and carries a Basis-pinned continuation under the same cursor contract | working-lore contract, staged M3 |
 
 ### Kernel invariants and the policy seam (issue #6)
