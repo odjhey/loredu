@@ -68,7 +68,7 @@ The concrete reference is [axi's 10 principles](https://github.com/kunchenguid/a
 | 2. Minimal default schemas | Adopted: default list/lore output is compact lines (key, value, handle, state) — full records only behind `show`. |
 | 3. Content truncation with escape hatches | Adopted via handles instead of a `--full` flag: bounded packets state full counts and carry runnable continuation/expansion commands ([decision 0009](../decisions/0009-hypermedia-pagination.md)). |
 | 4. Pre-computed aggregates | Adopted: Working Lore `orientation` counts and `lor status` totals avoid enumeration round trips. |
-| 5. Definitive empty states | Adopted: an empty scope returns a definitive empty packet with a basis, exit 0 — never an error (journey 1). |
+| 5. Definitive empty states | Adopted: an empty scope returns a definitive empty packet with a basis, exit 0 — never an error ([journey 4](../v0.x/execution/first-user-journey.md)). |
 | 6. Structured errors, exit codes, idempotent mutations | Adopted for errors/exit codes (stable, distinct, actionable; no interactive prompts). Deliberate divergence on idempotent mutations: `append` is append-only by design — a retried write creates a second record, and reconciliation surfaces it as a duplicate/corroboration rather than the store deduplicating silently. |
 | 7. Ambient context | Adapted, inverted order: the skill ships inside the binary (`lor skill`); session integrations are thin wrappers that defer to it ([decision 0008](../decisions/0008-cli-first-agent-reactive.md)). |
 | 8. Content first | Adopted: bare `lor` prints the orientation/status view, not help text. |

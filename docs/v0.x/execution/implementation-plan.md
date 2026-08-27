@@ -76,7 +76,7 @@ During this phase the agent performs judgment manually: it records explicit Rela
 
 T50–T75 are protocol-ready under this contract, but implementation remains staged: M1.5 owns its record/query/chain rows, M2 owns scenario/Current Knowledge rows, and M3 owns packet-started disclosure and Working Lore budget continuation. Contract closure changes no catalog claim.
 
-Exit: an agent given only the binary and `lor skill` completes the M1.5 portions of journeys 0, 1, 2, 3, 3b, 5, 7, 8, and 9 on a fresh store, follows pagination/disclosure commands, records manual judgment, and ends with `lor status --check` passing. Acceptance scenario A's records and manual relations are executable; its Current Knowledge and Working Lore assertions remain M2/M3 exits.
+Exit: an agent given only the binary and `lor skill` completes the M1.5 portions of journeys 0, 1, 2, 3, 3b, 7, 8, and 9 on a fresh store, follows pagination/disclosure commands, records manual judgment, and ends with `lor status --check` passing. Acceptance scenario A's records and manual relations are executable; its Current Knowledge and Working Lore assertions remain M2/M3 exits.
 
 ## M2 — Reconciliation and projection
 
