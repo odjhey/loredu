@@ -31,7 +31,7 @@ Add `.no-mistakes.yaml` at the repository root using only fields supported by th
 
 - `commands.lint` installs the frozen Bun lockfile and runs lint, spelling, docs structure, catalog integrity, gate self-tests, workspace-boundary analysis, and type checking. These are deterministic static/corpus gates rather than broad behavioral regression.
 - `commands.format` uses the frozen install and Loredu's existing Biome write script. Markdown remains hand-shaped because Biome's repository configuration excludes it.
-- `commands.test` stays unset. The Test agent must select the smallest relevant executable validation and record its evidence. The full `bun test` and build/CLI smoke remain mandatory in `ci-required` before landing.
+- `commands.test` stays unset. The Test agent must select the smallest relevant executable validation and record its evidence. Protected remote `ci-required` owns regression: prose-only `docs/` changes run the intentional docs corpus suite, while every other change—including this root configuration—runs the workspace suite, where `bun test` and the build/CLI smoke are mandatory before landing.
 - Review auto-fix is pinned to zero so intent-sensitive findings remain explicit decisions. Rebase, Test, Document, Lint, and CI retain bounded three-attempt repair budgets.
 - Cancelled CI checks are not rerun automatically. This repository deliberately uses `cancel-in-progress`; a cancellation is ambiguous and another provider run spends CI resources.
 - Trusted documentation guidance maps facts to their existing owners: domain material under `docs/architecture/`, decisions under `docs/decisions/`, current delivery under `docs/v0.x/`, and CI behavior in `.github/workflows/README.md`.
