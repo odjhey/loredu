@@ -67,7 +67,7 @@ ruleset: { core: loredu.reconciliation/v1, claim_policy: { id: loredu.default, v
 query: { as_of: ..., valid_at: ..., scope: ... }
 ```
 
-`query` is canonical portable JSON data with object-order-insensitive structural identity. `computed_at` is a separate projection field, never a Basis field and never part of basis equality. M0 exports Basis/ruleset construction, validation, default identity, and structural equality only. It does not claim a projection, cache, advice envelope, or deterministic derived bytes; those remain later milestones.
+`query` is a closed `JsonObject` value with object-order-insensitive structural identity. `computed_at` is a separate projection field, never a Basis field and rejected by `createBasis`. M0 exports `createRulesetIdentity(policy)`, `createBasis(input)`, and `basisEquals(left, right)` plus `DEFAULT_RULESET_IDENTITY`. `createBasis` validates, detaches, canonicalizes, and freezes the exact closed shape. M0 supplies these primitives only. It does not claim a projection, cache, advice envelope, or deterministic derived bytes; those remain later milestones.
 
 Once projections exist, a consumer compares `basis.stream_position` against store head to detect staleness without replaying history. In v0.x this check is conservatively store-wide. Same basis reproducing the same derived content is an M2 projection guarantee, not an M0 primitive claim.
 

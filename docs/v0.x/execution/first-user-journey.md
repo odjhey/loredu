@@ -26,7 +26,11 @@ Every command returns the same envelope shape in text and `--json`:
     { "why": "another claim exists under this key with a different value", "run": "lor show clm_7f3k" },
     { "why": "record your judgment once verified against the source", "run": "lor resolve --targets clm_7f3k,clm_x4x8 --decision prefer --replacement clm_x4x8 --reason \"...\"" }
   ],
-  "basis": { "stream_position": 6 }
+  "basis": {
+    "stream_position": 6,
+    "ruleset": { "core": "loredu.reconciliation/v1", "claim_policy": { "id": "loredu.default", "version": "1" } },
+    "query": {}
+  }
 }
 ```
 
@@ -62,7 +66,10 @@ Store resolution is predictable, never cwd-dependent: `--store <path>` (used as-
 ```text
 $ lor lore --activity investigate --scope repo=rozoro
 no knowledge yet for this scope
-basis: stream_position=0 ruleset=r1
+basis:
+  stream_position: 0
+  ruleset: { core: loredu.reconciliation/v1, claim_policy: { id: loredu.default, version: "1" } }
+  query: { activity: investigate, scope: { repo: rozoro } }
 ```
 
 A definitive empty state (borrowed agent-ergonomics principle), never an error, and even the empty packet carries a basis.
@@ -150,7 +157,10 @@ current:
   (code-area command-registration) location = src/commands   [clm_7f3k, corroborated]
 attention:
   conflict: location = src/commands vs src/cli/commands      [clm_7f3k ~ clm_x4x8]
-basis: stream_position=4 ruleset=r1
+basis:
+  stream_position: 4
+  ruleset: { core: loredu.reconciliation/v1, claim_policy: { id: loredu.default, version: "1" } }
+  query: { activity: investigate, scope: { repo: rozoro } }
 ```
 
 Bounded, ranked, with stable handles — not a record dump.
@@ -210,17 +220,18 @@ Grouped by milestone; **AC n** = acceptance criterion in [goal and scope](../sco
 | T03 | all safely discoverable malformed Claim/plain-data issues aggregate as stable code + RFC6901 path without invoking accessors | AC 11, ADR 0004 |
 | T04 | missing/malformed declared-key fields, including free prose in `subject.id`, reject without normalization | ADR 0004 |
 | T05 | canonical records are detached recursive copies and deeply frozen; mutating every nested draft container or returned/store-read container cannot change history | invariant 1 |
-| T06 | public `encode → JSON.stringify → JSON.parse → decode` preserves recursive unknown non-`loredu.*` metadata semantically; malformed/excess persisted data rejects | ADR 0005 |
+| T06 | public `encodePersistedRecord → JSON.stringify → JSON.parse → decodePersistedRecord` preserves recursive unknown non-`loredu.*` metadata, including repeated nested array elements; malformed/excess persisted data rejects | ADR 0005 |
 | T07 | same logical input twice → distinct record ids (append, never replace) | store contract |
 | T08 | all family prefixes and MSB-first entropy fixtures match; prefix mismatch rejects; generated collision surfaces `DUPLICATE_RECORD_ID` without retry | record/identity contracts |
 | T19 | through kernel + testing only, missing/wrong-kind Claim `derived_from`, Relation `from`/`to`, Resolution `targets`/`replacement`, or Verification `targets` fails with ordered code/path issues before entropy, clock, or append; SourceRefs cause no lookup | store contract, ADR 0020 |
 | T85 | scope identity is order-insensitive: two claims whose scope maps differ only in pair order share a key; adding a pair yields a different key; absent scope and `{}` are the same key | ADR 0019, ADR 0004 |
+| T87 | using only exact normal/testing exports, assemble via `createLoreduApplication`; two Entry appends return branded positive increasing positions; plain number assignment fails; failed append publishes/advances no position; `createStreamPosition` supports adapters; testing helpers are absent normally | ADR 0020, kernel API |
 
 ### M1 — plain-file store
 
 | # | Given / When / Then | Covers |
 |---|---|---|
-| T10 | `append` returns monotonically increasing positions | ADR 0006 |
+| T10 | every adapter under the M1 reusable conformance kit, including PlainFileStore and M1-complete InMemoryStore, returns positive strictly increasing successful positions and matching latest `head` | ADR 0006, ADR 0020 |
 | T11 | write records → new store instance on same directory replays the identical ordered stream | AC 9 |
 | T12 | positions are stable across replays | ADR 0006 |
 | T13 | `append` with an existing id → error, original untouched | store contract |

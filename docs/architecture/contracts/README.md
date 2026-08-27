@@ -14,6 +14,7 @@ The v0.x contracts are intentionally language-neutral and provider-neutral.
 - [Records](./records.md) — exact closed envelopes, five families, portable JSON, time, references, codec, and errors
 - [Store](./store.md) — staged M0 append/get port and M1 durable/query extension
 - [Clock and identity](./clock-and-identity.md) — exact Instant, id encoding, and append capability order
+- [Kernel API](./kernel-api.md) — exact M0 TypeScript entrypoints, exports, signatures, branded constructors, and assembly
 - [Projection](./projection.md) — structural ruleset/Basis primitives and later temporal views
 - [Working Lore](./working-lore.md) — bounded progressive-disclosure context
 

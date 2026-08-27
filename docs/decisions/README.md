@@ -32,4 +32,4 @@ Initial decisions:
 - [0017: Branch protection posture](./0017-branch-protection-posture.md)
 - [0018: Capability ports for time and identity](./0018-capability-ports.md)
 - [0019: M0 validation rules](./0019-m0-validation-rules.md)
-- [0020: Close the M0 public contract before implementation](./0020-m0-public-contract-closure.md)
+- [0020: Close the M0 public contract before implementation](./0020-m0-public-contract-closure.md) — partially supersedes only identified ADR 0010 identity/advice wording, ADR 0016 helper timing, and ADR 0019 §3 string-whitespace wording

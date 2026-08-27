@@ -332,6 +332,11 @@
       "milestone": "M2",
       "group": "M2 — reconciliation, resolution, projections",
       "reason": "value canonicalization lands with the kernel in M0; its use in conflict detection is M2"
+    },
+    "T87": {
+      "milestone": "M0",
+      "group": "M0 — records and validation",
+      "reason": "public application assembly, branded position, failure non-advancement, and exact export boundaries are not implemented yet"
     }
   }
 }

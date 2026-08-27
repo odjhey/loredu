@@ -13,15 +13,20 @@ The application depends on record semantics, never provider paths, tables, SDK o
 
 ## M0 public slice
 
-```text
-RecordStore.append(record: PersistedRecord) -> Promise<StreamPosition>
-RecordStore.get(id: RecordId) -> Promise<PersistedRecord | undefined>
-application.append(draft) -> Promise<{ record: PersistedRecord, position: StreamPosition }>
+```ts
+interface RecordStore {
+  append(record: PersistedRecord): Promise<StreamPosition>
+  get(id: RecordId): Promise<PersistedRecord | undefined>
+}
+interface LoreduApplication {
+  append<D extends RecordDraft>(draft: D):
+    Promise<AppendRecordResult<PersistedRecordFor<D>>>
+}
 ```
 
 These typed semantics are public even if language spelling differs. Store append receives a complete validated, deeply frozen record and assigns only position; it never creates or rewrites schema, id, or time. Application success returns exactly record plus position. Failure publishes/returns no record, and stamped values are unobservable except through collaborator call counts.
 
-At the TypeScript boundary, `StreamPosition` is opaque/branded and is a nonnegative safe integer. Successful append positions are positive, strictly increase from the previous position in that store, and commit ordering. `0` is reserved for empty head when `head` arrives. Disk representation remains adapter-private.
+At the TypeScript boundary, `StreamPosition` is opaque/branded and is a nonnegative safe integer. Adapters construct it through `createStreamPosition(value: number)`; `0` is valid for future empty head, while successful append returns only positive positions. Ordinary numbers are not assignable. Successful append positions are positive, strictly increase from the previous position in that store, and commit ordering. `0` is reserved for empty head when `head` arrives. Disk representation remains adapter-private.
 
 M0 append rejects duplicate ids without replacing the original and reports `DUPLICATE_RECORD_ID`. A generated-id collision surfaces; application append does not retry, draw entropy again, or sample another clock value. Reads return canonical deeply frozen records detached from caller/store aliases. Append-result and get object identity is not promised; structural identity is.
 
@@ -41,7 +46,7 @@ stream(after-position?) -> ordered records
 head() -> current stream position
 ```
 
-M1, not M0, owns filter shape, cursors, full reads, stream/head behavior, replay-stable positions, read-your-writes across those methods, reusable conformance, crash durability, atomic visibility, locking, and provider codecs/layout. The M0 two-method port makes no claim about them.
+M1, not M0, owns filter shape, cursors, full reads, stream/head behavior, replay-stable positions, read-your-writes across those methods, reusable conformance, crash durability, atomic visibility, locking, and provider codecs/layout. M0 T87 proves the reference application/InMemoryStore branded positive increasing position boundary and no advancement on failure. Narrowed T10 remains M1: every adapter under reusable full-port conformance returns increasing positions and a matching latest `head`. The M0 two-method port makes no claim about them.
 
 For durable adapters, successful append is the single-record commit point: returned position means durable, reads reflect it, writers become visible in append order, and no torn record is visible. M1 conformance runs against InMemoryStore and PlainFileStore; it does not ask stores to validate domain references.
 

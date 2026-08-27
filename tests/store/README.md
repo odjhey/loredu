@@ -1,6 +1,6 @@
 # store — M1, durable plain-file conformance
 
-Catalog rows **T10–T18** cover the M1 extension: replay-stable positions and stream,
+Catalog rows **T10–T18** cover the M1 extension. Narrowed T10 is reusable full-port conformance over PlainFileStore and M1-complete InMemoryStore, proving positive increasing positions and matching latest `head`; M0 T87 is the first reference-position evidence. Remaining rows cover: replay-stable positions and stream,
 duplicate preservation, hand-inspectable Markdown replay, roots/isolation, locking,
 atomic visibility, durable append, scan/stream/head, and crash-safe prefix behavior.
 

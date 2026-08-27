@@ -26,9 +26,11 @@ corpus: optional-corpus-ref
 snapshot: optional-snapshot
 basis:
   stream_position: position-of-last-record-included
-  ruleset: ruleset-version
-  query: activity-scope-and-temporal-bounds
-computed_at: timestamp
+  ruleset:
+    core: loredu.reconciliation/v1
+    claim_policy: { id: loredu.default, version: "1" }
+  query: { activity: investigate, scope: { repo: loredu } }
+computed_at: 2026-08-27T04:00:00.000Z
 orientation:
   current_count: 0
   candidate_count: 0
@@ -46,7 +48,7 @@ budget:
 
 Token budgets may be supported by adapters that can measure them reliably; the core should also support implementation-neutral item/character bounds.
 
-The `basis` block makes a packet cacheable: comparing `basis.stream_position` to the store head detects staleness deterministically ([decision 0006](../../decisions/0006-explicit-version-basis.md)).
+Basis is the exact closed structural `{stream_position, ruleset, query}` object; query is canonical JSON and `computed_at` is its sibling, never part of Basis. Comparing `basis.stream_position` to the store head detects staleness deterministically ([decision 0006](../../decisions/0006-explicit-version-basis.md)).
 
 ## Pagination and continuation
 

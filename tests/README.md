@@ -16,7 +16,7 @@ bun test tests/store           # one group
 
 | Directory | Catalog group |
 |---|---|
-| [`records/`](./records/README.md) | M0 records/application (T01–T08, T19, T80, T83–T85) |
+| [`records/`](./records/README.md) | M0 records/application (T01–T08, T19, T80, T83–T85, T87) |
 | [`store/`](./store/README.md) | M1 durable plain-file conformance (T10–T18) |
 | [`reconciliation/`](./reconciliation/README.md) | M0 identity primitives (T81–T82); M2 reconciliation/projections (T20–T30, T86) |
 | [`working-lore/`](./working-lore/README.md) | M3 — Working Lore (T40–T45) |
@@ -46,6 +46,8 @@ implemented, so nothing may claim coverage; every T-number is deferred in the st
 file. The group directories and their READMEs say what belongs where; an empty
 `describe()` or a `test.todo` would say something false. As a milestone lands, its
 tests move T-numbers out of the status file and into this tree.
+
+M0 also audits the exact normal/testing export allowlists, all-family imports through public package names, no deep imports, helper absence from normal exports, and no production testing-subpath imports. T87 owns assembly/branded-position evidence; supplemental assurance vectors stay with their existing rows.
 
 Structural tests that guard the scaffold itself (the package DAG, the kernel
 boundary) live at the root of this tree and claim no T-number — they test the

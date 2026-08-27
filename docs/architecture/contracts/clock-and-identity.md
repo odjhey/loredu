@@ -11,12 +11,13 @@ created_at: 2026-08-26T21:00:00+08:00
 
 The kernel alone renders `recorded_at` and record ids, using injected capabilities:
 
-```text
-Clock.now() -> Instant
-RandomSource.nextBytes(count) -> bytes
+```ts
+interface Clock { now(): Instant }
+interface RandomSource { nextBytes(count: number): Uint8Array }
+function createInstant(epochMilliseconds: number): Instant
 ```
 
-`Instant` is an integer number of milliseconds since Unix epoch, both a safe integer and inside the ECMAScript TimeClip range. The kernel renders it as canonical UTC RFC3339 with exactly three fractional digits: `YYYY-MM-DDTHH:mm:ss.sssZ`. The clock returns an instant, never formatted record text.
+Both capability calls are synchronous. `Instant` is an opaque branded integer number of milliseconds since Unix epoch, both a safe integer and inside the ECMAScript TimeClip range. Host adapters construct it through validating `createInstant`; ordinary numbers are not assignable. The kernel renders it as canonical UTC RFC3339 with exactly three fractional digits: `YYYY-MM-DDTHH:mm:ss.sssZ`. The clock returns an instant, never formatted record text.
 
 RandomSource supplies exactly the requested bytes or fails and knows nothing about ids. Production assembly supplies qualified cryptographic entropy; seeded sources are test-only. Both ports are injected once at application assembly, are never ambient/global/store dependencies, and do not permit `Date.now()`, zero-argument `new Date()`, or `Math.random()` bypasses in production kernel source.
 
