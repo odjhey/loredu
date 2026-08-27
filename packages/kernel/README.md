@@ -32,8 +32,9 @@ testing/       M1 InMemoryStore, FixedClock, SeededRandomSource, conformance kit
 
 `@loredu/kernel/testing` is test support, never product surface: production code in
 any package must not import it. Its pure in-memory adapter implements the full M1
-port; durable-provider conformance remains later M1 work.
+port. Concrete adapter status lives in the
+[`@loredu/store-plainfile` README](../store-plainfile/README.md).
 
 ## State
 
-M0 is complete and its behavior remains intact. M1-K adds the exact kind-only atomic scan, snapshot-bounded exclusive-after stream, head, positioned records, M1-complete InMemoryStore, and reusable runner-neutral conformance kit. Catalog rows T10, T13, and T15 run against InMemoryStore. PlainFileStore representation, replay across instances, locking, roots, and durability remain owned by later M1 work; policy advice and reconciliation remain later milestones.
+M0 is complete and its behavior remains intact. M1-K adds the exact kind-only atomic scan, snapshot-bounded exclusive-after stream, head, positioned records, M1-complete InMemoryStore, and reusable runner-neutral conformance kit. Catalog rows T10, T13, and T15 run against InMemoryStore. Plain-file implementation status is maintained by the adapter; policy advice and reconciliation remain later milestones.
