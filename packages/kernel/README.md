@@ -19,7 +19,7 @@ Anything the kernel needs from its environment arrives through a port in
 
 ## Public M0 surface
 
-Only `@loredu/kernel` and `@loredu/kernel/testing` are entrypoints; deep imports are unsupported. The exact final M0 value/type allowlists and signatures are the [kernel API contract](../../docs/architecture/contracts/kernel-api.md). The current M0-P runtime exports the five draft/record families, portable JSON codec/equality, ClaimKey, Instant/position constructors, versioned ClaimPolicy/default semantics, structural RulesetIdentity/Basis primitives, and the landed Entry append assembly slice. Testing exports exactly InMemoryStore, FixedClock, and SeededRandomSource. Scaffold-only `AppendResult`, `RecordRef`, `stream`, `head`, and `StoreUnderTest` do not survive M0.
+Only `@loredu/kernel` and `@loredu/kernel/testing` are entrypoints; deep imports are unsupported. The exact final M0 value/type allowlists and signatures are the [kernel API contract](../../docs/architecture/contracts/kernel-api.md). The completed M0 runtime exports the five draft/record families, portable JSON codec/equality, ClaimKey, Instant/position constructors, versioned ClaimPolicy/default semantics, structural RulesetIdentity/Basis primitives, and the family-narrowed generic append application. Testing exports exactly InMemoryStore, FixedClock, and SeededRandomSource. Scaffold-only `AppendResult`, `RecordRef`, `stream`, `head`, and `StoreUnderTest` do not survive M0.
 
 ## Layout
 
