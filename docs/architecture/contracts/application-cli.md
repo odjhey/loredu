@@ -29,7 +29,7 @@ interface LoreduApplication {
 }
 ```
 
-`add` is the reactive mutation operation used by surfaces. It calls the same append path once, then derives feedback from the prefix ending at the returned position. `append` remains available for embedded consumers that want the smaller M0 result. `show`, `history`, `claims`, `status`, and `readHead` never stamp or append records and consume neither Clock nor RandomSource.
+`add` is the reactive mutation operation used by surfaces. It calls the same append path once, then for a Claim attempts to derive feedback from the prefix ending at the returned position. Once append has returned, `add` is committed and must not turn a later feedback-read failure into a failed-looking mutation: it returns the committed id/kind/position and own handle with `reconciliation.state:"unavailable"`, a Basis pinned to the committed position, and one runnable status affordance. The CLI exits 0 and states that the record committed but feedback must be retried; retrying the mutation is never advised. Pre-acknowledgement append failures retain the M1 uncertain-outcome contract. `append` remains available for embedded consumers that want the smaller M0 result. `show`, `history`, `claims`, `status`, and `readHead` never stamp or append records and consume neither Clock nor RandomSource.
 
 `init`, store selection, argv parsing, help, rendering, environment access, and skill output are adapter behavior, not application operations. Relation, Resolution, and Verification commands construct their public drafts and call `add`; the application does not gain surface-shaped methods for each family.
 
@@ -57,7 +57,7 @@ interface Page {
   readonly cursor?: string
 }
 interface Affordance {
-  readonly rel: "show" | "history" | "list" | "continue" | "init"
+  readonly rel: "show" | "history" | "list" | "status" | "continue" | "init"
   readonly action:
     | "record.show"
     | "record.history"
@@ -73,9 +73,9 @@ interface RenderedAdvice extends Affordance { readonly run: string }
 
 `returned` is the number on this page; `total` is the number matching the query in the pinned snapshot, not the number remaining. `cursor` is present exactly when another item exists. Non-list operations never carry `page`. Top-level `advice` carries corrective actions first and continuation last; ordinary disclosure affordances live on each handle and enter top-level advice only when inspection is itself corrective. Within a class, advice follows the record ordering rules below. Duplicate semantic affordances are removed by `(rel, action, params)` structural identity, keeping the first.
 
-The valid rel/action pairs are exactly `show`/`record.show`, `history`/`record.history`, `list`/`claims.list`, `continue`/`claims.list|history.list|status.read`, and `init`/`store.init`. Params are respectively exactly `{id}`, `{id}`, `{query}`, `{cursor, limit?}`, and `{selector}`. A list query is a complete cursorless `ClaimQuery`. Continuation params include `limit` exactly when the current effective limit is not the default 50, preserving that page size; callers may still change it explicitly on the next request. The application never emits `lor`, shell quoting, paths, or argv. `params` contains complete typed portable JSON input for that action. `why` is deterministic explanatory text but its prose is not a compatibility surface. The set, order, action, and params are compatibility behavior. An affordance is emitted only when it is executable as-is: mechanics may recommend inspecting a conflict, but cannot preselect a Resolution decision, replacement, actor, or reason. The embedded skill teaches the agent to construct that judgment command after inspection.
+The valid rel/action pairs are exactly `show`/`record.show`, `history`/`record.history`, `list`/`claims.list`, `status`/`status.read`, `continue`/`claims.list|history.list|status.read`, and `init`/`store.init`. Params are respectively exactly `{id}`, `{id}`, `{query}`, `{}`, `{cursor, limit?}`, and `{selector}`. A list query is a complete cursorless `ClaimQuery`. Continuation params include `limit` exactly when the current effective limit is not the default 50, preserving that page size; callers may still change it explicitly on the next request. The application never emits `lor`, shell quoting, paths, or argv. `params` contains complete typed portable JSON input for that action. `why` is deterministic explanatory text but its prose is not a compatibility surface. The set, order, action, and params are compatibility behavior. An affordance is emitted only when it is executable as-is: mechanics may recommend inspecting a conflict, but cannot preselect a Resolution decision, replacement, actor, or reason. The embedded skill teaches the agent to construct that judgment command after inspection.
 
-Application failures remain structured `LoreduError` throws; they are never returned as `ok:false` application values. The application preserves the existing phase-owned errors and adds `RECORD_NOT_FOUND`, `INVALID_CURSOR`, and `CURSOR_MISMATCH`. `RECORD_NOT_FOUND` identifies a syntactically valid absent record. `INVALID_CURSOR` means the token cannot be decoded as a supported cursor. `CURSOR_MISMATCH` means it is structurally valid but belongs to another operation, normalized query, ruleset, or store snapshot.
+Application failures remain structured `LoreduError` throws; they are never returned as `ok:false` application values. The sole committed-success recovery is `add`'s post-append feedback-read fallback above, which is `ok:true` and not an error. The application preserves the existing phase-owned errors and adds `RECORD_NOT_FOUND`, `INVALID_CURSOR`, and `CURSOR_MISMATCH`. `RECORD_NOT_FOUND` identifies a syntactically valid absent record. `INVALID_CURSOR` means the token cannot be decoded as a supported cursor. `CURSOR_MISMATCH` means it is structurally valid but belongs to another operation, normalized query, ruleset, or store snapshot.
 
 ## Result and feedback shapes
 
@@ -86,9 +86,10 @@ interface RecordHandle {
   readonly affordances: readonly Affordance[] // show, then history
 }
 interface AddedRecordResult<R extends PersistedRecord = PersistedRecord> {
-  readonly record: R
+  readonly id: R["id"]
+  readonly kind: R["kind"]
   readonly position: StreamPosition
-  readonly handles: readonly RecordHandle[]
+  readonly handle: RecordHandle
 }
 interface ShownRecordResult {
   readonly record: PersistedRecord
@@ -137,21 +138,23 @@ type ReconciliationFeedback =
   | {readonly state: "coexisting"; readonly key: ClaimKey;
       readonly related_count: number;
       readonly related: readonly [RecordHandle]; readonly claims: Affordance}
+  | {readonly state: "unavailable"; readonly key: ClaimKey;
+      readonly reason: "post-commit-read-failed"; readonly related: readonly []}
 }
 ```
 
-Non-Claim additions and every read use `{state:"not-applicable", related:[]}`. A Claim addition compares only earlier Claims in the prefix that have the same exact declared ClaimKey:
+Non-Claim additions and every read use `{state:"not-applicable", related:[]}`. When its committed feedback read succeeds, a Claim addition compares only earlier Claims in the prefix that have the same exact declared ClaimKey:
 
 1. no same-key Claim → `new-key`;
 2. at least one canonically different value and assembled semantics `exclusive` → `conflict-candidate`;
 3. otherwise, at least one canonically equal value → `corroboration`;
 4. otherwise differing values with `coexisting` semantics → `coexisting`.
 
-`jsonValuesEqual` defines value equality; `claimKeysEqual` defines key equality. Validity, actor, confidence, source, and phrasing do not alter this M1.5 classification. For each non-new state, `related_count` counts the relevant earlier same-key Claims: canonically equal for `corroboration`, canonically different for `conflict-candidate` and `coexisting`. `related` contains exactly the earliest such Claim as a bounded representative. `claims` is the `claims.list` affordance for the complete exact key, using exact scope, subject, predicate, and present/absent perspective filters; it is the bounded drill-down for every overlap state. The feedback creates no Relation and makes no projection choice.
+`jsonValuesEqual` defines value equality; `claimKeysEqual` defines key equality. Validity, actor, confidence, source, and phrasing do not alter this M1.5 classification. For each overlap state, `related_count` counts the relevant earlier same-key Claims: canonically equal for `corroboration`, canonically different for `conflict-candidate` and `coexisting`. `related` contains exactly the earliest such Claim as a bounded representative. `claims` is the `claims.list` affordance for the complete exact key, using exact scope, subject, predicate, and present/absent perspective filters; it is the bounded drill-down for every overlap state. The feedback creates no Relation and makes no projection choice.
 
-Top-level advice is exact and bounded at M1.5. A `conflict-candidate` addition emits the exact-key `claims.list` affordance, one `record.show` for its earlier representative, and one for the new Claim, in that order. Thus the second differing Claim names both ids directly, while later additions do not expand the response with the size of the group. `new-key`, `corroboration`, `coexisting`, and non-Claim additions emit no corrective advice. Each status page emits the exact-key `claims.list` and representative show affordances for each unresolved group, then one show for each dangling reference's referring record, deduplicated by the general rule, followed by continuation when present. Generic divergence remains represented by its result handles and adds no corrective advice. Show and ordinary list reads add no top-level advice except list continuation. Every record handle still carries its ordinary nested show/history disclosure affordances.
+Top-level advice is exact and bounded at M1.5. Post-commit unavailable feedback emits only `status`/`status.read`. A `conflict-candidate` addition emits the exact-key `claims.list` affordance, one `record.show` for its earlier representative, and one for the new Claim, in that order. Thus the second differing Claim names both ids directly, while later additions do not expand the response with the size of the group. `new-key`, `corroboration`, `coexisting`, and non-Claim additions emit no corrective advice. Each status page emits the exact-key `claims.list` and representative show affordances for each unresolved group, then one show for each dangling reference's referring record, deduplicated by the general rule, followed by continuation when present. Generic divergence remains represented by its result handles and adds no corrective advice. Show and ordinary list reads add no top-level advice except list continuation. Every record handle still carries its ordinary nested show/history disclosure affordances.
 
-A history or Claim result item carries only its own record handle. List summaries deliberately omit record-reference fields; following the item's show affordance is the explicit full-record disclosure step rather than multiplying each bounded list item by an unbounded schema array. An added or shown result carries its own handle followed by every distinct referenced record committed at a lower position, in schema field/index order. An absent or forward-pointing id in a persisted reference field remains visible in the full shown record but receives no handle or affordance; it is an explicit terminal invalid-reference diagnostic, never a promise that following it is valid history. `show` scans one snapshot so it can return the full record's position, handles, and basis atomically. Lists also omit Entry bodies and common metadata/sources. `history(id)` returns the target and every record in the pinned prefix that directly references it: Claim `derived_from`; Relation `from`/`to`; Resolution `targets`/`replacement`; and Verification `targets`. Results are unique and ascending by stream position; the target naturally occupies its committed position rather than being forced to index zero. `history` for an absent target still fails with `RECORD_NOT_FOUND`; it never turns dangling references into a successful dead-end result. External SourceRefs and explicit missing-reference diagnostics are terminal disclosure values, not Loredu record handles.
+A history or Claim result item carries only its own record handle. List summaries deliberately omit record-reference fields; following the item's show affordance is the explicit full-record disclosure step rather than multiplying each bounded list item by an unbounded schema array. An added result returns only the new `id`, `kind`, `position`, and own `handle` rather than echoing the full submitted record, so neither payload nor automatic affordances grow with an unbounded reference array; embedded consumers that need the full canonical append result already have M0 `append`. A shown result carries its own handle followed by every distinct referenced record committed at a lower position, in schema field/index order. An absent or forward-pointing id in a persisted reference field remains visible in the full shown record but receives no handle or affordance; it is an explicit terminal invalid-reference diagnostic, never a promise that following it is valid history. `show` scans one snapshot so it can return the full record's position, handles, and basis atomically. Lists also omit Entry bodies and common metadata/sources. `history(id)` returns the target and every record in the pinned prefix that directly references it: Claim `derived_from`; Relation `from`/`to`; Resolution `targets`/`replacement`; and Verification `targets`. Results are unique and ascending by stream position; the target naturally occupies its committed position rather than being forced to index zero. `history` for an absent target still fails with `RECORD_NOT_FOUND`; it never turns dangling references into a successful dead-end result. External SourceRefs and explicit missing-reference diagnostics are terminal disclosure values, not Loredu record handles.
 
 ## Claim query and ordering
 
@@ -349,7 +352,7 @@ Stable process exits are:
 | 5 | `status --check` executed successfully and health is false |
 | 6 | Clock, RandomSource, or unexpected internal application failure |
 
-`status --check` returns the same successful response as `status`; only exit 5 differs. A generic divergence advisory alone still exits 0. Unknown errors map to 6 without leaking details. Signal/launcher exits are host behavior outside this table.
+`status --check` returns the same successful response as `status`; only exit 5 differs. A generic divergence advisory alone still exits 0. An `add` whose append returned but feedback read failed is committed success and exits 0 with `reconciliation.state:"unavailable"`. Unknown errors map to 6 without leaking details. Signal/launcher exits are host behavior outside this table.
 
 ## Composition root capabilities
 

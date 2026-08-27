@@ -15,12 +15,12 @@ The CLI arrives right after M1, before full reconciliation, and its semantic res
 
 ## Response envelope
 
-The exact [application and CLI contract](../../architecture/contracts/application-cli.md) owns field shapes, errors, exits, filters, cursors, and rendering. A Claim mutation success has this shape (record and handle internals are abridged in this explanatory example):
+The exact [application and CLI contract](../../architecture/contracts/application-cli.md) owns field shapes, errors, exits, filters, cursors, and rendering. A Claim mutation success has this shape (handle internals are abridged in this explanatory example):
 
 ```json
 {
   "ok": true,
-  "result": {"record": {"kind": "claim", "id": "clm_3333333333333333"}, "position": 4, "handles": [{"id": "clm_3333333333333333", "kind": "claim", "affordances": []}]},
+  "result": {"id": "clm_3333333333333333", "kind": "claim", "position": 4, "handle": {"id": "clm_3333333333333333", "kind": "claim", "affordances": []}},
   "reconciliation": {
     "state": "conflict-candidate",
     "key": {"scope": {"repo": "rozoro"}, "subject": {"type": "code-area", "id": "command-registration"}, "predicate": "location"},
@@ -43,7 +43,7 @@ The exact [application and CLI contract](../../architecture/contracts/applicatio
 
 Claim/history lists and the combined status attention/advisory collection add `page: {returned,total,cursor?}`. Every collection is deterministically ordered and bounded to 50 by default (maximum 200). List items expose only their own handle and omit reference fields from summaries; `show` is the explicit full-reference disclosure step. A continuation command carries only its opaque `loredu.cursor.v1.` cursor; the token binds operation, normalized query, Basis, pinned-head record-id anchor, and an operation-specific exclusive resume key. Claims/history use the last position; status also binds item class and same-position ordinal so two diagnostics from one record paginate exactly. It rejects invalid/foreign snapshots rather than restarting. Every present Loredu record id exposed at the full-record level is paired with show/history affordances. Valid absent ids reported as missing-reference diagnostics and external SourceRefs explicitly end Loredu disclosure; neither receives a dead command.
 
-Application advice contains surface-neutral `{rel,action,params,why}`; only CLI JSON adds `run`. Advice is deterministic mechanics, never model output. Exact-key overlap and core key-divergence are not ClaimPolicy advice.
+Application advice contains surface-neutral `{rel,action,params,why}`; only CLI JSON adds `run`. Advice is deterministic mechanics, never model output. Exact-key overlap and core key-divergence are not ClaimPolicy advice. If a Claim commits but its feedback scan fails, success still returns that id/position, marks reconciliation unavailable, and advises `lor status`; it never tells the caller to repeat the append.
 
 Two suites automate the same staged journeys:
 
@@ -293,7 +293,7 @@ Grouped by milestone; **AC n** = acceptance criterion in [goal and scope](../sco
 | T50 | every semantic command supports `--json`; success/failure is one LF-terminated object, and application-backed semantic fields match the application result after CLI advice rendering | agent ergonomics, ADR 0026 |
 | T51 | exits are exact: 0 executed, 2 usage/validation/reference/cursor, 3 not-found, 4 store/provider, 5 unhealthy `--check`, 6 capability/internal | agent ergonomics, ADR 0026 |
 | T52 | `add entry --body -` reads stdin; body round-trips byte-exact through store and `show` | journey 2 |
-| T53 | `add claim` prints the reconciliation feedback line (new / corroborates / conflict candidate) | journey 2–3 |
+| T53 | `add claim` prints new/corroboration/conflict/coexisting feedback; a post-commit read failure prints committed-but-feedback-unavailable with status advice and still exits 0 | journey 2–3, ADR 0026 |
 | T54 | after M2/M3 commands exist, end-to-end scenario A (three runs, revalidation surfaced) through the binary | S A, staged M2/M3 |
 | T55 | after M2 temporal projection exists, end-to-end scenario B (30→60-day amendment, all four temporal queries) through the binary | S B, staged M2 |
 | T56 | staged end-to-end journey 0→8 as one scripted fresh-store session: M1.5 record/query/health first, then M2 current/time and M3 lore when those commands land | AC 12 (ergonomics), ADR 0026 |
@@ -304,7 +304,7 @@ Grouped by milestone; **AC n** = acceptance criterion in [goal and scope](../sco
 
 | # | Given / When / Then | Covers |
 |---|---|---|
-| T60 | every mutation response (`--json`) contains exact `ok`, `result`, `reconciliation`, rendered `advice`, and `basis`; each application affordance becomes a runnable command without putting CLI strings in the application | ADR 0008/0026 |
+| T60 | every mutation response (`--json`) contains exact bounded `ok`, `result`, `reconciliation`, rendered `advice`, and `basis`; each application affordance becomes runnable without CLI strings in the application, and committed feedback failure never looks like mutation failure | ADR 0008/0026 |
 | T61 | second claim, same key + same value → corroboration feedback, no attention raised | journey 3 |
 | T62 | second claim, same key + different value → conflict-candidate feedback with related count, one representative, exact-key list drill-down, and bounded `advice` naming both ids | journey 3 |
 | T63 | agent chain: execute both show commands from T62, make the manual judgment using the embedded skill's resolve grammar, then `lor status` reports healthy and `--check` exits 0 | journey 3b, ADR 0026 |
@@ -322,7 +322,7 @@ Grouped by milestone; **AC n** = acceptance criterion in [goal and scope](../sco
 | T71 | append mid-pagination → `loredu.cursor.v1.` chain verifies pinned anchor and its operation-specific resume key, yielding no duplicates/skips from that prefix; a fresh cursorless query reflects new head | ADR 0009/0006/0026 |
 | T72 | malformed, wrong-operation/query/ruleset, or foreign-snapshot cursor → actionable `INVALID_CURSOR`/`CURSOR_MISMATCH`, exit 2, never restart | ADR 0009/0026 |
 | T73 | M1.5 link-following starts from status/query/add responses and reaches record/history/entry/source using only affordances | ADR 0009/0026, journey 7 |
-| T74 | no dead ends: every id presented as an existing Loredu record is paired with recursively CLI-rendered show/history affordances that preserve store selection; invalid-reference diagnostics and SourceRefs are explicit terminal values | ADR 0009/0026 |
+| T74 | no dead ends: automatic add/list items expose only their own recursively rendered handle, `show` explicitly discloses complete valid references, store selection is preserved, and invalid-reference diagnostics/SourceRefs are terminal | ADR 0009/0026 |
 | T75 | when M3 lands, a Working Lore section hitting its budget states its full count and carries a Basis-pinned continuation under the same cursor contract | working-lore contract, staged M3 |
 
 ### Kernel invariants and the policy seam (issue #6)
