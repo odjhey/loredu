@@ -37,7 +37,7 @@ This decision **partially supersedes only ADR 0020 §5** and derived contract wo
 
 - CM-N06 is `IN_SCOPE` and refines CM-A05 and matrix invariants CM-I08–I10.
 - The Clock, record timestamp, and public constructor contracts use one range, so a constructed or caller-normalized instant is always able to be persisted in canonical form.
-- Existing P0/R1 supplemental timestamp-boundary evidence under T02, T80, and T84 covers both extrema, one millisecond outside each bound, runtime Clock validation, and caller normalization near offsets. No catalog row, milestone owner, dependency edge, or graph shape changes.
+- P0/R1 implementation acceptance must add supplemental timestamp-boundary assertions under the deferred T02, T80, and T84 catalog rows for both extrema, one millisecond outside each bound, runtime Clock validation, and caller normalization near offsets. This decision implements or claims no test evidence and changes no catalog row, milestone owner, dependency edge, or graph shape.
 - The implementation plan says “strict-RFC3339 boundaries,” not “TimeClip boundaries.”
 
 ## Rule / follow-up
