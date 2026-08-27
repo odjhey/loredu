@@ -47,7 +47,7 @@ created_at: 2026-08-26T12:10:00+08:00
 | **Basis** | Exactly stream position, structural RulesetIdentity, and canonical JSON query. `computed_at` is outside Basis and equality. |
 | **Handle** | Loredu record id paired with surface-neutral show/history affordances. SourceRefs are terminal external disclosure values, not record handles. |
 | **Cursor** | Opaque `loredu.cursor.v1.` continuation token binding operation, normalized query, complete Basis, pinned-head record-id anchor, and exclusive last position. It preserves one immutable prefix while records append and rejects foreign snapshots. |
-| **Envelope** | Uniform store-backed CLI response: `ok`, `result`, `reconciliation`, `advice`, `basis`; list success adds `page`, failure adds `error`. Text help and text `skill` are direct documentation exceptions. |
+| **Envelope** | Uniform semantic response shape: success has `ok`, `result`, `reconciliation`, `advice`, and `basis`; list success adds `page`, and CLI failure adds `error`. Direct version metadata, help, and text `skill` are non-envelope outputs; `skill --json` is the documented successful null-Basis exception. |
 | **ok** | Envelope field stating whether execution produced a semantic result. Ordinary unhealthy status remains `ok: true`; `--check` changes only the process exit. |
 | **Advice** | Deterministic follow-up affordance with `rel`, stable application `action`, typed `params`, and `why`; a surface may add a runnable rendering. Never speculative. |
 | **Page** | Bounded list slice with this page's returned count, the pinned snapshot's total matching count, and a cursor exactly when more exists. |

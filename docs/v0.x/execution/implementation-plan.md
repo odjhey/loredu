@@ -76,7 +76,7 @@ During this phase the agent performs judgment manually: it records explicit Rela
 
 T50–T75 are protocol-ready under this contract, but implementation remains staged: M1.5 owns its record/query/chain rows, M2 owns scenario/Current Knowledge rows, and M3 owns packet-started disclosure and Working Lore budget continuation. Contract closure changes no catalog claim.
 
-Exit: an agent given only the binary and `lor skill` completes the M1.5 portions of journeys 0, 1, 2, 3, 3b, 7, 8, and 9 on a fresh store, follows pagination/disclosure commands, records manual judgment, and ends with `lor status --check` passing. Acceptance scenario A's records and manual relations are executable; its Current Knowledge and Working Lore assertions remain M2/M3 exits.
+Exit: an agent given only the binary and `lor skill` completes the M1.5 portions of journeys 0, 1, 2, 3, 3b, 5, 7, 8, and 9 on a fresh store, follows pagination/disclosure commands, records manual judgment, and ends with `lor status --check` passing. Acceptance scenario A's records and manual relations are executable; its Current Knowledge and Working Lore assertions remain M2/M3 exits.
 
 ## M2 — Reconciliation and projection
 
@@ -89,10 +89,9 @@ Implement deterministic baseline rules, mediated by the active versioned ClaimPo
 - mechanical temporal precedence where inputs are sufficient;
 - explicit Resolution application;
 - current, `as_of`, `valid_at`, and combined temporal projections;
-- derived content under the M0 structural ruleset/Basis identity, with `computed_at` separate from Basis;
-- evidence/history lookup by record identity.
+- derived content under the M0 structural ruleset/Basis identity, with `computed_at` separate from Basis.
 
-The CLI's feedback upgrades in place: the envelope shape is unchanged, but `reconciliation` is now filled by the full deterministic ruleset instead of the early key-overlap slice, and `current`/`--as-of` queries appear.
+The CLI's feedback upgrades in place: the envelope shape is unchanged, but `reconciliation` is now filled by the full deterministic ruleset instead of the early key-overlap slice, and `current` with temporal query flags appears.
 
 Exit: projections are deterministic and rebuildable from canonical records using the same core-ruleset + ClaimPolicy version; a stale cached projection is detectable by comparing its store-wide `basis.stream_position` to `head()`; deterministic reconciliation is diffed against the manual-phase relation corpus and disagreements are reviewed, not silently overridden.
 

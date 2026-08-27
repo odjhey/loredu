@@ -15,7 +15,7 @@ Loredu is an embedded operational knowledge kernel — a utility for our own pro
 
 The kernel's dividing line is **mechanical versus judgment**. Loredu detects deterministically — duplicates, corroboration, conflict candidates, key divergence, dangling provenance, stale views — and never makes open-ended judgments. Humans, agents, and programs judge; their resolutions are appended as records with the same provenance discipline as everything else. This is why the kernel needs no model runtime: extraction and resolution are caller capabilities, not core assumptions.
 
-The kernel is **reactive** ([decision 0008](../decisions/0008-cli-first-agent-reactive.md)): every interaction answers with the resulting knowledge health and deterministic next actions, so a writer — especially an agent — can chain corrections in the same session until the store is healthy. Advice is derived only from mechanical checks; the kernel points, it never speculates.
+The kernel is **reactive** ([decision 0008](../decisions/0008-cli-first-agent-reactive.md)): mutations return mechanical reconciliation feedback, responses expose deterministic affordances where applicable, and status reports health. A writer — especially an agent — can follow those actions in the same session until the store is healthy. Advice is derived only from mechanical checks; the kernel points, it never speculates.
 
 Every derived view is **bounded and versioned** ([decision 0006](../decisions/0006-explicit-version-basis.md)): stamped with the basis (stream position, ruleset, query) it was computed from, so consumers cache safely, detect staleness by comparison, and reproduce views exactly. Storage may grow without bound; a caller's context never has to.
 

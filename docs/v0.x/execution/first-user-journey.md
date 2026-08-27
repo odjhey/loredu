@@ -20,14 +20,14 @@ The exact [application and CLI contract](../../architecture/contracts/applicatio
 ```json
 {
   "ok": true,
-  "result": {"record": {"kind": "claim", "id": "clm_3333333333333333"}, "position": 6, "handles": [{"id": "clm_3333333333333333", "kind": "claim", "affordances": []}]},
+  "result": {"record": {"kind": "claim", "id": "clm_3333333333333333"}, "position": 4, "handles": [{"id": "clm_3333333333333333", "kind": "claim", "affordances": []}]},
   "reconciliation": {"state": "conflict-candidate", "key": {"scope": {"repo": "rozoro"}, "subject": {"type": "code-area", "id": "command-registration"}, "predicate": "location"}, "related": [{"id": "clm_1111111111111111", "kind": "claim", "affordances": []}]},
   "advice": [
     {"rel": "show", "action": "record.show", "params": {"id": "clm_1111111111111111"}, "why": "inspect the earlier claim", "run": "lor show clm_1111111111111111"},
     {"rel": "show", "action": "record.show", "params": {"id": "clm_3333333333333333"}, "why": "inspect the new claim", "run": "lor show clm_3333333333333333"}
   ],
   "basis": {
-    "stream_position": 6,
+    "stream_position": 4,
     "ruleset": {"core": "loredu.reconciliation/v1", "claim_policy": {"id": "loredu.default", "version": "1"}},
     "query": {"operation": "add", "id": "clm_3333333333333333"}
   }
@@ -134,9 +134,9 @@ Content first (borrowed agent-ergonomics principle): bare `lor` with no argument
 
 ## Namespacing and key hygiene
 
-The kernel enforces key **shape** only (identifier-safe, no prose). Namespacing and vocabulary are the consumer's to impose — Loredu models healthy conventions in its examples and CLI output (e.g. `--scope repo=rozoro`, subjects like `code-area/command-registration`) without mandating them. The agent's duplicate-detection tool is the query engine, not a kernel rule: `lor claims` filters by any field (`--scope`, `--subject-type`, `--subject`, `--predicate`, `--value`, `--actor`, `--since`), so an agent checks for existing keys before inventing one, and `status` advisories catch what slips through.
+The kernel enforces key **shape** only (identifier-safe, no prose). Namespacing and vocabulary are the consumer's to impose — Loredu models healthy conventions in its examples and CLI output (e.g. `--scope repo=rozoro`, subjects like `code-area/command-registration`) without mandating them. The agent's duplicate-detection tool is the query engine, not a kernel rule: `lor claims` composes the contract filters (`--scope`, `--subject-type`, `--subject`, `--predicate`, `--perspective`, `--value`, `--actor`, `--since`), so an agent checks for existing keys before inventing one, and `status` advisories catch what slips through.
 
-Because every command emits machine-readable artifacts (`--json`, line-oriented text), the built-in filters only need to cover the common paths — anything further composes through unix pipes:
+Because semantic results are available as `--json` or line-oriented text, the built-in filters only need to cover the common paths — anything further composes through unix pipes:
 
 ```text
 $ lor claims --scope repo=rozoro --json | jq -r '.result[] | select(.confidence == "candidate") | .id'
@@ -205,10 +205,10 @@ Every printed present-record id is resolvable. A valid absent id can appear only
 
 ```text
 $ lor head
-stream_position=6
+stream_position=5
 ```
 
-M1.5 can compare any response Basis to this store-wide head and can continue an older list through its pinned cursor. Once projections exist, a cached Current Knowledge or Working Lore response with `basis.stream_position=4` is conservatively stale when head is 6. Deleting derived artifacts and replaying plain files must reproduce later derived content for the same basis and query ([decision 0006](../../decisions/0006-explicit-version-basis.md)).
+M1.5 can compare any response Basis to this store-wide head and can continue an older list through its pinned cursor. Once projections exist, a cached Current Knowledge or Working Lore response with `basis.stream_position=4` is conservatively stale when head is 5. Deleting derived artifacts and replaying plain files must reproduce later derived content for the same basis and query ([decision 0006](../../decisions/0006-explicit-version-basis.md)).
 
 ## Journey 9 — teach the agents
 
@@ -269,7 +269,7 @@ Grouped by milestone; **AC n** = acceptance criterion in [goal and scope](../sco
 
 | # | Given / When / Then | Covers |
 |---|---|---|
-| T40 | empty scope → definitive empty packet with basis, exit 0 | journey 1 |
+| T40 | empty scope → definitive empty packet with basis, exit 0 | journey 4 |
 | T41 | packet respects `max_items` / `max_chars` as record count grows 10× (S A: bounded, not raw entries) | AC 8, S A |
 | T42 | superseded claims omitted from default packet but reachable via handles | working-lore contract |
 | T43 | conflicts and needs-revalidation appear in attention sections | AC 8 |

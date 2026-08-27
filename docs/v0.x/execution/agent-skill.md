@@ -29,7 +29,9 @@ agent's) start from what you record now.
 ### The loop
 
 1. **Orient.** `lor status --json` — see health and advisories before starting.
-   List what is already known in your scope: `lor claims --scope <key=value>`.
+   If it reports `STORE_NOT_FOUND`, run `lor init` for the default store and
+   retry. List what is already known in your scope:
+   `lor claims --scope <key=value>`.
 2. **Record entries as you go.** Every finding worth keeping:
    `echo "<free text>" | lor add entry --actor agent:<agent-id> --type finding --title "..." --source-json '{"ref":"<source>","snapshot":"<version>"}' --body -`
    Entries are cheap. When in doubt, record.
@@ -40,9 +42,9 @@ agent's) start from what you record now.
    claimed under an existing key: `lor claims --scope <key=value> --value <string>`,
    or narrow by `--subject-type` / `--predicate`. Reuse what you find —
    reconciliation only works when keys converge.
-4. **Follow the advice.** Every response includes `advice:` commands. Run them.
-   They are deterministic — lor only points at real, mechanical issues
-   (same-key overlap, dangling references), never guesses.
+4. **Follow the response.** Run each `advice:` command that appears.
+   Corrective advice points only at real, mechanical issues (same-key overlap,
+   unresolved groups, dangling references), never guesses.
    Responses are also your map: navigate by the embedded commands and ids
    instead of constructing calls from memory. When a list says more exists,
    the continuation command (with its `--cursor`) is in the response — use
