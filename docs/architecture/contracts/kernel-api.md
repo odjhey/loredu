@@ -206,9 +206,10 @@ interface RecordStoreConformanceCase {
 [Decision 0026](../../decisions/0026-m15-application-cli-contract.md) adds no entrypoint, testing export, or normal runtime value. It adds these type-only normal exports exactly:
 
 ```text
-Affordance Page RecordHandle ReconciliationState ReconciliationFeedback
-ApplicationResponse ApplicationListResponse AddedRecordResult ShownRecordResult
-RecordSummary HistoryItem ClaimItem HeadResult ClaimFilters ClaimQuery HistoryQuery
+Affordance Page RecordHandle ReconciliationFeedback
+ApplicationResponse ApplicationListResponse ApplicationStatusResponse
+AddedRecordResult ShownRecordResult RecordSummary HistoryItem ClaimItem HeadResult
+ClaimFilters ClaimQuery HistoryQuery StatusQuery
 UnresolvedExclusiveGroup DanglingRecordReference HealthItem
 KeyDivergenceAdvisory StatusResult
 ```
@@ -224,7 +225,7 @@ interface LoreduApplication {
   show(id: RecordId): Promise<ApplicationResponse<ShownRecordResult>>
   history(query: HistoryQuery): Promise<ApplicationListResponse<HistoryItem>>
   claims(query?: ClaimQuery): Promise<ApplicationListResponse<ClaimItem>>
-  status(): Promise<ApplicationResponse<StatusResult>>
+  status(query?: StatusQuery): Promise<ApplicationStatusResponse>
   readHead(): Promise<ApplicationResponse<HeadResult>>
 }
 ```

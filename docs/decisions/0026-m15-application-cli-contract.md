@@ -36,17 +36,17 @@ The CLI owns argv, store selection/init, text/JSON rendering, failure envelopes,
 
 Claim feedback compares only the exact declared key and portable-JSON value. Same key/same value corroborates. Same key/different value is a conflict candidate only under `exclusive`; `coexisting` remains non-conflicting. No derived Relation is appended and no claim is preferred. Corrective affordances may run show/history, but mechanics never fabricate a runnable Resolution by preselecting judgment, actor, replacement, or reason; the embedded skill teaches the follow-on grammar.
 
-Health is exactly unresolved exclusive groups plus dangling record references. A Resolution closes a group only when its targets cover every Claim currently in the group; a later Claim reopens it. Relations do not substitute for judgment. Malformed canonical files remain provider corruption and make status fail rather than returning a knowingly partial health report.
+Health is exactly unresolved exclusive groups plus dangling record references. A Resolution closes a group only when its targets cover every Claim currently in the group; a later Claim reopens it. A reference is dangling when no target exists at a lower position, so a forward hand-authored reference remains unhealthy even if the target appears later. Relations do not substitute for judgment. Malformed canonical files remain provider corruption and make status fail rather than returning a knowingly partial health report. Status computes full counts/health but paginates one combined attention/advisory stream; group and divergence items carry bounded representatives plus filtered Claim-list affordances rather than unbounded nested arrays.
 
 Generic same-scope/same-value/different-key divergence is core mechanics, never reconciliation and never ClaimPolicy advice. Explicit duplicate Relations connect key components and can suppress the advisory. M1.5 executes no policy advice callback because the M0 ClaimPolicy surface has none; a later additive callback must remain versioned and distinguish its output from core mechanics.
 
 ### Query snapshots, filters, and disclosure
 
-Claim filters are exact AND-composed application predicates; scope is subset matching, value is structural JSON equality, and `since` is inclusive after timestamp normalization. Store filters remain kind-only. List ordering is stream position, default/max limits are fixed, and every list carries returned/total counts.
+Claim filters are exact AND-composed application predicates; scope defaults to subset matching and supports an explicit exact mode for mechanical drill-down, perspective can match present or absent, value is structural JSON equality, and `since` is inclusive after timestamp normalization. Store filters remain kind-only. List ordering is stream position, default/max limits are fixed, and every bounded collection carries returned/total counts.
 
 Cursors are opaque `loredu.cursor.v1.` base64url tokens whose semantic payload binds operation, normalized query, complete Basis, pinned-head record-id anchor, and exclusive last position. Continuation validates that anchor against current immutable history and rereads only the pinned prefix. Invalid or foreign tokens fail loudly; no continuation silently restarts. The anchor provides store-snapshot mismatch detection without introducing canonical store identity, secrets, or ambient cursor randomness.
 
-Every returned present Loredu record id is paired with show/history affordances. A valid absent id preserved in a hand-authored record reference or reported by dangling-reference health is an explicit terminal missing-reference diagnostic: the referring record remains inspectable, but the absent target receives no dead affordance and `show`/`history` for it returns `RECORD_NOT_FOUND`. SourceRefs likewise terminate Loredu disclosure. Working Lore section continuation obeys the same rule when M3 exists; it is not an M1.5 command.
+Every id presented as an existing Loredu record is paired with show/history affordances. An absent or forward-pointing id preserved in a hand-authored record reference or reported by dangling-reference health is an explicit terminal invalid-reference diagnostic: the referring record remains inspectable, but the invalid target receives no misleading affordance. SourceRefs likewise terminate Loredu disclosure. Working Lore section continuation obeys the same rule when M3 exists; it is not an M1.5 command.
 
 ### Composition and embedded guide
 
@@ -64,8 +64,8 @@ This decision narrows ADR 0009's statement that the M1.5 exit starts from Workin
 
 - M15-K and M15-B can work from one application/result/filter/cursor contract without importing CLI strings into the kernel.
 - The early binary is useful without pretending that a record listing is Current Knowledge or Working Lore.
-- `status` can be exact through the provider-neutral port: corruption remains a provider error, while dangling valid references remain health data.
-- Cursor chains survive independent CLI processes and concurrent appends without a new secret/store-id subsystem.
+- `status` can be exact and bounded through the provider-neutral port: corruption remains a provider error, while absent/forward references remain health data and full counts survive pagination.
+- Cursor chains survive independent CLI processes and concurrent appends without a new secret/store-id subsystem; rendered continuations and nested handles preserve explicit store selection.
 - Command examples become more explicit: mutation actors and JSON-valued options cannot be guessed from environment or ambiguous scalar parsing.
 - M2/M3 add commands and derived content without changing envelope, error, exit, affordance, pagination, or capability ownership.
 

@@ -34,7 +34,7 @@ The exact [application and CLI contract](../../architecture/contracts/applicatio
 }
 ```
 
-List responses add `page: {returned,total,cursor?}`. Every list is ordered by stream position and bounded to 50 by default (maximum 200). A continuation command carries only its opaque `loredu.cursor.v1.` cursor; the token binds operation, normalized query, Basis, pinned-head record-id anchor, and last position. It rejects invalid/foreign snapshots rather than restarting. Every present Loredu record id is paired with show/history affordances. Valid absent ids reported as missing-reference diagnostics and external SourceRefs explicitly end Loredu disclosure; neither receives a dead command.
+Claim/history lists and the combined status attention/advisory collection add `page: {returned,total,cursor?}`. Every collection is deterministically ordered and bounded to 50 by default (maximum 200). A continuation command carries only its opaque `loredu.cursor.v1.` cursor; the token binds operation, normalized query, Basis, pinned-head record-id anchor, and last position. It rejects invalid/foreign snapshots rather than restarting. Every present Loredu record id is paired with show/history affordances. Valid absent ids reported as missing-reference diagnostics and external SourceRefs explicitly end Loredu disclosure; neither receives a dead command.
 
 Application advice contains surface-neutral `{rel,action,params,why}`; only CLI JSON adds `run`. Advice is deterministic mechanics, never model output. Exact-key overlap and core key-divergence are not ClaimPolicy advice.
 
@@ -61,6 +61,7 @@ $ lor status
 healthy: true
 open exclusive groups: 0    dangling record refs: 0
 advisories: 0
+page: returned=0 total=0
 $ lor claims --scope repo=rozoro
 no claims
 page: returned=0 total=0
@@ -121,6 +122,7 @@ $ lor status
 healthy: true
 open exclusive groups: 0    dangling record refs: 0
 advisories: 0
+page: returned=0 total=0
 ```
 
 `lor status` is the "am I done?" check that terminates the chain. It has two tiers:
@@ -199,7 +201,7 @@ $ lor history clm_3333333333333333     # relations, resolution, verifications
 $ lor show ent_0123456789abcdef        # the original free text
 ```
 
-Every printed present-record id is resolvable. A valid absent id can appear only as an explicit missing-reference diagnostic and is terminal rather than paired with a dead command.
+Every id presented as an existing record is resolvable. An absent or forward-pointing id can appear only as an explicit invalid-reference diagnostic and is terminal rather than paired with a misleading command.
 
 ## Journey 8 — M1.5 head; later projection staleness
 
@@ -298,21 +300,21 @@ Grouped by milestone; **AC n** = acceptance criterion in [goal and scope](../sco
 | T61 | second claim, same key + same value → corroboration feedback, no attention raised | journey 3 |
 | T62 | second claim, same key + different value → conflict-candidate feedback with `advice` entries naming both ids | journey 3 |
 | T63 | agent chain: execute both show commands from T62, make the manual judgment using the embedded skill's resolve grammar, then `lor status` reports healthy and `--check` exits 0 | journey 3b, ADR 0026 |
-| T64 | `lor status` flags every dangling persisted record reference and unresolved exclusive group; a Resolution covering all current members closes it, while malformed canonical files fail as store corruption rather than partial health | journey 3b, ADR 0026 |
+| T64 | bounded `lor status` counts every absent/forward persisted reference and unresolved exclusive group; a Resolution covering all current members closes it, while malformed canonical files fail as store corruption rather than partial health | journey 3b, ADR 0026 |
 | T65 | text `lor skill` equals frontmatter-stripped embedded source bytes and needs no store; a fresh store using only its M1.5 commands completes orientation, record/query/disclosure/manual-resolution, and healthy exit | journey 9, ADR 0026 |
 | T66 | for the same pinned state, corrective/navigational affordance fields and order are identical; healthy state has no corrective advice, though record handles and list continuation remain navigational | ADR 0008/0026 |
-| T67 | `lor claims` AND-composes exact scope-subset + key/value/actor/since filters, orders by stream position, and returns the contract page under `--json` | key hygiene, ADR 0026 |
+| T67 | `lor claims` AND-composes scope subset/exact + key/present-or-absent-perspective/value/actor/since filters, orders by stream position, and returns the contract page under `--json` | key hygiene, ADR 0026 |
 | T68 | versioned core mechanics (not ClaimPolicy advice) finds canonically equal values under different exact keys in one exact scope → non-blocking advisory, never cross-key reconciliation; duplicate Relations connecting components suppress it | key hygiene, ADR 0026 |
 
 ### Pagination and link-following (ADR 0009)
 
 | # | Given / When / Then | Covers |
 |---|---|---|
-| T70 | any list beyond its effective limit → `page` with returned/total/cursor plus runnable continuation preserving a nondefault limit; at completion → counts and omitted cursor | ADR 0009/0026 |
+| T70 | any Claim/history/status collection beyond its effective limit → `page` with returned/total/cursor plus runnable continuation preserving a nondefault limit; at completion → counts and omitted cursor | ADR 0009/0026 |
 | T71 | append mid-pagination → `loredu.cursor.v1.` chain verifies pinned anchor and yields no duplicates/skips from that prefix; a fresh cursorless query reflects new head | ADR 0009/0006/0026 |
 | T72 | malformed, wrong-operation/query/ruleset, or foreign-snapshot cursor → actionable `INVALID_CURSOR`/`CURSOR_MISMATCH`, exit 2, never restart | ADR 0009/0026 |
 | T73 | M1.5 link-following starts from status/query/add responses and reaches record/history/entry/source using only affordances | ADR 0009/0026, journey 7 |
-| T74 | no dead ends: every present Loredu record id returned by any command is paired with show/history affordances; absent-reference diagnostics and SourceRefs are explicit terminal values with no dead command | ADR 0009/0026 |
+| T74 | no dead ends: every id presented as an existing Loredu record is paired with recursively CLI-rendered show/history affordances that preserve store selection; invalid-reference diagnostics and SourceRefs are explicit terminal values | ADR 0009/0026 |
 | T75 | when M3 lands, a Working Lore section hitting its budget states its full count and carries a Basis-pinned continuation under the same cursor contract | working-lore contract, staged M3 |
 
 ### Kernel invariants and the policy seam (issue #6)

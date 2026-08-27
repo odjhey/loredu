@@ -45,13 +45,13 @@ created_at: 2026-08-26T12:10:00+08:00
 | **Record filter** | Provider-neutral M1 scan selector, closed to exact record-kind membership. Claim/query semantics remain application-owned. |
 | **Store root** | One explicitly selected physical directory containing an isolated canonical record stream plus provider control state; never discovered by walking cwd parents. |
 | **Basis** | Exactly stream position, structural RulesetIdentity, and canonical JSON query. `computed_at` is outside Basis and equality. |
-| **Handle** | Loredu record id paired with surface-neutral show/history affordances. SourceRefs are terminal external disclosure values, not record handles. |
+| **Handle** | Existing Loredu record id paired with surface-neutral show/history affordances. Invalid-reference diagnostics and SourceRefs are terminal values, not record handles. |
 | **Cursor** | Opaque `loredu.cursor.v1.` continuation token binding operation, normalized query, complete Basis, pinned-head record-id anchor, and exclusive last position. It preserves one immutable prefix while records append and rejects foreign snapshots. |
 | **Envelope** | Uniform semantic response shape: success has `ok`, `result`, `reconciliation`, `advice`, and `basis`; list success adds `page`, and CLI failure adds `error`. Direct version metadata, help, and text `skill` are non-envelope outputs; `skill --json` is the documented successful null-Basis exception. |
 | **ok** | Envelope field stating whether execution produced a semantic result. Ordinary unhealthy status remains `ok: true`; `--check` changes only the process exit. |
 | **Advice** | Deterministic follow-up affordance with `rel`, stable application `action`, typed `params`, and `why`; a surface may add a runnable rendering. Never speculative. |
-| **Page** | Bounded list slice with this page's returned count, the pinned snapshot's total matching count, and a cursor exactly when more exists. |
-| **Health** | Blocking M1.5 condition: an exclusive exact-key group without a Resolution covering every current member, or a dangling persisted record reference. Provider corruption prevents a health result rather than becoming partial health data. |
+| **Page** | Bounded collection slice with this page's returned count, the pinned snapshot's total matching count, and a cursor exactly when more exists. |
+| **Health** | Blocking M1.5 condition: an exclusive exact-key group without a Resolution covering every current member, or a reference with no matching record at a lower position. Provider corruption prevents a health result rather than becoming partial health data. |
 | **Advisory** | Non-blocking mechanical hint. Generic same-scope, canonically equal-value, different-key divergence is M1.5 versioned core mechanics, can be connected by explicit duplicate Relations, is never ClaimPolicy advice, and never reconciles across keys. |
 | **Scope** | Caller-declared namespace a claim key belongs to (e.g. `repo=rozoro`); the consumer owns its vocabulary. |
 | **Perspective** | Optional claim-key component distinguishing coexisting views of the same subject/predicate, e.g. `documented_process` vs `observed_process`. |

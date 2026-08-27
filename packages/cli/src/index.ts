@@ -6,10 +6,10 @@ import { LOR_VERSION } from "./version";
  * The `lor` entry point. Argv in, rendered output out — the CLI is a rendering
  * adapter over the application API (ADR 0011) and holds no domain logic.
  *
- * No journey commands exist yet. ADR 0026 owns the exact M1.5 surface and its
- * staged M2/M3 additions. Until then this binary answers only `--version`/`-v`,
- * so the compile smoke has something real to run and the package DAG is
- * exercised end to end.
+ * No journey commands exist yet: `init`, `add`, `lore`, `status`, `show`,
+ * `history`, `resolve`, and `skill` land with M1+ (catalog T50–T58). Until then
+ * this binary answers only `--version`, so the compile smoke has something real
+ * to run and the package DAG is exercised end to end.
  */
 
 export interface CliIo {

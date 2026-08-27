@@ -61,11 +61,11 @@ Pulled ahead of full reconciliation ([decision 0008](../../decisions/0008-cli-fi
 - commands: preserved direct `--version`/`-v`, `init`, `add entry`, `add claim`, `relate`, `resolve`, `add verification`, `show`, `history`, `claims`, `head`, `status` (`--check`), and `skill`; bare `lor` is status orientation;
 - no M1.5 `current`, temporal projection flags, or `lore`: M2 owns `current`/`as-of`/`valid-at`, and M3 owns Working Lore;
 - exact success and failure envelopes, surface-neutral affordances plus CLI-rendered runnable commands, text/JSON behavior, and stable exit categories;
-- AND-composed exact Claim filters above the kind-only store port: scope subset, subject type/id, predicate, perspective, JSON value, Actor, and inclusive normalized `since`;
-- bounded position-ordered `claims`/`history` pages, explicit returned/total counts, and opaque `loredu.cursor.v1.` cursors bound to operation/query/Basis/pinned-head anchor/last position; continuation rereads only that prefix and rejects invalid or foreign snapshots;
-- handles pairing every returned present Loredu record id with show/history affordances, explicit terminal treatment for absent-reference diagnostics and SourceRefs, plus deterministic corrective and continuation affordances;
+- AND-composed exact Claim filters above the kind-only store port: scope subset/exact, subject type/id, predicate, present/absent perspective, JSON value, Actor, and inclusive normalized `since`;
+- bounded position-ordered `claims`/`history` pages and a bounded combined status item stream with full counts, plus opaque `loredu.cursor.v1.` cursors bound to operation/query/Basis/pinned-head anchor/last position; continuation rereads only that prefix and rejects invalid or foreign snapshots;
+- handles pairing every id presented as an existing Loredu record with recursively rendered show/history affordances that preserve explicit store selection, terminal treatment for invalid-reference diagnostics and SourceRefs, plus deterministic corrective and continuation affordances;
 - the mechanical key-overlap slice: same exact key + same value → corroboration; same key + different value under `exclusive` → conflict candidate; `coexisting` remains non-conflicting;
-- exact health: unresolved exclusive groups not fully covered by a Resolution and dangling record references; provider corruption is a store failure, not partial health;
+- exact health: unresolved exclusive groups not fully covered by a Resolution and references with no backward target; provider corruption is a store failure, not partial health;
 - generic same-scope/equal-value/different-key divergence as non-blocking versioned core mechanics suppressible by explicit duplicate Relations, never cross-key reconciliation or ClaimPolicy advice; M1.5 executes no policy advice callback;
 - consumer-owned namespacing, with examples and skill guidance requiring query-before-key invention;
 - CLI-internal production Clock and secure cryptographic RandomSource at the composition root, with no weak fallback, ambient kernel access, export, or dedicated package;
