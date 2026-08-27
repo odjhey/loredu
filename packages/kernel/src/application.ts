@@ -124,6 +124,7 @@ function inspectObject(value: unknown, path: string, issues: LoreduIssue[]): Dat
   }
 }
 function dataValue(data: Data, key: string): unknown {
+  if (!Object.hasOwn(data, key)) return undefined;
   const descriptor = data[key];
   return descriptor && "value" in descriptor ? descriptor.value : undefined;
 }
@@ -373,21 +374,34 @@ function validateEntry(input: unknown): EntryDraft {
     sources: Object.freeze(sources),
   };
 }
+const typedArrayPrototype = Object.getPrototypeOf(Uint8Array.prototype);
+const typedArrayTag = Object.getOwnPropertyDescriptor(typedArrayPrototype, Symbol.toStringTag)?.get;
+const typedArrayLength = Object.getOwnPropertyDescriptor(typedArrayPrototype, "length")?.get;
+
 function idFrom(bytes: unknown): RecordId {
-  if (!(bytes instanceof Uint8Array) || bytes instanceof Uint8ClampedArray || bytes.length !== 10)
+  try {
+    // These intrinsic getters consult typed-array internal slots. They are cross-realm safe,
+    // reject proxies/spoofs, and cannot be influenced by own or subclass properties.
+    if (typedArrayTag?.call(bytes) !== "Uint8Array") throw new TypeError("not Uint8Array");
+    // The intrinsic constructor's typed-array path copies represented elements without using
+    // caller length, indexed properties, iteration, at, slice, or subarray hooks.
+    const owned = new Uint8Array(bytes as Uint8Array);
+    if (typedArrayLength?.call(owned) !== 10) throw new RangeError("wrong length");
+    const byteAt = (index: number) => Uint8Array.prototype.at.call(owned, index) ?? 0;
+    let suffix = "";
+    for (let index = 0; index < 10; index += 5) {
+      const number =
+        byteAt(index) * 2 ** 32 +
+        byteAt(index + 1) * 2 ** 24 +
+        byteAt(index + 2) * 2 ** 16 +
+        byteAt(index + 3) * 2 ** 8 +
+        byteAt(index + 4);
+      for (let shift = 35; shift >= 0; shift -= 5) suffix += ALPHABET[Math.floor(number / 2 ** shift) & 31];
+    }
+    return `ent_${suffix}` as RecordId;
+  } catch {
     throw new LoreduError("RANDOM_SOURCE_FAILED", "RandomSource must return exactly 10 Uint8 bytes");
-  const byteAt = (index: number) => bytes.at(index) ?? 0;
-  let suffix = "";
-  for (let index = 0; index < 10; index += 5) {
-    const number =
-      byteAt(index) * 2 ** 32 +
-      byteAt(index + 1) * 2 ** 24 +
-      byteAt(index + 2) * 2 ** 16 +
-      byteAt(index + 3) * 2 ** 8 +
-      byteAt(index + 4);
-    for (let shift = 35; shift >= 0; shift -= 5) suffix += ALPHABET[Math.floor(number / 2 ** shift) & 31];
   }
-  return `ent_${suffix}` as RecordId;
 }
 export function createLoreduApplication({
   store,

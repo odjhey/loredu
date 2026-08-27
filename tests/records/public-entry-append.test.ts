@@ -1,4 +1,5 @@
 import { describe, expect, test } from "bun:test";
+import * as vm from "node:vm";
 import * as kernel from "@loredu/kernel";
 import {
   createInstant,
@@ -228,6 +229,102 @@ describe("public Entry assembly", () => {
       await expect(app.append(draft)).rejects.toMatchObject({ code: "CLOCK_FAILED", issues: [] });
       expect(randomCalls).toBe(1);
       expect(storeCalls).toBe(0);
+    }
+  });
+
+  test("entropy uses genuine Uint8 internal slots and an owned intrinsic copy", async () => {
+    const crossRealm = vm.runInNewContext("new Uint8Array(10).fill(255)") as Uint8Array;
+    const ownAt = new Uint8Array(10);
+    Object.defineProperties(ownAt, {
+      at: { value: () => 255 },
+      length: { value: 1 },
+      [Symbol.iterator]: {
+        value: () => {
+          throw new Error("caller iterator must not run");
+        },
+      },
+    });
+    class MisleadingLength extends Uint8Array {
+      override get length() {
+        return 10;
+      }
+    }
+    const detached = new Uint8Array(10);
+    structuredClone(detached.buffer, { transfer: [detached.buffer] });
+    const spoof = Object.create(Uint8Array.prototype) as Uint8Array;
+    const proxy = new Proxy(new Uint8Array(10), {});
+
+    const accept = async (entropy: Uint8Array, expectedId: string) => {
+      const calls: string[] = [];
+      const app = createLoreduApplication({
+        randomSource: {
+          nextBytes: () => {
+            calls.push("random");
+            return entropy;
+          },
+        },
+        clock: {
+          now: () => {
+            calls.push("clock");
+            return createInstant(0);
+          },
+        },
+        store: {
+          get: async () => undefined,
+          append: async () => {
+            calls.push("store");
+            return createStreamPosition(1);
+          },
+        },
+      });
+      expect(String((await app.append(draft)).record.id)).toBe(expectedId);
+      expect(calls).toEqual(["random", "clock", "store"]);
+    };
+    await accept(crossRealm, "ent_zzzzzzzzzzzzzzzz");
+    await accept(ownAt, "ent_0000000000000000");
+    await accept(new Uint8Array(10), "ent_0000000000000000");
+
+    for (const entropy of [new MisleadingLength(1), proxy, detached, spoof, new Uint8ClampedArray(10)]) {
+      const calls: string[] = [];
+      const app = createLoreduApplication({
+        randomSource: {
+          nextBytes: () => {
+            calls.push("random");
+            return entropy as Uint8Array;
+          },
+        },
+        clock: {
+          now: () => {
+            calls.push("clock");
+            return createInstant(0);
+          },
+        },
+        store: {
+          get: async () => undefined,
+          append: async () => {
+            calls.push("store");
+            return createStreamPosition(1);
+          },
+        },
+      });
+      await expect(app.append(draft)).rejects.toMatchObject({ code: "RANDOM_SOURCE_FAILED", issues: [] });
+      expect(calls).toEqual(["random"]);
+    }
+  });
+
+  test("inherited descriptor-map pollution cannot fabricate absent schema fields", async () => {
+    Object.defineProperty(Object.prototype, "body", {
+      value: { value: "fabricated", enumerable: true },
+      configurable: true,
+    });
+    try {
+      const { body: _body, ...withoutBody } = draft;
+      await expect(assembly().app.append(withoutBody as EntryDraft)).rejects.toMatchObject({
+        code: "VALIDATION_FAILED",
+        issues: [{ code: "TYPE", path: "/body" }],
+      });
+    } finally {
+      delete (Object.prototype as { body?: unknown }).body;
     }
   });
 
