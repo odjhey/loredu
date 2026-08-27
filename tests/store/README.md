@@ -8,7 +8,8 @@ M1-K ships the reusable conformance kit under `@loredu/kernel/testing` and runs 
 against the M1-complete InMemoryStore for T10, T13, and T15. The same cases run
 unchanged against PlainFileStore. Provider tests own T11, T12, and T14 replay/codec
 evidence plus T16–T18 locking, initialization/root isolation, durable commit order,
-and crash/fault prefix evidence. T19 is not store conformance: application reference
+and injected-failure plus process-kill prefix evidence at every commit boundary. T19
+is not store conformance: application reference
 semantics live in M0 records tests, and a semantics-ignorant store must not reject
 references.
 

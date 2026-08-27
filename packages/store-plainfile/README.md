@@ -17,14 +17,16 @@ port. The unchanged `@loredu/kernel/testing` conformance suite runs against this
 adapter and the M1-complete in-memory reference adapter.
 
 Initialization is explicit through `initializePlainFileStore`; ordinary construction
-and reads never create a missing store. `resolveStoreRoot` handles discriminated
-explicit path, validated named, and default selections without discovery. Named
-stores live under `<LOREDU_HOME>/stores/` and remain isolated.
+and reads never create a missing store. `resolveStoreRoot` preserves discriminated
+explicit path, validated named, and default selections through initialization/open so
+named roots can enforce physical containment. Named stores live under
+`<LOREDU_HOME>/stores/` and remain isolated.
 
 Every append acquires an immediate-failure append-scoped writer lock, replays under
 the lock, writes an exclusive same-filesystem temp file, fsyncs it, atomically renames
-it, fsyncs both affected directories, and releases the lock before returning. Only a
-same-host owner proven dead may be quarantined and recovered. A failure after rename
+it, fsyncs both affected directories, and releases the lock before returning. Only
+an owner with the same boot and process-namespace identity that is proven dead may be
+quarantined and recovered. A failure after rename
 is an uncertain whole-record outcome discoverable by the attempted id; it is never a
 torn record. T19 remains M0 application/reference evidence: `PlainFileStore` is
 semantics-ignorant and does not validate record relationships.

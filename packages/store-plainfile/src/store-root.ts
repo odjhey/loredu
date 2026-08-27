@@ -12,6 +12,15 @@ export type StoreRootSelection =
   | { readonly kind: "name"; readonly name: string }
   | { readonly kind: "default" };
 
+export type ResolvedStoreRoot =
+  | { readonly kind: "path"; readonly path: string }
+  | {
+      readonly kind: "name" | "default";
+      readonly path: string;
+      readonly home: string;
+      readonly name: string;
+    };
+
 export interface StoreRootContext {
   readonly loreduHome?: string;
   readonly osHome: string;
@@ -24,7 +33,7 @@ function nonempty(value: unknown, label: string): asserts value is string {
   }
 }
 
-function validateStoreName(name: string): void {
+export function validateStoreName(name: string): void {
   nonempty(name, "store name");
   if (
     name.length > 128 ||
@@ -48,15 +57,28 @@ export function defaultLoreduHome(
   return configured !== undefined && configured !== "" ? configured : join(osHome, ".loredu");
 }
 
-/** Where a validated named store lives: `<home>/stores/<name>`. */
-export function storeRootForName(name: string, home: string = defaultLoreduHome()): string {
+function resolvedNamedRoot(kind: "name" | "default", name: string, home: string): ResolvedStoreRoot {
   validateStoreName(name);
   nonempty(home, "Loredu home");
-  return join(home, STORES_DIRNAME, name);
+  const physicalHomeCandidate = resolve(home);
+  return Object.freeze({
+    kind,
+    name,
+    home: physicalHomeCandidate,
+    path: join(physicalHomeCandidate, STORES_DIRNAME, name),
+  });
+}
+
+/** Where a validated named store lives: `<home>/stores/<name>`. */
+export function storeRootForName(name: string, home: string = defaultLoreduHome()): ResolvedStoreRoot {
+  return resolvedNamedRoot("name", name, home);
 }
 
 /** Resolve one already-classified path/name/default selection without discovery or creation. */
-export function resolveStoreRoot(selection: StoreRootSelection, context: StoreRootContext): string {
+export function resolveStoreRoot(
+  selection: StoreRootSelection,
+  context: StoreRootContext,
+): ResolvedStoreRoot {
   if (typeof selection !== "object" || selection === null) {
     throw new TypeError("store root selection must be an object");
   }
@@ -65,11 +87,14 @@ export function resolveStoreRoot(selection: StoreRootSelection, context: StoreRo
 
   if (selection.kind === "path") {
     nonempty(selection.path, "store path");
-    return isAbsolute(selection.path) ? resolve(selection.path) : resolve(context.cwd, selection.path);
+    return Object.freeze({
+      kind: "path",
+      path: isAbsolute(selection.path) ? resolve(selection.path) : resolve(context.cwd, selection.path),
+    });
   }
 
   const home = defaultLoreduHome({ LOREDU_HOME: context.loreduHome }, context.osHome);
-  if (selection.kind === "name") return storeRootForName(selection.name, home);
-  if (selection.kind === "default") return storeRootForName(DEFAULT_STORE_NAME, home);
+  if (selection.kind === "name") return resolvedNamedRoot("name", selection.name, home);
+  if (selection.kind === "default") return resolvedNamedRoot("default", DEFAULT_STORE_NAME, home);
   throw new TypeError("store root selection kind is invalid");
 }

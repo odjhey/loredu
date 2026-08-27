@@ -1,5 +1,8 @@
 import { expect, test } from "bun:test";
+import { mkdtemp, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { initializePlainFileStore } from "@loredu/store-plainfile";
 
 interface FaultOutcome {
   readonly fault: string;
@@ -90,4 +93,53 @@ test("durable commit faults expose only the old prefix or one uncertain whole ne
     "tmp-dir-sync",
     "lock-release",
   ]);
+
+  const crashProbe = join(import.meta.dir, "plain-file-crash-probe.ts");
+  const parent = await mkdtemp(join(tmpdir(), "loredu-m1d-crash-"));
+  try {
+    const crashFaults = [
+      "after-temp-write",
+      "after-temp-file-sync",
+      "after-rename",
+      "after-records-dir-sync",
+      "after-tmp-dir-sync",
+    ] as const;
+    for (const [index, crashFault] of crashFaults.entries()) {
+      const root = join(parent, `case-${index}`);
+      await initializePlainFileStore(root);
+      const writer = Bun.spawn([process.execPath, crashProbe, "write", root, crashFault], {
+        cwd: join(import.meta.dir, "../.."),
+        stderr: "pipe",
+        stdout: "pipe",
+      });
+      const [writerExit, writerStderr] = await Promise.all([
+        writer.exited,
+        new Response(writer.stderr).text(),
+      ]);
+      expect(writerExit, `${crashFault}: ${writerStderr}`).not.toBe(0);
+
+      const observer = Bun.spawn([process.execPath, crashProbe, "observe", root], {
+        cwd: join(import.meta.dir, "../.."),
+        stderr: "pipe",
+        stdout: "pipe",
+      });
+      const [observerExit, observerStdout, observerStderr] = await Promise.all([
+        observer.exited,
+        new Response(observer.stdout).text(),
+        new Response(observer.stderr).text(),
+      ]);
+      expect(observerExit, `${crashFault}: ${observerStderr}`).toBe(0);
+      const observed = JSON.parse(observerStdout) as { readonly head: number; readonly ids: string[] };
+      if (crashFault === "after-temp-write" || crashFault === "after-temp-file-sync") {
+        expect(observed, crashFault).toEqual({ head: 0, ids: [] });
+      } else {
+        expect(observed, crashFault).toEqual({
+          head: 1,
+          ids: ["ent_0000000000000018"],
+        });
+      }
+    }
+  } finally {
+    await rm(parent, { recursive: true, force: true });
+  }
 });
