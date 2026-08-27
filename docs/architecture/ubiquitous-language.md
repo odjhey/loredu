@@ -30,8 +30,8 @@ created_at: 2026-08-26T12:10:00+08:00
 | **Current Knowledge** | Projection representing the preferred interpretation using all currently available records. |
 | **Working Lore** | Bounded, ranked projection prepared for one activity, with handles for deeper disclosure. |
 | **Pattern** | Reusable operational knowledge that helps a future activity investigate more effectively. It is represented as a class/purpose of claim, not a separate storage engine. |
-| **Instant** | Integer epoch milliseconds, safe and within the ECMAScript TimeClip range; supplied by Clock and rendered by the kernel. |
-| **Canonical timestamp** | UTC RFC3339 text with exactly millisecond precision: `YYYY-MM-DDTHH:mm:ss.sssZ`. |
+| **Instant** | Opaque safe-integer epoch milliseconds in inclusive `-62_167_219_200_000..253_402_300_799_999`; supplied by Clock and always rendered by the kernel as strict four-digit-year RFC3339. |
+| **Canonical timestamp** | UTC RFC3339 text with exactly four year digits and millisecond precision: `YYYY-MM-DDTHH:mm:ss.sssZ`; normalized caller timestamps remain inside the Instant range. |
 | **recorded_at** | Canonical timestamp sampled after entropy and immediately before store append, never caller-authoritative. It becomes history only if append succeeds; stream position is the commit fact. |
 | **valid_from / valid_until** | When the claim is believed to apply in the external world. Either may be unknown. |
 | **as_of** | Query boundary limiting knowledge to records available at that time. |
