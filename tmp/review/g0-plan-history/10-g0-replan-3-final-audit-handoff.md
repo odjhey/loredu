@@ -1,0 +1,7 @@
+## turn 1 — hash-bound replan3 matrix audit found composition and acceptance blockers
+verdict:       needs-action
+reason:        Replan3 is materially improved and hash-valid, but the frozen stage signatures, mutation propagation, matrix schema, and watchdog/authority evidence still contain contradictions that prevent A0 dispatch.
+did:           Verified replan3 SHA-256 820d83dc2e91298c18025ae789d3f2b75a472acca7fca14844c03311df3e64b6 and Steward clarification SHA-256 ed2db13e50f3f60d084a55c3103b8efcc81582b3184949e364ac75562b6096f3; independently reviewed the prior Steward/audit/replan chain, governing ADRs and implementation plan, current root/workflow/test authority, and PR32/35 false-green custody. Found target-manifest context missing from ReferenceStage, per-input stage call-count contradiction, no closed MatrixRow registry, root-project context unrepresentable, blocked-dependency mutation delta ambiguity, unexercisable 125 cleanup-failure evidence, and provisional legacy authority during G2.
+pending:       Planner must resolve these blockers in a new identity-bound plan before PF-A0/A0 dispatch; no implementation or acceptance is authorized.
+inputs-needed: none
+artifacts:     /Users/tiny/.rozoro/tasks/loredu-g0-replanner-3--01M1176WRGJEKXFP8CQE5F6G9W/g0-replan-3.md; SHA-256 820d83dc2e91298c18025ae789d3f2b75a472acca7fca14844c03311df3e64b6; Steward SHA-256 ed2db13e50f3f60d084a55c3103b8efcc81582b3184949e364ac75562b6096f3; current base 612ddcb0f23d0177b806942f89a158c50267b926; handoff.md
