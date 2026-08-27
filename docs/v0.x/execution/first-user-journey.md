@@ -11,7 +11,7 @@ created_at: 2026-08-26T00:00:00+08:00
 
 The first user is the project owner plus their agents, driving Loredu through the CLI ([decision 0007](../../decisions/0007-typescript-bun.md)). The binary is `lor` — short enough for agents to type constantly. This document describes usage step by step and derives the behavioral tests that must be automated. [Decision 0026](../../decisions/0026-m15-application-cli-contract.md) now fixes the M1.5 spellings and protocol; M2/M3 additions remain staged.
 
-The CLI arrives right after M1, before full reconciliation, and its semantic responses are **agent-reactive** ([decision 0008](../../decisions/0008-cli-first-agent-reactive.md)): each returns deterministic next actions so an agent can chain calls until health passes. M1.5 orientation is status plus filtered record queries. Current Knowledge does not exist until M2; Working Lore does not exist until M3.
+The CLI arrives right after M1, before full reconciliation, and its semantic responses are **agent-reactive** ([decision 0008](../../decisions/0008-cli-first-agent-reactive.md)): they expose mechanical feedback, health, and deterministic affordances when applicable so an agent can chain calls until health passes. M1.5 orientation is status plus filtered record queries. Current Knowledge does not exist until M2; Working Lore does not exist until M3.
 
 ## Response envelope
 
