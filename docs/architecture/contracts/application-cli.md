@@ -99,14 +99,10 @@ type RecordSummary =
   | {readonly kind: "entry"; readonly title?: string; readonly entry_type?: string}
   | {readonly kind: "claim"; readonly key: ClaimKey; readonly value: JsonValue;
       readonly confidence: Confidence}
-  | {readonly kind: "relation"; readonly relation_type: RelationType;
-      readonly from: RecordId; readonly to: RecordId}
-  | {readonly kind: "resolution"; readonly targets: readonly RecordId[];
-      readonly decision: ResolutionDecision; readonly replacement?: ClaimId;
+  | {readonly kind: "relation"; readonly relation_type: RelationType}
+  | {readonly kind: "resolution"; readonly decision: ResolutionDecision;
       readonly reason: string; readonly effective_at?: string}
-  | {readonly kind: "verification"; readonly targets: readonly ClaimId[];
-      readonly verified_against: readonly SourceRef[];
-      readonly result: VerificationResult}
+  | {readonly kind: "verification"; readonly result: VerificationResult}
 interface HistoryItem {
   readonly id: RecordId
   readonly position: StreamPosition
@@ -133,11 +129,14 @@ type ReconciliationFeedback =
   | {readonly state: "new-key"; readonly key: ClaimKey;
       readonly related: readonly []}
   | {readonly state: "corroboration"; readonly key: ClaimKey;
-      readonly related: readonly RecordHandle[]}
+      readonly related_count: number;
+      readonly related: readonly [RecordHandle]; readonly claims: Affordance}
   | {readonly state: "conflict-candidate"; readonly key: ClaimKey;
-      readonly related: readonly RecordHandle[]}
+      readonly related_count: number;
+      readonly related: readonly [RecordHandle]; readonly claims: Affordance}
   | {readonly state: "coexisting"; readonly key: ClaimKey;
-      readonly related: readonly RecordHandle[]}
+      readonly related_count: number;
+      readonly related: readonly [RecordHandle]; readonly claims: Affordance}
 }
 ```
 
@@ -148,11 +147,11 @@ Non-Claim additions and every read use `{state:"not-applicable", related:[]}`. A
 3. otherwise, at least one canonically equal value → `corroboration`;
 4. otherwise differing values with `coexisting` semantics → `coexisting`.
 
-`jsonValuesEqual` defines value equality; `claimKeysEqual` defines key equality. Validity, actor, confidence, source, and phrasing do not alter this M1.5 classification. `related` is empty for `new-key`; contains every canonically equal earlier same-key Claim for `corroboration`; every earlier same-key Claim for `conflict-candidate`; and every canonically different earlier same-key Claim for `coexisting`, always ascending by position. The feedback creates no Relation and makes no projection choice.
+`jsonValuesEqual` defines value equality; `claimKeysEqual` defines key equality. Validity, actor, confidence, source, and phrasing do not alter this M1.5 classification. For each non-new state, `related_count` counts the relevant earlier same-key Claims: canonically equal for `corroboration`, canonically different for `conflict-candidate` and `coexisting`. `related` contains exactly the earliest such Claim as a bounded representative. `claims` is the `claims.list` affordance for the complete exact key, using exact scope, subject, predicate, and present/absent perspective filters; it is the bounded drill-down for every overlap state. The feedback creates no Relation and makes no projection choice.
 
-Top-level advice is exact at M1.5. A `conflict-candidate` addition emits one `record.show` affordance for each canonically different related Claim in ascending position, then one for the new Claim; `new-key`, `corroboration`, `coexisting`, and non-Claim additions emit no corrective advice. Each status page emits the exact-key `claims.list` and representative show affordances for each unresolved group, then one show for each dangling reference's referring record, deduplicated by the general rule, followed by continuation when present. Generic divergence remains represented by its result handles and adds no corrective advice. Show and ordinary list reads add no top-level advice except list continuation. Every record handle still carries its ordinary nested show/history disclosure affordances.
+Top-level advice is exact and bounded at M1.5. A `conflict-candidate` addition emits the exact-key `claims.list` affordance, one `record.show` for its earlier representative, and one for the new Claim, in that order. Thus the second differing Claim names both ids directly, while later additions do not expand the response with the size of the group. `new-key`, `corroboration`, `coexisting`, and non-Claim additions emit no corrective advice. Each status page emits the exact-key `claims.list` and representative show affordances for each unresolved group, then one show for each dangling reference's referring record, deduplicated by the general rule, followed by continuation when present. Generic divergence remains represented by its result handles and adds no corrective advice. Show and ordinary list reads add no top-level advice except list continuation. Every record handle still carries its ordinary nested show/history disclosure affordances.
 
-For every added, shown, history, or Claim item, `handles` contains its own record followed by every distinct referenced record committed at a lower position, in schema field/index order. An absent or forward-pointing id in a persisted reference field remains visible in the full record or summary but receives no handle or affordance; it is an explicit terminal invalid-reference diagnostic, never a promise that following it is valid history. `show` scans one snapshot so it can return the full record's position, handles, and basis atomically. Lists return summaries rather than Entry bodies or common metadata/sources; `show` is the full-record disclosure step. `history(id)` returns the target and every record in the pinned prefix that directly references it: Claim `derived_from`; Relation `from`/`to`; Resolution `targets`/`replacement`; and Verification `targets`. Results are unique and ascending by stream position; the target naturally occupies its committed position rather than being forced to index zero. `history` for an absent target still fails with `RECORD_NOT_FOUND`; it never turns dangling references into a successful dead-end result. External SourceRefs and explicit missing-reference diagnostics are terminal disclosure values, not Loredu record handles.
+A history or Claim result item carries only its own record handle. List summaries deliberately omit record-reference fields; following the item's show affordance is the explicit full-record disclosure step rather than multiplying each bounded list item by an unbounded schema array. An added or shown result carries its own handle followed by every distinct referenced record committed at a lower position, in schema field/index order. An absent or forward-pointing id in a persisted reference field remains visible in the full shown record but receives no handle or affordance; it is an explicit terminal invalid-reference diagnostic, never a promise that following it is valid history. `show` scans one snapshot so it can return the full record's position, handles, and basis atomically. Lists also omit Entry bodies and common metadata/sources. `history(id)` returns the target and every record in the pinned prefix that directly references it: Claim `derived_from`; Relation `from`/`to`; Resolution `targets`/`replacement`; and Verification `targets`. Results are unique and ascending by stream position; the target naturally occupies its committed position rather than being forced to index zero. `history` for an absent target still fails with `RECORD_NOT_FOUND`; it never turns dangling references into a successful dead-end result. External SourceRefs and explicit missing-reference diagnostics are terminal disclosure values, not Loredu record handles.
 
 ## Claim query and ordering
 
@@ -206,7 +205,7 @@ A cursor is an opaque, versioned application token. Clients may store and return
 - normalized query excluding `limit` and `cursor`;
 - complete Basis;
 - the record id committed at `basis.stream_position` as snapshot anchor (a distinguished empty anchor only for position zero);
-- the exclusive last returned stream position.
+- the operation-specific exclusive resume key: the last returned stream position for Claims/history, or the last returned status item's class rank, primary stream position, and same-position ordinal.
 
 The token is an integrity/checking mechanism, not a confidentiality or authentication promise. Decode failures, unsupported versions, impossible positions, or missing fields are `INVALID_CURSOR`. On continuation the application scans current history, verifies current head is at least the pinned head and that the pinned position still contains the anchor id, verifies operation/query/ruleset equality, then filters every read to `position <= basis.stream_position`. Failure is `CURSOR_MISMATCH`; it never restarts at current head. Appends during a chain therefore cause neither duplicates nor skips. A cursorless repeat chooses a fresh snapshot.
 
@@ -249,7 +248,7 @@ interface StatusResult {
 }
 ```
 
-Health blocks `status --check`; advisories never do. Status forms one bounded ordered item stream: all unresolved groups, then all dangling references, then all key-divergence advisories, using each class's order below. `health` and `advisory_count` are full pinned-snapshot counts; `attention` and `advisories` contain only their members on this page. Its top-level `page.returned` is their combined page length and `page.total` is both full health counts plus `advisory_count`. Status uses the same default 50 and maximum 200 as other bounded collections, and continuation is `status.read`.
+Health blocks `status --check`; advisories never do. Status forms one bounded ordered item stream: all unresolved groups, then all dangling references, then all key-divergence advisories, using each class's order below. Its unique resume key is `(class rank, primary position, ordinal)`: class ranks are that fixed three-class order; primary position is the group's earliest member, the dangling reference's referring record, or the advisory's earliest representative; ordinal is the zero-based position among same-class items with that primary position in their defined deterministic order. The cursor resumes strictly after the complete key, so multiple diagnostics from one record cannot be duplicated or skipped. `health` and `advisory_count` are full pinned-snapshot counts; `attention` and `advisories` contain only their members on this page. Its top-level `page.returned` is their combined page length and `page.total` is both full health counts plus `advisory_count`. Status uses the same default 50 and maximum 200 as other bounded collections, and continuation is `status.read`.
 
 An **unresolved exclusive group** is an exact ClaimKey group for which the assembled policy selects `exclusive` and at least two canonically different values exist at the basis. It is closed only by a Resolution in the same prefix whose unique `targets` include every Claim currently in that group. Any decision, including `leave_disputed`, records sufficient human judgment to close health. Adding a later Claim to the group reopens it until a later Resolution covers the enlarged group. Relations describe links but do not close an exclusive group. Group Claims and groups themselves order by earliest member position. The item carries only the earliest representative plus full `claim_count`; its `claims.list` affordance uses exact scope, subject, predicate, and present/absent perspective filters so the complete group remains bounded and paginates normally.
 

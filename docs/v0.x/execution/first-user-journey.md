@@ -21,9 +21,16 @@ The exact [application and CLI contract](../../architecture/contracts/applicatio
 {
   "ok": true,
   "result": {"record": {"kind": "claim", "id": "clm_3333333333333333"}, "position": 4, "handles": [{"id": "clm_3333333333333333", "kind": "claim", "affordances": []}]},
-  "reconciliation": {"state": "conflict-candidate", "key": {"scope": {"repo": "rozoro"}, "subject": {"type": "code-area", "id": "command-registration"}, "predicate": "location"}, "related": [{"id": "clm_1111111111111111", "kind": "claim", "affordances": []}]},
+  "reconciliation": {
+    "state": "conflict-candidate",
+    "key": {"scope": {"repo": "rozoro"}, "subject": {"type": "code-area", "id": "command-registration"}, "predicate": "location"},
+    "related_count": 1,
+    "related": [{"id": "clm_1111111111111111", "kind": "claim", "affordances": []}],
+    "claims": {"rel": "list", "action": "claims.list", "params": {"query": {"scope": {"repo": "rozoro"}, "scope_match": "exact", "subject_type": "code-area", "subject": "command-registration", "predicate": "location", "perspective": null}}, "why": "inspect the complete exact-key group", "run": "lor claims --scope repo=rozoro --exact-scope --subject-type code-area --subject command-registration --predicate location --without-perspective"}
+  },
   "advice": [
-    {"rel": "show", "action": "record.show", "params": {"id": "clm_1111111111111111"}, "why": "inspect the earlier claim", "run": "lor show clm_1111111111111111"},
+    {"rel": "list", "action": "claims.list", "params": {"query": {"scope": {"repo": "rozoro"}, "scope_match": "exact", "subject_type": "code-area", "subject": "command-registration", "predicate": "location", "perspective": null}}, "why": "inspect the complete exact-key group", "run": "lor claims --scope repo=rozoro --exact-scope --subject-type code-area --subject command-registration --predicate location --without-perspective"},
+    {"rel": "show", "action": "record.show", "params": {"id": "clm_1111111111111111"}, "why": "inspect the earlier representative", "run": "lor show clm_1111111111111111"},
     {"rel": "show", "action": "record.show", "params": {"id": "clm_3333333333333333"}, "why": "inspect the new claim", "run": "lor show clm_3333333333333333"}
   ],
   "basis": {
@@ -34,7 +41,7 @@ The exact [application and CLI contract](../../architecture/contracts/applicatio
 }
 ```
 
-Claim/history lists and the combined status attention/advisory collection add `page: {returned,total,cursor?}`. Every collection is deterministically ordered and bounded to 50 by default (maximum 200). A continuation command carries only its opaque `loredu.cursor.v1.` cursor; the token binds operation, normalized query, Basis, pinned-head record-id anchor, and last position. It rejects invalid/foreign snapshots rather than restarting. Every present Loredu record id is paired with show/history affordances. Valid absent ids reported as missing-reference diagnostics and external SourceRefs explicitly end Loredu disclosure; neither receives a dead command.
+Claim/history lists and the combined status attention/advisory collection add `page: {returned,total,cursor?}`. Every collection is deterministically ordered and bounded to 50 by default (maximum 200). List items expose only their own handle and omit reference fields from summaries; `show` is the explicit full-reference disclosure step. A continuation command carries only its opaque `loredu.cursor.v1.` cursor; the token binds operation, normalized query, Basis, pinned-head record-id anchor, and an operation-specific exclusive resume key. Claims/history use the last position; status also binds item class and same-position ordinal so two diagnostics from one record paginate exactly. It rejects invalid/foreign snapshots rather than restarting. Every present Loredu record id exposed at the full-record level is paired with show/history affordances. Valid absent ids reported as missing-reference diagnostics and external SourceRefs explicitly end Loredu disclosure; neither receives a dead command.
 
 Application advice contains surface-neutral `{rel,action,params,why}`; only CLI JSON adds `run`. Advice is deterministic mechanics, never model output. Exact-key overlap and core key-divergence are not ClaimPolicy advice.
 
@@ -106,7 +113,8 @@ A later run finds the world changed:
 
 ```text
 $ lor add claim ... --predicate location --value src/cli/commands ...
-clm_3333333333333333  conflict candidate under key with clm_1111111111111111
+clm_3333333333333333  conflict candidate under key with 1 earlier differing claim
+advice: lor claims --scope repo=rozoro --exact-scope --subject-type code-area --subject command-registration --predicate location --without-perspective
 advice: lor show clm_1111111111111111
 advice: lor show clm_3333333333333333
 ```
@@ -298,7 +306,7 @@ Grouped by milestone; **AC n** = acceptance criterion in [goal and scope](../sco
 |---|---|---|
 | T60 | every mutation response (`--json`) contains exact `ok`, `result`, `reconciliation`, rendered `advice`, and `basis`; each application affordance becomes a runnable command without putting CLI strings in the application | ADR 0008/0026 |
 | T61 | second claim, same key + same value → corroboration feedback, no attention raised | journey 3 |
-| T62 | second claim, same key + different value → conflict-candidate feedback with `advice` entries naming both ids | journey 3 |
+| T62 | second claim, same key + different value → conflict-candidate feedback with related count, one representative, exact-key list drill-down, and bounded `advice` naming both ids | journey 3 |
 | T63 | agent chain: execute both show commands from T62, make the manual judgment using the embedded skill's resolve grammar, then `lor status` reports healthy and `--check` exits 0 | journey 3b, ADR 0026 |
 | T64 | bounded `lor status` counts every absent/forward persisted reference and unresolved exclusive group; a Resolution covering all current members closes it, while malformed canonical files fail as store corruption rather than partial health | journey 3b, ADR 0026 |
 | T65 | text `lor skill` equals frontmatter-stripped embedded source bytes and needs no store; a fresh store using only its M1.5 commands completes orientation, record/query/disclosure/manual-resolution, and healthy exit | journey 9, ADR 0026 |
@@ -310,8 +318,8 @@ Grouped by milestone; **AC n** = acceptance criterion in [goal and scope](../sco
 
 | # | Given / When / Then | Covers |
 |---|---|---|
-| T70 | any Claim/history/status collection beyond its effective limit → `page` with returned/total/cursor plus runnable continuation preserving a nondefault limit; at completion → counts and omitted cursor | ADR 0009/0026 |
-| T71 | append mid-pagination → `loredu.cursor.v1.` chain verifies pinned anchor and yields no duplicates/skips from that prefix; a fresh cursorless query reflects new head | ADR 0009/0006/0026 |
+| T70 | any Claim/history/status collection beyond its effective limit → `page` with returned/total/cursor plus runnable continuation preserving a nondefault limit; status continuation does not duplicate/skip multiple diagnostics at one position; at completion → counts and omitted cursor | ADR 0009/0026 |
+| T71 | append mid-pagination → `loredu.cursor.v1.` chain verifies pinned anchor and its operation-specific resume key, yielding no duplicates/skips from that prefix; a fresh cursorless query reflects new head | ADR 0009/0006/0026 |
 | T72 | malformed, wrong-operation/query/ruleset, or foreign-snapshot cursor → actionable `INVALID_CURSOR`/`CURSOR_MISMATCH`, exit 2, never restart | ADR 0009/0026 |
 | T73 | M1.5 link-following starts from status/query/add responses and reaches record/history/entry/source using only affordances | ADR 0009/0026, journey 7 |
 | T74 | no dead ends: every id presented as an existing Loredu record is paired with recursively CLI-rendered show/history affordances that preserve store selection; invalid-reference diagnostics and SourceRefs are explicit terminal values | ADR 0009/0026 |
