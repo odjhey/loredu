@@ -283,8 +283,35 @@ describe("public strict record codec", () => {
     }
   });
 
+  test("rejects a raw UTF-8 BOM before an otherwise valid record", () => {
+    const encoded = encodePlainFileRecord(records[0]);
+    const withBom = new Uint8Array(encoded.length + 3);
+    withBom.set([0xef, 0xbb, 0xbf]);
+    withBom.set(encoded, 3);
+
+    expect(() => decodePlainFileRecord(withBom)).toThrow(LoreduError);
+    try {
+      decodePlainFileRecord(withBom);
+    } catch (error) {
+      expect(error).toBeInstanceOf(LoreduError);
+      expect((error as LoreduError).code).toBe("STORE_CORRUPT");
+    }
+  });
+
+  test("orders numeric-looking keys recursively in dynamic JSON maps", () => {
+    const claim = decodePersistedRecord({
+      ...encodePersistedRecord(records[1]),
+      value: { "2": "two", "10": "ten", nested: { "2": 2, "10": 10 } },
+    });
+    const bytes = encodePlainFileRecord(claim);
+
+    expect(textDecoder.decode(bytes)).toContain(
+      'value: {"10":"ten","2":"two","nested":{"10":10,"2":2}}\n',
+    );
+    expect(encodePersistedRecord(decodePlainFileRecord(bytes))).toEqual(encodePersistedRecord(claim));
+  });
+
   test.each([
-    ["BOM", `\uFEFF---\nschema: "loredu.record/v1"\n---\n`],
     ["CRLF headers", `---\r\nschema: "loredu.record/v1"\r\n---\r\n`],
     ["implicit scalar", `---\nschema: loredu.record/v1\n---\n`],
     ["comment", `---\nschema: "loredu.record/v1" # no\n---\n`],

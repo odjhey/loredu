@@ -43,10 +43,65 @@ function corrupt(message: string, issues: LoreduError["issues"] = []): LoreduErr
   return new LoreduError("STORE_CORRUPT", message, issues);
 }
 
+type JsonShape =
+  | "dynamic"
+  | { readonly kind: "object"; readonly keys: readonly string[] }
+  | { readonly kind: "array"; readonly items: JsonShape };
+
+const ACTOR_SHAPE = { kind: "object", keys: ["type", "id"] } as const satisfies JsonShape;
+const SUBJECT_SHAPE = { kind: "object", keys: ["type", "id"] } as const satisfies JsonShape;
+const SOURCE_SHAPE = {
+  kind: "object",
+  keys: ["ref", "locator", "snapshot"],
+} as const satisfies JsonShape;
+const SOURCE_LIST_SHAPE = { kind: "array", items: SOURCE_SHAPE } as const satisfies JsonShape;
+const FIELD_SHAPES: Readonly<Record<string, JsonShape>> = {
+  actor: ACTOR_SHAPE,
+  subject: SUBJECT_SHAPE,
+  sources: SOURCE_LIST_SHAPE,
+  verified_against: SOURCE_LIST_SHAPE,
+};
+
+function compareUnicodeScalars(left: string, right: string): number {
+  const leftScalars = [...left];
+  const rightScalars = [...right];
+  const length = Math.min(leftScalars.length, rightScalars.length);
+  for (let index = 0; index < length; index++) {
+    const difference =
+      (leftScalars[index]?.codePointAt(0) ?? 0) - (rightScalars[index]?.codePointAt(0) ?? 0);
+    if (difference !== 0) return difference;
+  }
+  return leftScalars.length - rightScalars.length;
+}
+
+function canonicalJson(value: unknown, shape: JsonShape = "dynamic"): string {
+  if (value === null || typeof value !== "object") {
+    const encoded = JSON.stringify(value);
+    if (encoded === undefined) throw corrupt("field contains a non-JSON value");
+    return encoded;
+  }
+
+  if (Array.isArray(value)) {
+    const itemShape = shape !== "dynamic" && shape.kind === "array" ? shape.items : "dynamic";
+    return `[${value.map((item) => canonicalJson(item, itemShape)).join(",")}]`;
+  }
+
+  const object = value as Readonly<Record<string, unknown>>;
+  let keys: readonly string[];
+  if (shape !== "dynamic" && shape.kind === "object") {
+    const unknown = Object.keys(object).find((key) => !shape.keys.includes(key));
+    if (unknown !== undefined) throw corrupt(`fixed-shape field has unknown key: ${unknown}`);
+    keys = shape.keys.filter((key) => Object.hasOwn(object, key));
+  } else {
+    keys = Object.keys(object).sort(compareUnicodeScalars);
+  }
+  return `{${keys
+    .map((key) => `${JSON.stringify(key)}:${canonicalJson(object[key])}`)
+    .join(",")}}`;
+}
+
 function jsonLine(field: string, value: unknown): string {
-  const encoded = JSON.stringify(value);
-  if (encoded === undefined) throw corrupt(`field ${field} is not a JSON value`);
-  return `${field}: ${encoded}\n`;
+  return `${field}: ${canonicalJson(value, FIELD_SHAPES[field])}\n`;
 }
 
 /** Encode one canonical strict-YAML/frontmatter Markdown record file. */
@@ -66,8 +121,9 @@ export function encodePlainFileRecord(record: PersistedRecord): Uint8Array {
 export function decodePlainFileRecord(bytes: Uint8Array): PersistedRecord {
   try {
     if (!(bytes instanceof Uint8Array)) throw corrupt("record file must be bytes");
+    if (bytes[0] === 0xef && bytes[1] === 0xbb && bytes[2] === 0xbf)
+      throw corrupt("record file must not have a UTF-8 BOM");
     const text = decoder.decode(bytes);
-    if (text.startsWith("\uFEFF")) throw corrupt("record file must not have a UTF-8 BOM");
     if (!text.startsWith("---\n")) throw corrupt("record file must start with an LF frontmatter delimiter");
     const closing = text.indexOf("\n---\n", 4);
     if (closing < 0) throw corrupt("record file is missing its LF closing delimiter");
