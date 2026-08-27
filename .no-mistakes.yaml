@@ -1,0 +1,54 @@
+# Repository policy for no-mistakes v1.57.x. Gate-control fields become trusted
+# only after this file is present on the default branch.
+commands:
+  # Lint owns deterministic static and corpus checks. Remote CI still owns the
+  # broad test/build suite; the Test step stays unconfigured so its agent chooses
+  # the smallest validation relevant to each change and records that evidence.
+  lint: >-
+    bun install --frozen-lockfile &&
+    bun run lint &&
+    bun run spell &&
+    bun run check:docs &&
+    bun run check:catalog &&
+    bun run check:gates &&
+    bun run check:boundaries &&
+    bun run typecheck
+  format: "bun install --frozen-lockfile && bun run format"
+
+# Keep intent-sensitive review findings at a decision gate. Mechanical failures
+# in the other phases retain bounded repair attempts.
+auto_fix:
+  rebase: 3
+  review: 0
+  test: 3
+  document: 3
+  lint: 3
+  ci: 3
+
+# A cancelled GitHub check may be a deliberate concurrency cancellation; do not
+# spend CI minutes rerunning it without an explicit decision.
+ci:
+  rerun_transient: 0
+
+document:
+  instructions: |
+    Domain terms and behavior are owned by docs/architecture/, durable choices by
+    docs/decisions/, current delivery scope by docs/v0.x/, and CI behavior by
+    .github/workflows/README.md. Follow docs/playbooks/domain-doc-update.md when
+    domain behavior, terminology, or boundaries change. Keep AGENTS.md as the
+    cross-harness policy entry point, not a change log or duplicate reference.
+
+review:
+  path_instructions:
+    - path: "packages/kernel/**"
+      instructions: |
+        Preserve the kernel's zero-runtime-dependency and host-isolation boundary:
+        no node:* or bun:* imports and no ambient Node or Bun globals.
+    - path: ".github/workflows/**"
+      instructions: |
+        Preserve ADR 0012's single fail-closed ci-required aggregate and fail-safe
+        path selection. Uncertain path classifications must select the full suite.
+    - path: "docs/**"
+      instructions: |
+        Treat frontmatter, indexes, links, catalog accounting, and supersession as
+        maintained contracts. Domain changes must close the domain-doc playbook.
