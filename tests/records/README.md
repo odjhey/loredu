@@ -1,9 +1,6 @@
 # records — M0, records and application append
 
-Catalog rows **T01–T08, T19, T80, T83–T85, T87** live here. The live
-`public-entry-append.test.ts` suite currently implements T01, T02, T84, and T87;
-the rest remain deferred. Drive only public `@loredu/kernel` and
-`@loredu/kernel/testing` exports.
+Catalog rows **T01–T08, T19, T80, T83–T85, T87** live here. The live `public-entry-append.test.ts` and `record-foundation.test.ts` suites implement T01–T08, T84, T85, and T87; policy, reference-orchestration, and remaining append rows stay deferred to their owning M0 slices. Drive only public `@loredu/kernel` and `@loredu/kernel/testing` exports.
 
 Cover all five exact family shapes; closed envelopes and reserved/excess fields;
 portable JSON rejection/equality; detached deep freezing; canonical timestamps;

@@ -3,36 +3,6 @@
   "catalog": "docs/v0.x/execution/first-user-journey.md",
   "note": "Every catalog T-number is either claimed by an executable test under tests/ (via an @covers annotation) or listed here with the milestone that will implement it. Never both, never neither. See ADR 0015.",
   "deferred": {
-    "T03": {
-      "milestone": "M0",
-      "group": "M0 — records and validation",
-      "reason": "kernel record types and validation not implemented yet"
-    },
-    "T04": {
-      "milestone": "M0",
-      "group": "M0 — records and validation",
-      "reason": "kernel record types and validation not implemented yet"
-    },
-    "T05": {
-      "milestone": "M0",
-      "group": "M0 — records and validation",
-      "reason": "kernel record types and validation not implemented yet"
-    },
-    "T06": {
-      "milestone": "M0",
-      "group": "M0 — records and validation",
-      "reason": "kernel record types and validation not implemented yet"
-    },
-    "T07": {
-      "milestone": "M0",
-      "group": "M0 — records and validation",
-      "reason": "kernel record types and validation not implemented yet"
-    },
-    "T08": {
-      "milestone": "M0",
-      "group": "M0 — records and validation",
-      "reason": "kernel record types and validation not implemented yet"
-    },
     "T10": {
       "milestone": "M1",
       "group": "M1 — plain-file store",
@@ -307,11 +277,6 @@
       "milestone": "M0",
       "group": "Kernel invariants and the policy seam (issue #6)",
       "reason": "kernel invariants and ClaimPolicy seam not implemented yet"
-    },
-    "T85": {
-      "milestone": "M0",
-      "group": "M0 — records and validation",
-      "reason": "claim key construction and scope canonicalization not implemented yet"
     },
     "T86": {
       "milestone": "M2",
