@@ -49,11 +49,17 @@ agent's) start from what you record now.
    instead of constructing calls from memory. When a list says more exists,
    the continuation command (with its `--cursor`) is in the response — use
    it only if the bounded view was not enough.
-5. **Judge conflicts yourself.** When lor reports a conflict candidate:
-   verify against the current source, then record your judgment:
-   `lor resolve --actor agent:<agent-id> --target <old> --target <new> --decision prefer --replacement <new> --reason "<what you checked>"`
+5. **Judge conflicts yourself.** When lor reports a conflict candidate, run
+   its exact-key `lor claims` advice and every continuation command. Inspect
+   every Claim in the complete current group and verify against the source.
+   A Resolution closes health only when it repeats `--target <claim-id>` for
+   every listed Claim, including same-value corroborations. Then record your
+   judgment:
+   `lor resolve --actor agent:<agent-id> --target <claim-id>... --decision prefer --replacement <preferred-target> --reason "<what you checked>"`
    If you cannot verify, use `--decision leave_disputed` — a recorded open
-   question beats a guessed answer. Never try to delete the losing claim.
+   question beats a guessed answer. Never try to delete the losing claim. A
+   Claim appended after your list reopens the group; follow `status` and record
+   a later Resolution covering the enlarged group.
 6. **Relate what you notice.** If two claims support or contradict each other
    and lor has not linked them, record it:
    `lor relate --actor agent:<agent-id> --from <a> --to <b> --type supports`
