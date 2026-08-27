@@ -536,6 +536,99 @@ describe("generic M0 application append", () => {
     expect(appends).toBe(0);
   });
 
+  test("policy callbacks are captured at assembly and active issue output is rejected inertly", async () => {
+    let originalValidationCalls = 0;
+    let originalSemanticsCalls = 0;
+    let replacementCalls = 0;
+    const mutablePolicy = {
+      id: "consumer.policy",
+      version: "1",
+      validateClaimKey() {
+        originalValidationCalls++;
+        return Object.freeze([]);
+      },
+      semantics() {
+        originalSemanticsCalls++;
+        return "exclusive" as const;
+      },
+    };
+    const assembled = createLoreduApplication({
+      store: new InMemoryStore(),
+      clock: new FixedClock(createInstant(0)),
+      randomSource: new SeededRandomSource(1),
+      claimPolicy: mutablePolicy,
+    });
+    mutablePolicy.validateClaimKey = () => {
+      replacementCalls++;
+      throw new Error("replacement validator must not run");
+    };
+    mutablePolicy.semantics = () => {
+      replacementCalls++;
+      throw new Error("replacement semantics must not run");
+    };
+    await expect(assembled.append(claimDraft())).resolves.toMatchObject({
+      record: { kind: "claim" },
+      position: 1,
+    });
+    expect({ originalValidationCalls, originalSemanticsCalls, replacementCalls }).toEqual({
+      originalValidationCalls: 1,
+      originalSemanticsCalls: 1,
+      replacementCalls: 0,
+    });
+
+    let getterCalls = 0;
+    let semanticsCalls = 0;
+    const activeIssue = { path: "/predicate", message: "must not execute" } as Record<string, unknown>;
+    Object.defineProperty(activeIssue, "code", {
+      enumerable: true,
+      get() {
+        getterCalls++;
+        return "FORMAT";
+      },
+    });
+    const events: string[] = [];
+    const activeOutput = createLoreduApplication({
+      store: {
+        get: async () => {
+          events.push("get");
+          return undefined;
+        },
+        append: async () => {
+          events.push("append");
+          return createStreamPosition(1);
+        },
+      },
+      clock: {
+        now() {
+          events.push("clock");
+          return createInstant(0);
+        },
+      },
+      randomSource: {
+        nextBytes(count) {
+          events.push("random");
+          return new Uint8Array(count);
+        },
+      },
+      claimPolicy: {
+        id: "consumer.policy",
+        version: "1",
+        validateClaimKey: () => [activeIssue] as never,
+        semantics: () => {
+          semanticsCalls++;
+          return "exclusive";
+        },
+      },
+    });
+    await expect(activeOutput.append(claimDraft())).rejects.toMatchObject({
+      code: "VALIDATION_FAILED",
+      issues: [{ code: "TYPE", path: "" }],
+    });
+    expect(getterCalls).toBe(0);
+    expect(semanticsCalls).toBe(0);
+    expect(events).toEqual([]);
+  });
+
   test("InMemoryStore snapshots direct inputs and never advances on duplicate or malformed append", async () => {
     const store = new InMemoryStore();
     const mutable = JSON.parse(JSON.stringify(persisted("entry"))) as PersistedRecord;

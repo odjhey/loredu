@@ -7,7 +7,8 @@ missing/excess/`computed_at`, and inequality covers each stream/ruleset/query
 component. Default ClaimPolicy validates the exact declared key, selects `exclusive`,
 emits no policy advice, and rejects remapping; custom policy assembly and structural
 identity validation are deterministic and do not execute callbacks. Generic Claim
-append executes custom validation later in M0-A.
+append policy execution is specified by the [kernel API contract](../../docs/architecture/contracts/kernel-api.md)
+and covered by the records suite.
 
 M2 rows **T20–T30 and T86** cover actual corroboration/conflict, cross-key guards,
 Resolution application, temporal projections, deterministic replayed content, and

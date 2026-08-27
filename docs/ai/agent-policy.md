@@ -3,7 +3,7 @@ name: agent_policy
 description: "Agent behavior policy: who decides (agents do), the record obligation, discovery sequence, trust rules, worktrees, and closure evidence."
 type: guide
 tags: [ai, agents, policy]
-generated: "Claude Opus 5 (Claude Code), 2026-08-26"
+generated: "Claude Opus 5 (Claude Code) and OpenAI coding agent, 2026-08-28"
 created_at: 2026-08-26T15:40:00+08:00
 ---
 
@@ -13,7 +13,7 @@ Applies to every agent and harness working in this repository. [`AGENTS.md`](../
 
 ## Repository state
 
-This repo is agent-first and design-first: it holds contracts, decision records, and the v0.x plan, with no source tree yet ([ADR 0001](../decisions/0001-application-core-first.md) explains why the application core is defined before any surface). Until code exists, docs *are* the artifact, and the maintenance rules in [docs/README.md](../README.md) are the build system.
+This repo is agent-first and design-first: contracts, decision records, the v0.x plan, and implementation evolve together ([ADR 0001](../decisions/0001-application-core-first.md) explains why the application core is defined before any surface). Docs remain part of the artifact, and the maintenance rules in [docs/README.md](../README.md) are their build system.
 
 ## Who decides
 
@@ -58,7 +58,7 @@ Terminology changes start in [ubiquitous language](../architecture/ubiquitous-la
 
 ## Evidence expected before work is complete
 
-- The change verified by the strictest check that applies. For docs: links resolve, frontmatter is complete, and the doc is reachable from its directory index and [INDEX.md](../INDEX.md). For code (once a source tree exists): the suites and gates named in [ADR 0012](../decisions/0012-dx-and-ci-gating.md).
+- The change verified by the strictest check that applies. For docs: links resolve, frontmatter is complete, and the doc is reachable from its directory index and [INDEX.md](../INDEX.md). For code: run the suites and gates named in [ADR 0012](../decisions/0012-dx-and-ci-gating.md).
 - A decision record for anything durable you settled.
 - Domain-doc impact addressed per the [domain doc update playbook](../playbooks/domain-doc-update.md) — either the docs are updated, or the reason no update was needed is recorded.
 - Anything you could not verify stated plainly as unverified. CI is the supervisor for code ([ADR 0012](../decisions/0012-dx-and-ci-gating.md)); until it is wired, say what you actually ran.

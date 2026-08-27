@@ -6,6 +6,6 @@ The kernel is strictly mechanical: it detects — duplicates, conflicts, diverge
 
 Vocabulary, namespacing, writers, and surfaces belong to consumers; Loredu owns the consistent record, detection, resolution, and disclosure semantics underneath — machine-readable at every boundary.
 
-The project is currently defining its v0.x application contracts before committing to CLI, runtime, model, crawler, or storage-provider surfaces.
+The project is implementing its v0.x contracts milestone by milestone. The M0 application-kernel runtime is complete; durable storage, the CLI, reconciliation, and Working Lore remain later milestones in the [implementation plan](docs/v0.x/execution/implementation-plan.md).
 
 Start with [`docs/README.md`](docs/README.md) and [`docs/v0.x/README.md`](docs/v0.x/README.md).
