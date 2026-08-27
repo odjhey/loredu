@@ -2,7 +2,7 @@
 # only after this file is present on the default branch.
 commands:
   # Lint owns deterministic static and corpus checks. Remote CI still owns the
-  # broad test/build suite; the Test step stays unconfigured so its agent chooses
+  # broad test/build suite; the Test step has no command, so its agent chooses
   # the smallest validation relevant to each change and records that evidence.
   lint: >-
     bun install --frozen-lockfile &&
