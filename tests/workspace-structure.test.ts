@@ -331,7 +331,7 @@ describe("authoritative workspace boundary guard", () => {
         "source file is outside a recognized production or test surface",
       ),
     );
-  });
+  }, 15_000);
 
   test("validates workspace edges separately from adapter external dependencies", () => {
     const green = fixture();

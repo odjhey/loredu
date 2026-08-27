@@ -3,12 +3,11 @@ import {
   type EntryDraft,
   type JsonValue,
   type PersistedRecord,
-  type PersistedRecordFor,
   RECORD_SCHEMA_ID,
-  type RecordDraft,
   type RecordId,
   type SourceRef,
 } from "./domain/entry";
+import { LoreduError, type LoreduIssue, type LoreduIssueCode } from "./errors";
 import {
   type Clock,
   createInstant,
@@ -18,35 +17,8 @@ import {
   type StreamPosition,
 } from "./ports/capabilities";
 
-export type LoreduErrorCode =
-  | "VALIDATION_FAILED"
-  | "DUPLICATE_RECORD_ID"
-  | "RANDOM_SOURCE_FAILED"
-  | "CLOCK_FAILED"
-  | "STORE_APPEND_FAILED";
-export type LoreduIssueCode =
-  | "REQUIRED"
-  | "TYPE"
-  | "FORMAT"
-  | "RANGE"
-  | "UNKNOWN_FIELD"
-  | "RESERVED_FIELD"
-  | "DUPLICATE";
-export interface LoreduIssue {
-  readonly code: LoreduIssueCode;
-  readonly path: string;
-  readonly message: string;
-}
-export class LoreduError extends Error {
-  constructor(
-    readonly code: LoreduErrorCode,
-    message: string,
-    readonly issues: readonly LoreduIssue[] = [],
-  ) {
-    super(message);
-    this.name = "LoreduError";
-  }
-}
+export type { LoreduErrorCode, LoreduIssue, LoreduIssueCode } from "./errors";
+export { LoreduError } from "./errors";
 export interface AppendRecordResult<R extends PersistedRecord = PersistedRecord> {
   readonly record: R;
   readonly position: StreamPosition;
@@ -57,11 +29,18 @@ export interface LoreduApplicationDependencies {
   readonly randomSource: RandomSource;
 }
 export interface LoreduApplication {
-  append<D extends RecordDraft>(draft: D): Promise<AppendRecordResult<PersistedRecordFor<D>>>;
+  append<D extends EntryDraft>(draft: D): Promise<AppendRecordResult<Entry>>;
 }
 
 const TOKEN = /^[a-z0-9](?:[a-z0-9._:/-]*[a-z0-9])?$/;
 const METADATA_KEY = /^[a-z0-9](?:[a-z0-9_:/-]*[a-z0-9])?\.[a-z0-9](?:[a-z0-9._:/-]*[a-z0-9])?$/;
+
+function metadataKeyHalvesFitLength(key: string): boolean {
+  const separator = key.indexOf(".");
+  const namespace = key.slice(0, separator);
+  const name = key.slice(separator + 1);
+  return scalarLength(namespace) <= 128 && scalarLength(name) <= 128;
+}
 const ALPHABET = "0123456789abcdefghjkmnpqrstvwxyz";
 type Data = Readonly<Record<string, PropertyDescriptor>>;
 
@@ -315,7 +294,7 @@ function validateEntry(input: unknown): EntryDraft {
     const metadataData = inspectObject(dataValue(data, "metadata"), "/metadata", issues);
     if (metadataData)
       for (const key of Object.keys(metadataData).sort(compareUnicodeScalars)) {
-        if (!METADATA_KEY.test(key) || key.startsWith("loredu."))
+        if (!METADATA_KEY.test(key) || key.startsWith("loredu.") || !metadataKeyHalvesFitLength(key))
           issues.push(issue("FORMAT", `/metadata/${pointer(key)}`, "must be a non-reserved namespaced key"));
         else
           metadata[key] = copyJson(
@@ -426,7 +405,7 @@ export function createLoreduApplication({
   randomSource,
 }: LoreduApplicationDependencies): LoreduApplication {
   return Object.freeze({
-    async append<D extends RecordDraft>(input: D) {
+    async append<D extends EntryDraft>(input: D) {
       const draft = validateEntry(input);
       let id: RecordId;
       try {
@@ -450,7 +429,7 @@ export function createLoreduApplication({
       try {
         const position = createStreamPosition(await store.append(record));
         if (position === 0) throw new RangeError("append position must be positive");
-        return Object.freeze({ record, position }) as AppendRecordResult<PersistedRecordFor<D>>;
+        return Object.freeze({ record, position }) as AppendRecordResult<Entry>;
       } catch (error) {
         if (error instanceof LoreduError && error.code === "DUPLICATE_RECORD_ID") throw error;
         throw new LoreduError("STORE_APPEND_FAILED", "Store append failed");

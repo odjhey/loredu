@@ -19,7 +19,7 @@ Anything the kernel needs from its environment arrives through a port in
 
 ## Public M0 surface
 
-Only `@loredu/kernel` and `@loredu/kernel/testing` are entrypoints; deep imports are unsupported. The exact final M0 value/type allowlists and signatures are the [kernel API contract](../../docs/architecture/contracts/kernel-api.md). The current P0 runtime exports its Entry/application and capability slice; codecs/equality, ClaimKey/Basis/policy primitives, and the other families arrive in their owning M0 slices rather than as placeholders. Testing exports exactly InMemoryStore, FixedClock, and SeededRandomSource. Scaffold-only `AppendResult`, `RecordRef`, `stream`, `head`, and `StoreUnderTest` do not survive M0.
+Only `@loredu/kernel` and `@loredu/kernel/testing` are entrypoints; deep imports are unsupported. The exact final M0 value/type allowlists and signatures are the [kernel API contract](../../docs/architecture/contracts/kernel-api.md). The current M0-R runtime exports the five draft/record families, portable JSON codec/equality, ClaimKey, Instant/position constructors, and the append assembly slice; Basis and policy primitives arrive in M0-P rather than as placeholders. Testing exports exactly InMemoryStore, FixedClock, and SeededRandomSource. Scaffold-only `AppendResult`, `RecordRef`, `stream`, `head`, and `StoreUnderTest` do not survive M0.
 
 ## Layout
 
@@ -36,8 +36,4 @@ full scan/stream/head and reusable durable-store conformance remain M1.
 
 ## State
 
-The P0 slice implements the public Entry draft/envelope and application append path,
-the M0 `RecordStore` append/get port, branded Instant and StreamPosition constructors,
-and the three testing helpers. Catalog rows T01, T02, T84, and T87 are executable.
-Claim, Relation, Resolution, Verification, codecs/equality, policy, Basis, references,
-and the remaining M0 behavior are still pending in their owning slices.
+The landed P0 Entry behavior remains intact. M0-R adds all five public draft/record families, strict timestamp/id/field validation, detached recursively frozen canonical data, portable JSON transport/equality, and ClaimKey/scope identity. Catalog rows T01–T08, T84, T85, and T87 are executable. Policy/Basis (M0-P), ordered reference validation and the complete generic append orchestration (M0-A), and their catalog rows remain pending.

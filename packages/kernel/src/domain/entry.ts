@@ -29,33 +29,128 @@ export interface SourceRef {
   readonly locator?: string;
   readonly snapshot?: string;
 }
+export interface Subject {
+  readonly type: string;
+  readonly id: string;
+}
 
-export interface EntryDraft {
-  readonly kind: "entry";
+interface DraftEnvelope<K extends RecordKind> {
+  readonly kind: K;
   readonly actor: Actor;
-  readonly body: string;
-  readonly title?: string;
-  readonly entry_type?: string;
   readonly scope?: Scope;
   readonly metadata?: Metadata;
   readonly sources?: readonly SourceRef[];
 }
-
-export interface Entry {
+interface PersistedEnvelope<K extends RecordKind, I extends RecordId> {
   readonly schema: RecordSchemaId;
-  readonly kind: "entry";
-  readonly id: EntryId;
+  readonly kind: K;
+  readonly id: I;
   readonly recorded_at: string;
   readonly actor: Actor;
-  readonly body: string;
-  readonly title?: string;
-  readonly entry_type?: string;
   readonly scope: Scope;
   readonly metadata: Metadata;
   readonly sources: readonly SourceRef[];
 }
 
-/** P0's closed public slice. Later M0 slices add the other settled families. */
-export type RecordDraft = EntryDraft;
-export type PersistedRecord = Entry;
-export type PersistedRecordFor<D extends RecordDraft> = D extends EntryDraft ? Entry : never;
+export interface EntryDraft extends DraftEnvelope<"entry"> {
+  readonly body: string;
+  readonly title?: string;
+  readonly entry_type?: string;
+}
+export interface Entry extends PersistedEnvelope<"entry", EntryId> {
+  readonly body: string;
+  readonly title?: string;
+  readonly entry_type?: string;
+}
+
+export type Confidence = "candidate" | "observed" | "corroborated" | "confirmed" | "authoritative";
+export interface ClaimDraft extends DraftEnvelope<"claim"> {
+  readonly subject: Subject;
+  readonly predicate: string;
+  readonly value: JsonValue;
+  readonly confidence: Confidence;
+  readonly claim_class?: string;
+  readonly perspective?: string;
+  readonly valid_from?: string;
+  readonly valid_until?: string;
+  readonly derived_from?: readonly EntryId[];
+}
+export interface Claim extends PersistedEnvelope<"claim", ClaimId> {
+  readonly subject: Subject;
+  readonly predicate: string;
+  readonly value: JsonValue;
+  readonly confidence: Confidence;
+  readonly claim_class?: string;
+  readonly perspective?: string;
+  readonly valid_from?: string;
+  readonly valid_until?: string;
+  readonly derived_from: readonly EntryId[];
+}
+
+export type RelationType =
+  | "supports"
+  | "contradicts"
+  | "duplicates"
+  | "supersedes"
+  | "derived_from"
+  | "related_to";
+export interface RelationDraft extends DraftEnvelope<"relation"> {
+  readonly relation_type: RelationType;
+  readonly from: RecordId;
+  readonly to: RecordId;
+}
+export interface Relation extends PersistedEnvelope<"relation", RelationId> {
+  readonly relation_type: RelationType;
+  readonly from: RecordId;
+  readonly to: RecordId;
+}
+
+export type ResolutionDecision = "prefer" | "supersede" | "retract" | "leave_disputed";
+export interface ResolutionDraft extends DraftEnvelope<"resolution"> {
+  readonly targets: readonly (ClaimId | RelationId)[];
+  readonly decision: ResolutionDecision;
+  readonly replacement?: ClaimId;
+  readonly reason: string;
+  readonly effective_at?: string;
+}
+export interface Resolution extends PersistedEnvelope<"resolution", ResolutionId> {
+  readonly targets: readonly (ClaimId | RelationId)[];
+  readonly decision: ResolutionDecision;
+  readonly replacement?: ClaimId;
+  readonly reason: string;
+  readonly effective_at?: string;
+}
+
+export type VerificationResult = "confirmed" | "contradicted" | "unchanged" | "needs_revalidation";
+export type VerificationSourceRef = SourceRef & { readonly snapshot: string };
+export interface VerificationDraft extends DraftEnvelope<"verification"> {
+  readonly targets: readonly ClaimId[];
+  readonly verified_against: readonly VerificationSourceRef[];
+  readonly result: VerificationResult;
+}
+export interface Verification extends PersistedEnvelope<"verification", VerificationId> {
+  readonly targets: readonly ClaimId[];
+  readonly verified_against: readonly VerificationSourceRef[];
+  readonly result: VerificationResult;
+}
+
+export type RecordDraft = EntryDraft | ClaimDraft | RelationDraft | ResolutionDraft | VerificationDraft;
+export type PersistedRecord = Entry | Claim | Relation | Resolution | Verification;
+export type PersistedRecordFor<D extends RecordDraft> = D extends EntryDraft
+  ? Entry
+  : D extends ClaimDraft
+    ? Claim
+    : D extends RelationDraft
+      ? Relation
+      : D extends ResolutionDraft
+        ? Resolution
+        : D extends VerificationDraft
+          ? Verification
+          : never;
+
+export interface ClaimKey {
+  readonly scope: Scope;
+  readonly subject: Subject;
+  readonly predicate: string;
+  readonly perspective?: string;
+}
