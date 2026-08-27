@@ -30,7 +30,7 @@ At the TypeScript boundary, `StreamPosition` is opaque/branded and is a nonnegat
 
 Append rejects duplicate ids without replacing the original and reports `DUPLICATE_RECORD_ID`. A generated-id collision surfaces; application append does not retry, draw entropy again, or sample another clock value. Reads return canonical deeply frozen records detached from caller/store aliases. Append-result and get object identity is not promised; structural identity is.
 
-`InMemoryStore` implements this slice in M0 and is exported only from `@loredu/kernel/testing`. It is test support, not a durable provider.
+`InMemoryStore` implements this slice in M0 and is exported only from `@loredu/kernel/testing`. It canonicalizes and snapshots a direct append input before allocating position, returns a fresh detached deeply frozen canonical snapshot from `get`, and allocates nothing for malformed or duplicate append. It remains semantics-ignorant: references and ClaimPolicy belong to the application. It is test support, not a durable provider ([decision 0025](../../decisions/0025-m0-application-append-phase-boundaries.md)).
 
 ## Application-owned references
 

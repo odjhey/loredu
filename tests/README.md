@@ -41,7 +41,7 @@ Every catalog T-number must be either claimed by a real test here or deferred in
 faked. `bun docs/scripts/check-catalog.mjs` enforces that accounting, and rejects a
 claim whose file asserts nothing or is `.skip`/`.todo`.
 
-The records suite currently implements T01–T08, T84, T85, and T87; the
+The records suite implements T01–T08, T19, T80, T83–T85, and T87; the
 reconciliation suite implements the M0 identity primitives T81–T82. All remaining
 rows stay explicitly deferred. The group directories and their READMEs say what
 belongs where. An empty `describe()` or a `test.todo` cannot claim coverage. As a

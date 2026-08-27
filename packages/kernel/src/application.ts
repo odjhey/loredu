@@ -1,13 +1,16 @@
+import { claimKeyOf } from "./domain/claim-key";
 import {
-  type Entry,
-  type EntryDraft,
-  type JsonValue,
   type PersistedRecord,
+  type PersistedRecordFor,
   RECORD_SCHEMA_ID,
+  type RecordDraft,
   type RecordId,
-  type SourceRef,
+  type RecordKind,
 } from "./domain/entry";
-import { LoreduError, type LoreduIssue, type LoreduIssueCode } from "./errors";
+import { compareUnicodeScalars, makeIssue } from "./domain/portable-json";
+import { RECORD_ID_PREFIX, recordKindOfIdPrefix } from "./domain/record-kind";
+import { decodePersistedRecord, decodeRecordDraft } from "./domain/records";
+import { LoreduError, type LoreduIssue } from "./errors";
 import {
   type Clock,
   createInstant,
@@ -16,7 +19,13 @@ import {
   type RecordStore,
   type StreamPosition,
 } from "./ports/capabilities";
-import { type ClaimPolicy, DEFAULT_CLAIM_POLICY, validateClaimPolicy } from "./ports/claim-policy";
+import {
+  type ClaimPolicy,
+  DEFAULT_CLAIM_POLICY,
+  type ValidatedClaimPolicy,
+  validateClaimForAppend,
+  validateClaimPolicy,
+} from "./ports/claim-policy";
 
 export type { LoreduErrorCode, LoreduIssue, LoreduIssueCode } from "./errors";
 export { LoreduError } from "./errors";
@@ -31,332 +40,10 @@ export interface LoreduApplicationDependencies {
   readonly claimPolicy?: ClaimPolicy;
 }
 export interface LoreduApplication {
-  append<D extends EntryDraft>(draft: D): Promise<AppendRecordResult<Entry>>;
+  append<D extends RecordDraft>(draft: D): Promise<AppendRecordResult<PersistedRecordFor<D>>>;
 }
 
-const TOKEN = /^[a-z0-9](?:[a-z0-9._:/-]*[a-z0-9])?$/;
-const METADATA_KEY = /^[a-z0-9](?:[a-z0-9_:/-]*[a-z0-9])?\.[a-z0-9](?:[a-z0-9._:/-]*[a-z0-9])?$/;
-
-function metadataKeyHalvesFitLength(key: string): boolean {
-  const separator = key.indexOf(".");
-  const namespace = key.slice(0, separator);
-  const name = key.slice(separator + 1);
-  return scalarLength(namespace) <= 128 && scalarLength(name) <= 128;
-}
 const ALPHABET = "0123456789abcdefghjkmnpqrstvwxyz";
-type Data = Readonly<Record<string, PropertyDescriptor>>;
-
-function issue(code: LoreduIssueCode, path: string, message: string): LoreduIssue {
-  return Object.freeze({ code, path, message });
-}
-function pointer(value: string): string {
-  return value.replaceAll("~", "~0").replaceAll("/", "~1");
-}
-function scalarLength(value: string): number {
-  return [...value].length;
-}
-function compareUnicodeScalars(left: string, right: string): number {
-  const leftScalars = [...left];
-  const rightScalars = [...right];
-  const length = Math.min(leftScalars.length, rightScalars.length);
-  for (let index = 0; index < length; index++) {
-    const difference = (leftScalars[index]?.codePointAt(0) ?? 0) - (rightScalars[index]?.codePointAt(0) ?? 0);
-    if (difference !== 0) return difference;
-  }
-  return leftScalars.length - rightScalars.length;
-}
-function isScalarText(value: string): boolean {
-  for (let index = 0; index < value.length; index++) {
-    const code = value.charCodeAt(index);
-    if (code >= 0xd800 && code <= 0xdbff) {
-      const next = value.charCodeAt(++index);
-      if (!(next >= 0xdc00 && next <= 0xdfff)) return false;
-    } else if (code >= 0xdc00 && code <= 0xdfff) return false;
-  }
-  return true;
-}
-function inspectObject(value: unknown, path: string, issues: LoreduIssue[]): Data | undefined {
-  if (typeof value !== "object" || value === null) {
-    issues.push(issue("TYPE", path, "must be a plain object"));
-    return undefined;
-  }
-  try {
-    if (Array.isArray(value)) {
-      issues.push(issue("TYPE", path, "must be a plain object"));
-      return undefined;
-    }
-    const prototype = Object.getPrototypeOf(value);
-    if (prototype !== Object.prototype && prototype !== null) {
-      issues.push(issue("TYPE", path, "must have Object.prototype or null prototype"));
-      return undefined;
-    }
-    if (Object.getOwnPropertySymbols(value).length > 0)
-      issues.push(issue("UNKNOWN_FIELD", path, "must not have symbol fields"));
-    const descriptors = Object.getOwnPropertyDescriptors(value);
-    for (const [key, descriptor] of Object.entries(descriptors)) {
-      if (!("value" in descriptor) || !descriptor.enumerable) {
-        issues.push(issue("TYPE", `${path}/${pointer(key)}`, "must be an enumerable own data property"));
-      }
-    }
-    return descriptors;
-  } catch {
-    issues.push(issue("TYPE", path, "could not be inspected as plain data"));
-    return undefined;
-  }
-}
-function dataValue(data: Data, key: string): unknown {
-  if (!Object.hasOwn(data, key)) return undefined;
-  const descriptor = data[key];
-  return descriptor && "value" in descriptor ? descriptor.value : undefined;
-}
-function inspectArray(value: unknown, path: string, issues: LoreduIssue[]): readonly unknown[] | undefined {
-  try {
-    if (!Array.isArray(value)) {
-      issues.push(issue("TYPE", path, "must be an array"));
-      return undefined;
-    }
-    if (Object.getPrototypeOf(value) !== Array.prototype)
-      issues.push(issue("TYPE", path, "must have Array.prototype"));
-    if (Object.getOwnPropertySymbols(value).length > 0)
-      issues.push(issue("UNKNOWN_FIELD", path, "must not have symbol fields"));
-    const descriptors = Object.getOwnPropertyDescriptors(value);
-    const length = value.length;
-    const result: unknown[] = [];
-    for (const [key, descriptor] of Object.entries(descriptors)) {
-      if (key === "length") continue;
-      const index = Number(key);
-      if (!Number.isSafeInteger(index) || index < 0 || index >= length || String(index) !== key) {
-        issues.push(issue("UNKNOWN_FIELD", `${path}/${pointer(key)}`, "is an array extra property"));
-      } else if (!("value" in descriptor) || !descriptor.enumerable) {
-        issues.push(issue("TYPE", `${path}/${key}`, "must be an enumerable own data element"));
-      } else result[index] = descriptor.value;
-    }
-    for (let index = 0; index < length; index++) {
-      if (!Object.hasOwn(descriptors, String(index)))
-        issues.push(issue("REQUIRED", `${path}/${index}`, "array must be dense"));
-    }
-    result.length = length;
-    return result;
-  } catch {
-    issues.push(issue("TYPE", path, "could not be inspected as plain array data"));
-    return undefined;
-  }
-}
-function copyJson(
-  value: unknown,
-  path: string,
-  issues: LoreduIssue[],
-  ancestors: Set<object>,
-): JsonValue | undefined {
-  if (value === null || typeof value === "boolean") return value;
-  if (typeof value === "string") {
-    if (isScalarText(value)) return value;
-    issues.push(issue("FORMAT", path, "must contain only Unicode scalar values"));
-    return undefined;
-  }
-  if (typeof value === "number") {
-    if (Number.isFinite(value) && !Object.is(value, -0)) return value;
-    issues.push(issue("FORMAT", path, "must be a finite JSON number other than -0"));
-    return undefined;
-  }
-  if (typeof value !== "object" || value === null) {
-    issues.push(issue("TYPE", path, "must be JSON data"));
-    return undefined;
-  }
-  if (ancestors.has(value)) {
-    issues.push(issue("FORMAT", path, "must be acyclic JSON data"));
-    return undefined;
-  }
-  ancestors.add(value);
-  let arrayValue: boolean;
-  try {
-    arrayValue = Array.isArray(value);
-  } catch {
-    issues.push(issue("TYPE", path, "could not be inspected as plain JSON data"));
-    ancestors.delete(value);
-    return undefined;
-  }
-  if (arrayValue) {
-    const array = inspectArray(value, path, issues);
-    const result: JsonValue[] = [];
-    if (array)
-      for (let index = 0; index < array.length; index++)
-        result.push(copyJson(array[index], `${path}/${index}`, issues, ancestors) as JsonValue);
-    ancestors.delete(value);
-    return Object.freeze(result);
-  }
-  const data = inspectObject(value, path, issues);
-  const result = Object.create(null) as Record<string, JsonValue>;
-  if (data) {
-    for (const key of Object.keys(data).sort(compareUnicodeScalars)) {
-      if (!isScalarText(key))
-        issues.push(
-          issue("FORMAT", `${path}/${pointer(key)}`, "property name must contain only Unicode scalar values"),
-        );
-      Object.defineProperty(result, key, {
-        value: copyJson(dataValue(data, key), `${path}/${pointer(key)}`, issues, ancestors) as JsonValue,
-        enumerable: true,
-        configurable: false,
-        writable: false,
-      });
-    }
-  }
-  ancestors.delete(value);
-  return Object.freeze(result);
-}
-function validateSource(value: unknown, path: string, issues: LoreduIssue[]): SourceRef | undefined {
-  const data = inspectObject(value, path, issues);
-  if (!data) return undefined;
-  for (const key of Object.keys(data))
-    if (!["ref", "locator", "snapshot"].includes(key))
-      issues.push(issue("UNKNOWN_FIELD", `${path}/${pointer(key)}`, "is not part of SourceRef"));
-  const result: { ref?: string; locator?: string; snapshot?: string } = {};
-  for (const [key, maximum] of [
-    ["ref", 1024],
-    ["locator", 1024],
-    ["snapshot", 256],
-  ] as const) {
-    const present = Object.hasOwn(data, key);
-    const field = dataValue(data, key);
-    if (!present) {
-      if (key === "ref") issues.push(issue("REQUIRED", `${path}/ref`, "is required"));
-    } else if (typeof field !== "string") issues.push(issue("TYPE", `${path}/${key}`, "must be a string"));
-    else if (
-      !isScalarText(field) ||
-      field !== field.trim() ||
-      scalarLength(field) === 0 ||
-      scalarLength(field) > maximum
-    )
-      issues.push(
-        issue("FORMAT", `${path}/${key}`, `must be trimmed Unicode scalar text of 1..${maximum} characters`),
-      );
-    else result[key] = field;
-  }
-  return result.ref === undefined ? undefined : Object.freeze(result as SourceRef);
-}
-function sourceEqual(left: SourceRef, right: SourceRef): boolean {
-  return left.ref === right.ref && left.locator === right.locator && left.snapshot === right.snapshot;
-}
-function validateEntry(input: unknown): EntryDraft {
-  const issues: LoreduIssue[] = [];
-  const data = inspectObject(input, "", issues);
-  if (!data)
-    throw new LoreduError("VALIDATION_FAILED", "Entry draft validation failed", Object.freeze(issues));
-  const allowed = new Set(["kind", "actor", "body", "title", "entry_type", "scope", "metadata", "sources"]);
-  for (const key of Object.keys(data)) {
-    if (["schema", "id", "recorded_at"].includes(key))
-      issues.push(issue("RESERVED_FIELD", `/${key}`, "is application-owned"));
-    else if (!allowed.has(key))
-      issues.push(issue("UNKNOWN_FIELD", `/${pointer(key)}`, "is not part of an Entry draft"));
-  }
-  const kind = dataValue(data, "kind");
-  const body = dataValue(data, "body");
-  if (kind !== "entry") issues.push(issue("FORMAT", "/kind", "must equal entry"));
-  if (typeof body !== "string") issues.push(issue("TYPE", "/body", "must be a string"));
-  else if (!isScalarText(body))
-    issues.push(issue("FORMAT", "/body", "must contain only Unicode scalar values"));
-  else if (!/\S/u.test(body)) issues.push(issue("REQUIRED", "/body", "must contain non-whitespace text"));
-
-  const actorData = inspectObject(dataValue(data, "actor"), "/actor", issues);
-  let actor: EntryDraft["actor"] | undefined;
-  if (actorData) {
-    for (const key of Object.keys(actorData))
-      if (key !== "type" && key !== "id")
-        issues.push(issue("UNKNOWN_FIELD", `/actor/${pointer(key)}`, "is not part of actor"));
-    const type = dataValue(actorData, "type");
-    const id = dataValue(actorData, "id");
-    if (!["human", "agent", "program", "system"].includes(type as string))
-      issues.push(issue("FORMAT", "/actor/type", "must be a supported actor type"));
-    if (typeof id !== "string" || !isScalarText(id) || scalarLength(id) > 128 || !TOKEN.test(id))
-      issues.push(issue("FORMAT", "/actor/id", "must be a lowercase token of at most 128 characters"));
-    else actor = Object.freeze({ type: type as EntryDraft["actor"]["type"], id });
-  }
-
-  const scope: Record<string, string> = {};
-  if (Object.hasOwn(data, "scope")) {
-    const scopeData = inspectObject(dataValue(data, "scope"), "/scope", issues);
-    if (scopeData)
-      for (const key of Object.keys(scopeData).sort(compareUnicodeScalars)) {
-        const value = dataValue(scopeData, key);
-        if (
-          !isScalarText(key) ||
-          !TOKEN.test(key) ||
-          scalarLength(key) > 128 ||
-          typeof value !== "string" ||
-          !isScalarText(value) ||
-          !TOKEN.test(value) ||
-          scalarLength(value) > 128
-        )
-          issues.push(issue("FORMAT", `/scope/${pointer(key)}`, "scope keys and values must be tokens"));
-        else scope[key] = value;
-      }
-  }
-  const metadata: Record<string, JsonValue> = {};
-  if (Object.hasOwn(data, "metadata")) {
-    const metadataData = inspectObject(dataValue(data, "metadata"), "/metadata", issues);
-    if (metadataData)
-      for (const key of Object.keys(metadataData).sort(compareUnicodeScalars)) {
-        if (!METADATA_KEY.test(key) || key.startsWith("loredu.") || !metadataKeyHalvesFitLength(key))
-          issues.push(issue("FORMAT", `/metadata/${pointer(key)}`, "must be a non-reserved namespaced key"));
-        else
-          metadata[key] = copyJson(
-            dataValue(metadataData, key),
-            `/metadata/${pointer(key)}`,
-            issues,
-            new Set(),
-          ) as JsonValue;
-      }
-  }
-  const sources: SourceRef[] = [];
-  if (Object.hasOwn(data, "sources")) {
-    const sourceInput = inspectArray(dataValue(data, "sources"), "/sources", issues);
-    if (sourceInput)
-      for (let index = 0; index < sourceInput.length; index++) {
-        const source = validateSource(sourceInput[index], `/sources/${index}`, issues);
-        if (source) {
-          if (sources.some((existing) => sourceEqual(existing, source)))
-            issues.push(issue("DUPLICATE", `/sources/${index}`, "duplicates an earlier SourceRef"));
-          else sources.push(source);
-        }
-      }
-  }
-  const title = dataValue(data, "title");
-  if (Object.hasOwn(data, "title")) {
-    if (typeof title !== "string") issues.push(issue("TYPE", "/title", "must be a string"));
-    else if (
-      !isScalarText(title) ||
-      title !== title.trim() ||
-      scalarLength(title) === 0 ||
-      scalarLength(title) > 256
-    )
-      issues.push(issue("FORMAT", "/title", "must be trimmed Unicode scalar text of 1..256 characters"));
-  }
-  const entryType = dataValue(data, "entry_type");
-  if (Object.hasOwn(data, "entry_type")) {
-    if (typeof entryType !== "string") issues.push(issue("TYPE", "/entry_type", "must be a string"));
-    else if (!isScalarText(entryType) || !TOKEN.test(entryType) || scalarLength(entryType) > 128)
-      issues.push(issue("FORMAT", "/entry_type", "must be a token"));
-  }
-  if (issues.length > 0 || !actor || typeof body !== "string") {
-    const ordered = issues.sort(
-      (left, right) =>
-        compareUnicodeScalars(left.path, right.path) || compareUnicodeScalars(left.code, right.code),
-    );
-    throw new LoreduError("VALIDATION_FAILED", "Entry draft validation failed", Object.freeze(ordered));
-  }
-  return {
-    kind: "entry",
-    actor,
-    body,
-    ...(Object.hasOwn(data, "title") ? { title: title as string } : {}),
-    ...(Object.hasOwn(data, "entry_type") ? { entry_type: entryType as string } : {}),
-    scope: Object.freeze(scope),
-    metadata: Object.freeze(metadata),
-    sources: Object.freeze(sources),
-  };
-}
-// Capture every entropy-boundary operation while this module's realm is still trusted. Append
-// must not rediscover these through mutable globals or prototypes after consumer code runs.
 const intrinsicUint8Array = Uint8Array;
 const intrinsicReflectApply = Reflect.apply;
 const typedArrayPrototype = Object.getPrototypeOf(intrinsicUint8Array.prototype);
@@ -364,20 +51,22 @@ const typedArrayTag = Object.getOwnPropertyDescriptor(typedArrayPrototype, Symbo
 const typedArrayLength = Object.getOwnPropertyDescriptor(typedArrayPrototype, "length")?.get;
 const typedArraySet = Object.getOwnPropertyDescriptor(typedArrayPrototype, "set")?.value;
 
+type Reference = {
+  readonly id: RecordId;
+  readonly path: string;
+  readonly kinds: readonly RecordKind[];
+};
+
 function applyIntrinsic(target: (...args: never[]) => unknown, receiver: unknown, argumentsList: unknown[]) {
   return intrinsicReflectApply(target, receiver, argumentsList);
 }
 
-function idFrom(bytes: unknown): RecordId {
+function idFrom(bytes: unknown, kind: RecordKind): RecordId {
   try {
-    // Intrinsic internal-slot getters are cross-realm safe and reject proxies, spoofs, detached
-    // storage, and every non-Uint8 typed-array element kind without consulting caller hooks.
     if (!typedArrayTag || !typedArrayLength || !typedArraySet) throw new TypeError("missing intrinsic");
     if (applyIntrinsic(typedArrayTag, bytes, []) !== "Uint8Array") throw new TypeError("not Uint8Array");
     if (applyIntrinsic(typedArrayLength, bytes, []) !== 10) throw new RangeError("wrong length");
 
-    // Allocate in the trusted realm and copy through %TypedArray%.prototype.set's typed-array
-    // path. The resulting exact-size snapshot is the only storage read during encoding.
     const owned = new intrinsicUint8Array(10);
     applyIntrinsic(typedArraySet, owned, [bytes]);
     if (applyIntrinsic(typedArrayLength, owned, []) !== 10) throw new RangeError("wrong snapshot length");
@@ -388,35 +77,141 @@ function idFrom(bytes: unknown): RecordId {
     };
     let suffix = "";
     for (let index = 0; index < 10; index += 5) {
-      const number =
+      const value =
         ownedByte(index) * 2 ** 32 +
         ownedByte(index + 1) * 2 ** 24 +
         ownedByte(index + 2) * 2 ** 16 +
         ownedByte(index + 3) * 2 ** 8 +
         ownedByte(index + 4);
-      for (let shift = 35; shift >= 0; shift -= 5) suffix += ALPHABET[Math.floor(number / 2 ** shift) & 31];
+      for (let shift = 35; shift >= 0; shift -= 5) suffix += ALPHABET[Math.floor(value / 2 ** shift) & 31];
     }
-    return `ent_${suffix}` as RecordId;
+    return `${RECORD_ID_PREFIX[kind]}_${suffix}` as RecordId;
   } catch {
     throw new LoreduError("RANDOM_SOURCE_FAILED", "RandomSource must return exactly 10 Uint8 bytes");
   }
 }
+
+function referencesOf(draft: RecordDraft): readonly Reference[] {
+  if (draft.kind === "entry") return Object.freeze([]);
+  if (draft.kind === "claim")
+    return Object.freeze(
+      (draft.derived_from ?? []).map((id, index) =>
+        Object.freeze({ id, path: `/derived_from/${index}`, kinds: Object.freeze(["entry"] as const) }),
+      ),
+    );
+  if (draft.kind === "relation") {
+    const kinds =
+      draft.relation_type === "derived_from"
+        ? Object.freeze(["claim"] as const)
+        : Object.freeze(["entry", "claim", "relation", "resolution", "verification"] as const);
+    return Object.freeze([
+      Object.freeze({ id: draft.from, path: "/from", kinds }),
+      Object.freeze({ id: draft.to, path: "/to", kinds }),
+    ]);
+  }
+  if (draft.kind === "resolution")
+    return Object.freeze([
+      ...draft.targets.map((id, index) =>
+        Object.freeze({
+          id,
+          path: `/targets/${index}`,
+          kinds: Object.freeze(["claim", "relation"] as const),
+        }),
+      ),
+      ...(draft.replacement === undefined
+        ? []
+        : [
+            Object.freeze({
+              id: draft.replacement,
+              path: "/replacement",
+              kinds: Object.freeze(["claim"] as const),
+            }),
+          ]),
+    ]);
+  return Object.freeze(
+    draft.targets.map((id, index) =>
+      Object.freeze({ id, path: `/targets/${index}`, kinds: Object.freeze(["claim"] as const) }),
+    ),
+  );
+}
+
+async function checkReferences(store: RecordStore, references: readonly Reference[]): Promise<void> {
+  const issues: LoreduIssue[] = [];
+  for (const reference of references) {
+    let found: PersistedRecord | undefined;
+    try {
+      const value = await store.get(reference.id);
+      found = value === undefined ? undefined : decodePersistedRecord(value);
+    } catch {
+      throw new LoreduError("REFERENCE_CHECK_FAILED", "Record reference read failed");
+    }
+    if (found === undefined) {
+      issues.push(makeIssue("REFERENCE_NOT_FOUND", reference.path, `record does not exist: ${reference.id}`));
+    } else if (
+      !reference.kinds.includes(found.kind) ||
+      recordKindOfIdPrefix(reference.id.slice(0, 3)) !== found.kind
+    ) {
+      issues.push(
+        makeIssue(
+          "REFERENCE_KIND_MISMATCH",
+          reference.path,
+          `record kind ${found.kind} is not valid for this reference`,
+        ),
+      );
+    }
+  }
+  if (issues.length > 0)
+    throw new LoreduError(
+      "REFERENCE_CHECK_FAILED",
+      "Record reference validation failed",
+      Object.freeze(issues),
+    );
+}
+
+function validateDraft(input: unknown, policy: ValidatedClaimPolicy): RecordDraft {
+  const draft = decodeRecordDraft(input);
+  if (draft.kind !== "claim") return draft;
+  const issues = validateClaimForAppend(policy, claimKeyOf(draft));
+  if (issues.length > 0) {
+    const ordered = Object.freeze(
+      [...issues].sort(
+        (left, right) =>
+          compareUnicodeScalars(left.path, right.path) || compareUnicodeScalars(left.code, right.code),
+      ),
+    );
+    throw new LoreduError("VALIDATION_FAILED", "Claim policy validation failed", ordered);
+  }
+  return draft;
+}
+
+function stamp(draft: RecordDraft, id: RecordId, recordedAt: string): PersistedRecord {
+  return decodePersistedRecord({
+    ...draft,
+    schema: RECORD_SCHEMA_ID,
+    id,
+    recorded_at: recordedAt,
+  });
+}
+
 export function createLoreduApplication({
   store,
   clock,
   randomSource,
   claimPolicy = DEFAULT_CLAIM_POLICY,
 }: LoreduApplicationDependencies): LoreduApplication {
-  validateClaimPolicy(claimPolicy);
+  const policy = validateClaimPolicy(claimPolicy);
   return Object.freeze({
-    async append<D extends EntryDraft>(input: D) {
-      const draft = validateEntry(input);
+    async append<D extends RecordDraft>(input: D) {
+      const draft = validateDraft(input, policy);
+      await checkReferences(store, referencesOf(draft));
+
       let id: RecordId;
       try {
-        id = idFrom(randomSource.nextBytes(10));
+        id = idFrom(randomSource.nextBytes(10), draft.kind);
       } catch {
         throw new LoreduError("RANDOM_SOURCE_FAILED", "RandomSource failed");
       }
+
       let recordedAt: string;
       try {
         const instant = createInstant(clock.now());
@@ -424,19 +219,15 @@ export function createLoreduApplication({
       } catch {
         throw new LoreduError("CLOCK_FAILED", "Clock failed");
       }
-      const record = Object.freeze({
-        ...draft,
-        schema: RECORD_SCHEMA_ID,
-        id,
-        recorded_at: recordedAt,
-      }) as Entry;
+
+      const record = stamp(draft, id, recordedAt);
       try {
         const position = createStreamPosition(await store.append(record));
         if (position === 0) throw new RangeError("append position must be positive");
-        return Object.freeze({ record, position }) as AppendRecordResult<Entry>;
+        return Object.freeze({ record, position }) as AppendRecordResult<PersistedRecordFor<D>>;
       } catch (error) {
         if (error instanceof LoreduError && error.code === "DUPLICATE_RECORD_ID") throw error;
-        throw new LoreduError("STORE_APPEND_FAILED", "Store append failed");
+        throw new LoreduError("STORE_APPEND_FAILED", `Store append failed for record ${id}`);
       }
     },
   });

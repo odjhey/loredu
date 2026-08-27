@@ -5,16 +5,31 @@ import {
   dataValue,
   escapePointer,
   hasOwnDescriptor,
+  inspectArray,
   inspectObject,
   isScalarText,
   makeIssue,
   scalarLength,
 } from "../domain/portable-json";
-import { LoreduError, type LoreduIssue } from "../errors";
+import { LoreduError, type LoreduIssue, type LoreduIssueCode } from "../errors";
 
 const TOKEN = /^[a-z0-9](?:[a-z0-9._:/-]*[a-z0-9])?$/;
 const POLICY_FIELDS = new Set(["id", "version", "validateClaimKey", "semantics"]);
 const FORBIDDEN_POLICY_FIELDS = ["identity", "advise", "advisories"] as const;
+const ISSUE_CODES: ReadonlySet<LoreduIssueCode> = new Set([
+  "REQUIRED",
+  "TYPE",
+  "FORMAT",
+  "RANGE",
+  "UNKNOWN_FIELD",
+  "RESERVED_FIELD",
+  "DUPLICATE",
+  "UNKNOWN_SCHEMA",
+  "REFERENCE_NOT_FOUND",
+  "REFERENCE_KIND_MISMATCH",
+]);
+const JSON_POINTER = /^(?:|(?:\/(?:[^~]|~[01])*)+)$/u;
+const intrinsicReflectApply = Reflect.apply;
 
 export type ClaimSemantics = "exclusive" | "coexisting";
 
@@ -134,6 +149,68 @@ export interface ValidatedClaimPolicy {
   readonly policy: ClaimPolicy;
   readonly id: string;
   readonly version: string;
+  validateClaimKey(key: ClaimKey): unknown;
+  semantics(key: ClaimKey): unknown;
+}
+
+function invalidCallbackResult(message: string): readonly LoreduIssue[] {
+  return Object.freeze([makeIssue("TYPE", "", message)]);
+}
+
+function copyPolicyIssues(value: unknown): readonly LoreduIssue[] | undefined {
+  const inspection: LoreduIssue[] = [];
+  const items = inspectArray(value, "", inspection);
+  if (!items || inspection.length > 0) return undefined;
+  const copied: LoreduIssue[] = [];
+  for (const item of items) {
+    const itemIssues: LoreduIssue[] = [];
+    const data = inspectObject(item, "", itemIssues);
+    if (!data || itemIssues.length > 0) return undefined;
+    rejectUnknown(data, new Set(["code", "path", "message"]), "", itemIssues);
+    const code = requiredValue(data, "code", "", itemIssues);
+    const path = requiredValue(data, "path", "", itemIssues);
+    const message = requiredValue(data, "message", "", itemIssues);
+    if (
+      itemIssues.length > 0 ||
+      typeof code !== "string" ||
+      !ISSUE_CODES.has(code as LoreduIssueCode) ||
+      typeof path !== "string" ||
+      !isScalarText(path) ||
+      !JSON_POINTER.test(path) ||
+      typeof message !== "string" ||
+      !isScalarText(message) ||
+      scalarLength(message) === 0
+    )
+      return undefined;
+    copied.push(makeIssue(code as LoreduIssueCode, path, message));
+  }
+  return orderedIssues(copied);
+}
+
+/** Internal Claim append policy phase over the already canonical declared key. */
+export function validateClaimForAppend(
+  validated: ValidatedClaimPolicy,
+  key: ClaimKey,
+): readonly LoreduIssue[] {
+  let returned: unknown;
+  try {
+    returned = validated.validateClaimKey(key);
+  } catch {
+    return invalidCallbackResult("ClaimPolicy validateClaimKey failed");
+  }
+  const issues = copyPolicyIssues(returned);
+  if (!issues) return invalidCallbackResult("ClaimPolicy validateClaimKey must return LoreduIssue[]");
+  if (issues.length > 0) return issues;
+
+  let semantics: unknown;
+  try {
+    semantics = validated.semantics(key);
+  } catch {
+    return invalidCallbackResult("ClaimPolicy semantics failed");
+  }
+  if (semantics !== "exclusive" && semantics !== "coexisting")
+    return Object.freeze([makeIssue("FORMAT", "", "ClaimPolicy semantics returned an unsupported value")]);
+  return EMPTY_ISSUES;
 }
 
 /** Internal runtime boundary shared by assembly and structural ruleset construction. */
@@ -186,7 +263,26 @@ export function validateClaimPolicy(policy: unknown): ValidatedClaimPolicy {
   if (typeof semantics !== "function") issues.push(makeIssue("TYPE", "/semantics", "must be a function"));
 
   const ordered = orderedIssues(issues);
-  if (ordered.length > 0 || !parsedId || !parsedVersion)
+  if (
+    ordered.length > 0 ||
+    !parsedId ||
+    !parsedVersion ||
+    typeof validator !== "function" ||
+    typeof semantics !== "function"
+  )
     throw new LoreduError("VALIDATION_FAILED", "ClaimPolicy validation failed", ordered);
-  return Object.freeze({ policy: policy as ClaimPolicy, id: parsedId, version: parsedVersion });
+  const capturedPolicy = policy as ClaimPolicy;
+  const capturedValidator = validator;
+  const capturedSemantics = semantics;
+  return Object.freeze({
+    policy: capturedPolicy,
+    id: parsedId,
+    version: parsedVersion,
+    validateClaimKey(key: ClaimKey): unknown {
+      return intrinsicReflectApply(capturedValidator, capturedPolicy, [key]);
+    },
+    semantics(key: ClaimKey): unknown {
+      return intrinsicReflectApply(capturedSemantics, capturedPolicy, [key]);
+    },
+  });
 }
