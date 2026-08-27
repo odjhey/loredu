@@ -305,6 +305,29 @@ describe("M0 record/draft family foundation", () => {
     );
   });
 
+  test("append and decode agree on the metadata key length bound", async () => {
+    const { app } = appWith();
+    const entryDraft = drafts[0] as EntryDraft;
+    const oversizedNamespace = `${"n".repeat(129)}.x`;
+    await expect(
+      app.append({ ...entryDraft, metadata: { [oversizedNamespace]: true } }),
+    ).rejects.toMatchObject({
+      code: "VALIDATION_FAILED",
+      issues: expect.arrayContaining([
+        expect.objectContaining({ code: "FORMAT", path: `/metadata/${oversizedNamespace}` }),
+      ]),
+    });
+    const oversizedName = `x.${"n".repeat(129)}`;
+    await expect(
+      app.append({ ...entryDraft, metadata: { [oversizedName]: true } }),
+    ).rejects.toMatchObject({ code: "VALIDATION_FAILED" });
+
+    const boundaryKey = `${"n".repeat(128)}.${"m".repeat(128)}`;
+    const accepted = await app.append({ ...entryDraft, metadata: { [boundaryKey]: true } });
+    const decoded = decodePersistedRecord(encodePersistedRecord(accepted.record));
+    expect(decoded).toEqual(accepted.record);
+  });
+
   test("repeated appends preserve history with distinct ids — @covers T07", async () => {
     const { app, store } = appWith();
     const one = await app.append(drafts[0] as EntryDraft);

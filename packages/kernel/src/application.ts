@@ -34,6 +34,13 @@ export interface LoreduApplication {
 
 const TOKEN = /^[a-z0-9](?:[a-z0-9._:/-]*[a-z0-9])?$/;
 const METADATA_KEY = /^[a-z0-9](?:[a-z0-9_:/-]*[a-z0-9])?\.[a-z0-9](?:[a-z0-9._:/-]*[a-z0-9])?$/;
+
+function metadataKeyHalvesFitLength(key: string): boolean {
+  const separator = key.indexOf(".");
+  const namespace = key.slice(0, separator);
+  const name = key.slice(separator + 1);
+  return scalarLength(namespace) <= 128 && scalarLength(name) <= 128;
+}
 const ALPHABET = "0123456789abcdefghjkmnpqrstvwxyz";
 type Data = Readonly<Record<string, PropertyDescriptor>>;
 
@@ -287,7 +294,7 @@ function validateEntry(input: unknown): EntryDraft {
     const metadataData = inspectObject(dataValue(data, "metadata"), "/metadata", issues);
     if (metadataData)
       for (const key of Object.keys(metadataData).sort(compareUnicodeScalars)) {
-        if (!METADATA_KEY.test(key) || key.startsWith("loredu."))
+        if (!METADATA_KEY.test(key) || key.startsWith("loredu.") || !metadataKeyHalvesFitLength(key))
           issues.push(issue("FORMAT", `/metadata/${pointer(key)}`, "must be a non-reserved namespaced key"));
         else
           metadata[key] = copyJson(
