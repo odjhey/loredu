@@ -48,12 +48,12 @@ created_at: 2026-08-26T12:10:00+08:00
 | **Advice** | Deterministic, runnable follow-up entries in a response — corrective (close an attention item) or navigational (continue a list, expand a handle). Never speculative. |
 | **Page** | Bounded slice of a list result: returned count, total count, and a cursor when more exists. Truncation is never silent. |
 | **Health** | Mechanically checkable store condition that blocks a health check: unresolved same-key groups, malformed records, dangling references. |
-| **Advisory** | Non-blocking mechanical hint. Generic same-value/different-key divergence is versioned core mechanics, never default-policy advice, and never reconciles across keys. |
+| **Advisory** | Non-blocking mechanical hint. Generic same-value/different-key divergence is later M1.5 versioned core mechanics, never ClaimPolicy advice, and never reconciles across keys. |
 | **Scope** | Caller-declared namespace a claim key belongs to (e.g. `repo=rozoro`); the consumer owns its vocabulary. |
 | **Perspective** | Optional claim-key component distinguishing coexisting views of the same subject/predicate, e.g. `documented_process` vs `observed_process`. |
 | **Confidence** | Claim field grading evidential strength: `candidate`, `observed`, `corroborated`, `confirmed`, `authoritative`. |
 | **RulesetIdentity** | Structural identity `{core, claim_policy: {id, version}}`; default is core `loredu.reconciliation/v1` plus policy `loredu.default` version `1`. |
-| **ClaimPolicy** | Versioned seam that may validate (never transform) the exact declared ClaimKey, select `exclusive|coexisting`, and emit optional policy advisories. Default emits none. |
+| **ClaimPolicy** | Versioned seam that in M0 may validate (never transform) the exact declared ClaimKey and select `exclusive|coexisting`; the M0 interface has no `advise` method. Optional policy advice requires a later additive API when M2/M4 executes it. |
 | **LoreduError** | Structured public failure with stable top-level code, human message, and ordered ValidationIssues. |
 | **ValidationIssue** | Stable issue code, RFC6901 JSON Pointer path, and human message identifying one validation/reference problem. |
 | **Affordance** | Surface-neutral follow-up emitted by the application layer (`rel`, `action`, `params`); surface adapters render it as a CLI command, link, or call. Advice is a list of affordances. |

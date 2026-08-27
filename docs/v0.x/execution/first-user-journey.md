@@ -20,11 +20,11 @@ Every command returns the same envelope shape in text and `--json`:
 ```json
 {
   "ok": true,
-  "result": { "id": "clm_x4x8", "kind": "claim" },
-  "reconciliation": { "state": "conflict-candidate", "key": "(repo=rozoro code-area command-registration).location", "related": ["clm_7f3k"] },
+  "result": { "id": "clm_3333333333333333", "kind": "claim" },
+  "reconciliation": { "state": "conflict-candidate", "key": "(repo=rozoro code-area command-registration).location", "related": ["clm_1111111111111111"] },
   "advice": [
-    { "why": "another claim exists under this key with a different value", "run": "lor show clm_7f3k" },
-    { "why": "record your judgment once verified against the source", "run": "lor resolve --targets clm_7f3k,clm_x4x8 --decision prefer --replacement clm_x4x8 --reason \"...\"" }
+    { "why": "another claim exists under this key with a different value", "run": "lor show clm_1111111111111111" },
+    { "why": "record your judgment once verified against the source", "run": "lor resolve --targets clm_1111111111111111,clm_3333333333333333 --decision prefer --replacement clm_3333333333333333 --reason \"...\"" }
   ],
   "basis": {
     "stream_position": 6,
@@ -83,7 +83,7 @@ $ echo "Command registration is concentrated in src/commands, but plugins
   can register commands dynamically elsewhere." | lor add entry \
     --type finding --title "command registration" \
     --source repo=rozoro --locator src/commands --snapshot 3a1d8b7 --body -
-ent_a1b2
+ent_0123456789abcdef
 ```
 
 Then the structured claim, keyed ([decision 0004](../../decisions/0004-claim-identity-key.md)):
@@ -92,8 +92,8 @@ Then the structured claim, keyed ([decision 0004](../../decisions/0004-claim-ide
 $ lor add claim --scope repo=rozoro \
     --subject-type code-area --subject command-registration \
     --predicate location --value src/commands \
-    --derived-from ent_a1b2 --confidence observed
-clm_7f3k  new claim (no prior claims under this key)
+    --derived-from ent_0123456789abcdef --confidence observed
+clm_1111111111111111  new claim (no prior claims under this key)
 ```
 
 The write-time feedback line is part of the contract: it is how writers learn whether their key vocabulary is landing.
@@ -104,16 +104,16 @@ A second actor (an agent, different phrasing, same declared key):
 
 ```text
 $ lor add claim ... --predicate location --value src/commands ...
-clm_9d2q  corroborates clm_7f3k
+clm_2222222222222222  corroborates clm_1111111111111111
 ```
 
 A later run finds the world changed:
 
 ```text
 $ lor add claim ... --predicate location --value src/cli/commands ...
-clm_x4x8  conflict candidate under key with clm_7f3k
-advice: lor show clm_7f3k
-advice: lor resolve --targets clm_7f3k,clm_x4x8 --decision prefer --replacement clm_x4x8 --reason "..."
+clm_3333333333333333  conflict candidate under key with clm_1111111111111111
+advice: lor show clm_1111111111111111
+advice: lor resolve --targets clm_1111111111111111,clm_3333333333333333 --decision prefer --replacement clm_3333333333333333 --reason "..."
 ```
 
 Nothing is deleted or overwritten; the conflict is now visible knowledge, and the advice tells the same agent how to close it.
@@ -154,9 +154,9 @@ The shell is the rest of the query engine; lor does not need to grow one.
 ```text
 $ lor lore --activity investigate --scope repo=rozoro
 current:
-  (code-area command-registration) location = src/commands   [clm_7f3k, corroborated]
+  (code-area command-registration) location = src/commands   [clm_1111111111111111, corroborated]
 attention:
-  conflict: location = src/commands vs src/cli/commands      [clm_7f3k ~ clm_x4x8]
+  conflict: location = src/commands vs src/cli/commands      [clm_1111111111111111 ~ clm_3333333333333333]
 basis:
   stream_position: 4
   ruleset: { core: loredu.reconciliation/v1, claim_policy: { id: loredu.default, version: "1" } }
@@ -168,11 +168,11 @@ Bounded, ranked, with stable handles — not a record dump.
 ## Journey 5 — resolve
 
 ```text
-$ lor resolve --targets clm_7f3k,clm_x4x8 --decision prefer --replacement clm_x4x8 \
+$ lor resolve --targets clm_1111111111111111,clm_3333333333333333 --decision prefer --replacement clm_3333333333333333 \
     --reason "verified against snapshot 9f21c44; registration moved"
-res_5m1p
+res_4444444444444444
 $ lor current --scope repo=rozoro
-(code-area command-registration) location = src/cli/commands  [clm_x4x8, resolved]
+(code-area command-registration) location = src/cli/commands  [clm_3333333333333333, resolved]
 ```
 
 ## Journey 6 — time travel
@@ -187,9 +187,9 @@ $ lor current --scope repo=rozoro --as-of 2026-08-26T12:00:00Z
 ## Journey 7 — drill down
 
 ```text
-$ lor show clm_x4x8        # claim detail + provenance refs
-$ lor history clm_x4x8     # relations, resolution, verifications
-$ lor show ent_a1b2        # the original free text
+$ lor show clm_3333333333333333        # claim detail + provenance refs
+$ lor history clm_3333333333333333     # relations, resolution, verifications
+$ lor show ent_0123456789abcdef        # the original free text
 ```
 
 Every id printed anywhere is resolvable — the progressive-disclosure promise.

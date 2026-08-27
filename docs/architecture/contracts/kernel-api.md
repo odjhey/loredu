@@ -76,6 +76,14 @@ interface LoreduApplicationDependencies {
   readonly randomSource: RandomSource
   readonly claimPolicy?: ClaimPolicy
 }
+type PersistedRecordFor<D extends RecordDraft> =
+  D extends EntryDraft ? Entry :
+  D extends ClaimDraft ? Claim :
+  D extends RelationDraft ? Relation :
+  D extends ResolutionDraft ? Resolution :
+  D extends VerificationDraft ? Verification :
+  never
+
 interface AppendRecordResult<R extends PersistedRecord = PersistedRecord> {
   readonly record: R
   readonly position: StreamPosition
@@ -88,6 +96,7 @@ function createLoreduApplication(
   dependencies: LoreduApplicationDependencies,
 ): LoreduApplication
 
+function recordKindOfIdPrefix(prefix: string): RecordKind | undefined
 function decodeRecordDraft(input: unknown): RecordDraft
 function decodePersistedRecord(input: unknown): PersistedRecord
 function encodePersistedRecord(record: PersistedRecord): JsonObject
@@ -100,6 +109,8 @@ function createRulesetIdentity(policy: ClaimPolicy): RulesetIdentity
 function createBasis(input: Basis): Basis
 function basisEquals(left: Basis, right: Basis): boolean
 ```
+
+`recordKindOfIdPrefix` accepts only the exact prefix strings `ent`, `clm`, `rel`, `res`, and `ver`, returning respectively `entry`, `claim`, `relation`, `resolution`, and `verification`. Every other string returns `undefined`; the function does not accept a trailing underscore and performs no case folding, trimming, or other normalization.
 
 `createInstant` enforces safe-integer epoch milliseconds inside TimeClip range. `createStreamPosition` enforces a nonnegative safe integer; `0` is valid for future empty head, while successful append positions are positive. These constructors let host adapters implement ports without unsafe casts.
 
