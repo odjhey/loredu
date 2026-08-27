@@ -11,13 +11,20 @@ that asymmetry with `@loredu/kernel` is the point of the boundary. It depends on
 
 ## State
 
-M1-F implements the public strict Markdown/frontmatter codec, filename-derived
-contiguous positions, canonical replay, and `PlainFileStore` append/get/scan/stream/head.
-The unchanged `@loredu/kernel/testing` conformance suite runs against this adapter;
-provider tests own T11, T12, and T14, including valid hand additions.
+M1 is complete. The adapter implements the strict Markdown/frontmatter codec,
+filename-derived contiguous positions, canonical replay, and the full `RecordStore`
+port. The unchanged `@loredu/kernel/testing` conformance suite runs against this
+adapter and the M1-complete in-memory reference adapter.
 
-M1-D still owns initialization/root resolution (T17), append-scoped locking (T16),
-and the temp-file/fsync/atomic-rename/crash-prefix protocol (T18). Until that slice
-lands, tests establish an exact existing layout explicitly and append does not claim
-durable-before-return behavior. T19 remains M0 application/reference evidence;
-`PlainFileStore` is semantics-ignorant and does not validate record relationships.
+Initialization is explicit through `initializePlainFileStore`; ordinary construction
+and reads never create a missing store. `resolveStoreRoot` handles discriminated
+explicit path, validated named, and default selections without discovery. Named
+stores live under `<LOREDU_HOME>/stores/` and remain isolated.
+
+Every append acquires an immediate-failure append-scoped writer lock, replays under
+the lock, writes an exclusive same-filesystem temp file, fsyncs it, atomically renames
+it, fsyncs both affected directories, and releases the lock before returning. Only a
+same-host owner proven dead may be quarantined and recovered. A failure after rename
+is an uncertain whole-record outcome discoverable by the attempted id; it is never a
+torn record. T19 remains M0 application/reference evidence: `PlainFileStore` is
+semantics-ignorant and does not validate record relationships.

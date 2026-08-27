@@ -3,21 +3,6 @@
   "catalog": "docs/v0.x/execution/first-user-journey.md",
   "note": "Every catalog T-number is either claimed by an executable test under tests/ (via an @covers annotation) or listed here with the milestone that will implement it. Never both, never neither. See ADR 0015.",
   "deferred": {
-    "T16": {
-      "milestone": "M1",
-      "group": "M1 — plain-file store",
-      "reason": "append-scoped locking and safe stale-lock recovery are not implemented yet"
-    },
-    "T17": {
-      "milestone": "M1",
-      "group": "M1 — plain-file store",
-      "reason": "explicit initialization and complete root selection/isolation are not implemented yet"
-    },
-    "T18": {
-      "milestone": "M1",
-      "group": "M1 — plain-file store",
-      "reason": "temp-file fsync, atomic rename, directory fsync, and crash-prefix evidence are not implemented yet"
-    },
     "T20": {
       "milestone": "M2",
       "group": "M2 — reconciliation, resolution, projections",
