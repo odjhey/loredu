@@ -55,7 +55,17 @@ export { RECORD_ID_PREFIX, recordKindOfIdPrefix } from "./domain/record-kind";
 export { decodePersistedRecord, decodeRecordDraft, encodePersistedRecord } from "./domain/records";
 export type { LoreduErrorCode, LoreduIssue, LoreduIssueCode } from "./errors";
 export { LoreduError } from "./errors";
-export type { Clock, Instant, RandomSource, RecordStore, StreamPosition } from "./ports/capabilities";
+export type {
+  Clock,
+  Instant,
+  PositionedRecord,
+  RandomSource,
+  RecordFilter,
+  RecordScan,
+  RecordStore,
+  RecordStreamOptions,
+  StreamPosition,
+} from "./ports/capabilities";
 export { createInstant, createStreamPosition } from "./ports/capabilities";
 export type { ClaimPolicy, ClaimSemantics } from "./ports/claim-policy";
 export { DEFAULT_CLAIM_POLICY } from "./ports/claim-policy";

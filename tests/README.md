@@ -41,12 +41,12 @@ Every catalog T-number must be either claimed by a real test here or deferred in
 faked. `bun docs/scripts/check-catalog.mjs` enforces that accounting, and rejects a
 claim whose file asserts nothing or is `.skip`/`.todo`.
 
-The records suite implements T01–T08, T19, T80, T83–T85, and T87; the
-reconciliation suite implements the M0 identity primitives T81–T82. All remaining
-rows stay explicitly deferred. The group directories and their READMEs say what
-belongs where. An empty `describe()` or a `test.todo` cannot claim coverage. As a
-milestone lands, its real assertions move T-numbers out of the status file and into
-this tree.
+Current implementation accounting is owned by executable `@covers` annotations and
+[`catalog-status.json`](../docs/v0.x/execution/catalog-status.json), with
+`check-catalog.mjs` enforcing that each row is implemented or deferred. The group
+directories and their READMEs say what belongs where. An empty `describe()` or a
+`test.todo` cannot claim coverage. As a milestone lands, its real assertions move
+T-numbers out of the status file and into this tree.
 
 M0 also audits the exact normal/testing export allowlists, all-family imports through public package names, no deep imports, helper absence from normal exports, and no production testing-subpath imports. T87 owns assembly/branded-position evidence; supplemental assurance vectors stay with their existing rows.
 
