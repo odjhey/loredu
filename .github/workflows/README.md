@@ -13,7 +13,9 @@ protection should require (ADR 0012).
 - **workspace suite** — every other change: `bun install --frozen-lockfile`,
   then lint and spelling (cheapest signal first), the same corpus checks, then
   typecheck, `bun test`, and a compile smoke that runs the built `lor` binary
-  rather than just trusting the bundler.
+  rather than just trusting the bundler. The test stage includes the package-DAG
+  assertions and synthetic red/green proofs for kernel type isolation and the
+  ambient time/randomness capability checker.
 - **aggregate** — runs with `if: always()` and asserts that the suite the
   selector chose actually succeeded, and that the other one was skipped rather
   than failed.

@@ -48,6 +48,11 @@ lands, its real assertions move T-numbers out of the status file and into this t
 
 M0 also audits the exact normal/testing export allowlists, all-family imports through public package names, no deep imports, helper absence from normal exports, and no production testing-subpath imports. T87 owns assembly/branded-position evidence; supplemental assurance vectors stay with their existing rows.
 
-Structural tests that guard the scaffold itself (the package DAG, the kernel
+Structural tests that guard the scaffold itself (the package DAG, TypeScript-source
+exports, the kernel's default-deny type environment, and its import/capability
 boundary) live at the root of this tree and claim no T-number — they test the
-repository, not the product's behavior.
+repository, not the product's behavior. The capability cases execute the real
+checker against isolated synthetic sources and prove `Date.now()`, zero-argument
+`new Date()`, and `Math.random()` each fail while explicit-value dates, comments,
+and strings pass. Type-isolation cases likewise prove ambient Node/Bun globals and
+`node:*`/`bun:*` imports fail in a copied kernel project, without mutating the checkout.
