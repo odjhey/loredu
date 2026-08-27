@@ -1,22 +1,60 @@
-/**
- * Test support, published only as `@loredu/kernel/testing`.
- *
- * This subpath exists so the store contract's guarantees can become an
- * executable conformance suite that every adapter runs, and so kernel/application
- * tests can use an in-memory reference store (ADR 0011). Both land with M1
- * alongside the store itself; this file declares the seam they plug into and
- * contains no test doubles yet — an `InMemoryStore` that did not honour
- * append-is-commit would be worse than none.
- *
- * Production code must never import this subpath.
- */
-import type { RecordStore } from "../src/ports/record-store";
+import { LoreduError } from "../src/application";
+import type { PersistedRecord, RecordId } from "../src/domain/entry";
+import {
+  type Clock,
+  createInstant,
+  createStreamPosition,
+  type Instant,
+  type RandomSource,
+  type RecordStore,
+  type StreamPosition,
+} from "../src/ports/capabilities";
 
-/**
- * How a store adapter offers itself to the conformance suite: a name for test
- * output, and a factory returning a fresh, empty store per case.
- */
-export interface StoreUnderTest {
-  readonly name: string;
-  create(): Promise<RecordStore>;
+export class FixedClock implements Clock {
+  readonly #instant: Instant;
+  constructor(instant: Instant) {
+    this.#instant = createInstant(instant);
+  }
+  now(): Instant {
+    return this.#instant;
+  }
+}
+
+export class SeededRandomSource implements RandomSource {
+  #state: number;
+  constructor(seed: number) {
+    if (!Number.isSafeInteger(seed) || seed < 0)
+      throw new RangeError("seed must be a nonnegative safe integer");
+    this.#state = seed >>> 0 || 0x9e3779b9;
+  }
+  nextBytes(count: number): Uint8Array {
+    if (!Number.isSafeInteger(count) || count < 0)
+      throw new RangeError("count must be a nonnegative safe integer");
+    const bytes = new Uint8Array(count);
+    for (let index = 0; index < count; index++) {
+      let value = this.#state;
+      value ^= value << 13;
+      value ^= value >>> 17;
+      value ^= value << 5;
+      this.#state = value >>> 0;
+      bytes[index] = this.#state & 0xff;
+    }
+    return bytes;
+  }
+}
+
+export class InMemoryStore implements RecordStore {
+  readonly #records = new Map<string, PersistedRecord>();
+  #position = 0;
+  async append(record: PersistedRecord): Promise<StreamPosition> {
+    if (this.#records.has(record.id))
+      throw new LoreduError("DUPLICATE_RECORD_ID", `record id already exists: ${record.id}`);
+    const next = createStreamPosition(this.#position + 1);
+    this.#records.set(record.id, record);
+    this.#position = next;
+    return next;
+  }
+  async get(id: RecordId): Promise<PersistedRecord | undefined> {
+    return this.#records.get(id);
+  }
 }
