@@ -1,0 +1,605 @@
+import { existsSync, lstatSync, readdirSync, readFileSync, realpathSync } from "node:fs";
+import { builtinModules } from "node:module";
+import { dirname, extname, join, relative, resolve, sep } from "node:path";
+import { fileURLToPath } from "node:url";
+import ts from "typescript";
+
+export interface Violation {
+  readonly path: string;
+  readonly rule: string;
+  readonly detail: string;
+}
+interface Manifest {
+  readonly name?: string;
+  readonly dependencies?: Record<string, string>;
+  readonly peerDependencies?: Record<string, string>;
+  readonly optionalDependencies?: Record<string, string>;
+  readonly exports?: Record<string, string>;
+}
+
+const PACKAGES = ["kernel", "store-plainfile", "cli"] as const;
+type PackageName = (typeof PACKAGES)[number];
+const SOURCE_EXTENSIONS = new Set([".ts", ".tsx", ".mts", ".cts"]);
+const EXECUTABLE_EXTENSIONS = new Set([".js", ".jsx", ".mjs", ".cjs"]);
+const EXPECTED_NAMES: Record<PackageName, string> = {
+  kernel: "@loredu/kernel",
+  "store-plainfile": "@loredu/store-plainfile",
+  cli: "@loredu/cli",
+};
+const REQUIRED_WORKSPACE_EDGES: Record<PackageName, readonly string[]> = {
+  kernel: [],
+  "store-plainfile": ["@loredu/kernel"],
+  cli: ["@loredu/kernel", "@loredu/store-plainfile"],
+};
+const ALLOWED_WORKSPACE_EDGES: Record<PackageName, readonly string[]> = REQUIRED_WORKSPACE_EDGES;
+const EXPECTED_EXPORTS: Record<PackageName, Readonly<Record<string, string>>> = {
+  kernel: { ".": "./src/index.ts", "./testing": "./testing/index.ts" },
+  "store-plainfile": { ".": "./src/index.ts" },
+  cli: { ".": "./src/index.ts" },
+};
+const BUILTINS = new Set(
+  builtinModules.flatMap((name) => {
+    const bare = name.replace(/^node:/, "");
+    return [bare, `node:${bare}`];
+  }),
+);
+
+function portable(path: string): string {
+  return path.split(sep).join("/");
+}
+function push(result: Violation[], root: string, path: string, rule: string, detail: string): void {
+  result.push({ path: portable(relative(root, path)), rule, detail });
+}
+function manifest(path: string): Manifest {
+  return JSON.parse(readFileSync(path, "utf8")) as Manifest;
+}
+function runtimeDependencies(value: Manifest): string[] {
+  return [
+    ...Object.keys(value.dependencies ?? {}),
+    ...Object.keys(value.peerDependencies ?? {}),
+    ...Object.keys(value.optionalDependencies ?? {}),
+  ].sort();
+}
+function testSurface(packageRoot: string, file: string): boolean {
+  const local = portable(relative(packageRoot, file));
+  return local.startsWith("testing/") || /\.(?:test|spec)\.(?:ts|tsx|mts|cts)$/.test(local);
+}
+function sourceKind(file: string): ts.ScriptKind {
+  const extension = extname(file);
+  if (extension === ".tsx") return ts.ScriptKind.TSX;
+  if (extension === ".js" || extension === ".mjs" || extension === ".cjs") return ts.ScriptKind.JS;
+  if (extension === ".jsx") return ts.ScriptKind.JSX;
+  return ts.ScriptKind.TS;
+}
+function location(source: ts.SourceFile, node: ts.Node): string {
+  const point = source.getLineAndCharacterOfPosition(node.getStart(source));
+  return `${point.line + 1}:${point.character + 1}`;
+}
+function unwrap(expression: ts.Expression): ts.Expression {
+  let current = expression;
+  while (
+    ts.isParenthesizedExpression(current) ||
+    ts.isAsExpression(current) ||
+    ts.isNonNullExpression(current)
+  )
+    current = current.expression;
+  return current;
+}
+function staticText(expression: ts.Expression | undefined): string | undefined {
+  if (!expression) return undefined;
+  const value = unwrap(expression);
+  return ts.isStringLiteralLike(value) ? value.text : undefined;
+}
+function propertyName(
+  expression: ts.Expression,
+): { readonly object: ts.Expression; readonly name?: string } | undefined {
+  const value = unwrap(expression);
+  if (ts.isPropertyAccessExpression(value))
+    return { object: unwrap(value.expression), name: value.name.text };
+  if (ts.isElementAccessExpression(value)) {
+    const name = staticText(value.argumentExpression);
+    return name === undefined
+      ? { object: unwrap(value.expression) }
+      : { object: unwrap(value.expression), name };
+  }
+  return undefined;
+}
+function identifier(expression: ts.Expression, name: string): boolean {
+  const value = unwrap(expression);
+  return ts.isIdentifier(value) && value.text === name;
+}
+function globalObject(expression: ts.Expression, name: string): boolean {
+  if (identifier(expression, name)) return true;
+  const member = propertyName(expression);
+  return !!member && identifier(member.object, "globalThis") && member.name === name;
+}
+
+interface Discovered {
+  readonly production: Map<PackageName, string[]>;
+  readonly tests: string[];
+}
+function discover(root: string, result: Violation[]): Discovered {
+  const packagesRoot = join(root, "packages");
+  const production = new Map<PackageName, string[]>(PACKAGES.map((name) => [name, []]));
+  const tests: string[] = [];
+  if (!existsSync(packagesRoot)) {
+    push(result, root, packagesRoot, "source-tree", "required packages directory is missing");
+    return { production, tests };
+  }
+  for (const entry of readdirSync(packagesRoot, { withFileTypes: true })) {
+    const path = join(packagesRoot, entry.name);
+    if (entry.isSymbolicLink()) {
+      push(result, root, path, "source-tree", "symlinked package entry is not inspectable");
+    } else if (entry.isDirectory()) {
+      if (!PACKAGES.includes(entry.name as PackageName))
+        push(result, root, path, "package-location", "new package is not classified by the dependency law");
+    } else if (entry.name !== "README.md") {
+      push(result, root, path, "source-tree", "file directly under packages is unclassified");
+    }
+  }
+  for (const name of PACKAGES) {
+    const packageRoot = join(packagesRoot, name);
+    const roots = [join(packageRoot, "src"), ...(name === "cli" ? [join(packageRoot, "bin")] : [])];
+    for (const sourceRoot of roots) {
+      if (!existsSync(sourceRoot) || !lstatSync(sourceRoot).isDirectory()) {
+        push(result, root, sourceRoot, "source-tree", "required production source root is missing");
+        continue;
+      }
+      let count = 0;
+      const visit = (directory: string): void => {
+        for (const entry of readdirSync(directory, { withFileTypes: true })) {
+          const path = join(directory, entry.name);
+          if (entry.isSymbolicLink()) {
+            push(result, root, path, "source-tree", "symlinked source entry is not inspectable");
+          } else if (entry.isDirectory()) visit(path);
+          else if (!entry.isFile()) push(result, root, path, "source-tree", "unsupported filesystem entry");
+          else if (SOURCE_EXTENSIONS.has(extname(path))) {
+            count++;
+            if (testSurface(packageRoot, path)) tests.push(path);
+            else production.get(name)?.push(path);
+          } else {
+            const kind = EXECUTABLE_EXTENSIONS.has(extname(path)) ? "executable" : "unrecognized";
+            push(
+              result,
+              root,
+              path,
+              "source-tree",
+              `${kind} production source extension ${extname(path) || "<none>"}`,
+            );
+          }
+        }
+      };
+      visit(sourceRoot);
+      if (count === 0)
+        push(
+          result,
+          root,
+          sourceRoot,
+          "source-tree",
+          "production source root contains no supported source files",
+        );
+    }
+    const testingRoot = join(packageRoot, "testing");
+    if (existsSync(testingRoot)) {
+      const visitTesting = (directory: string): void => {
+        for (const entry of readdirSync(directory, { withFileTypes: true })) {
+          const path = join(directory, entry.name);
+          if (entry.isSymbolicLink())
+            push(result, root, path, "source-tree", "symlinked test entry is not inspectable");
+          else if (entry.isDirectory()) visitTesting(path);
+          else if (entry.isFile() && SOURCE_EXTENSIONS.has(extname(path))) tests.push(path);
+          else push(result, root, path, "source-tree", "unrecognized test source entry");
+        }
+      };
+      visitTesting(testingRoot);
+    }
+    for (const entry of readdirSync(packageRoot, { withFileTypes: true })) {
+      if (
+        entry.name === "src" ||
+        entry.name === "testing" ||
+        (name === "cli" && entry.name === "bin") ||
+        entry.name === "node_modules" ||
+        entry.name === "dist" ||
+        entry.name === "package.json" ||
+        entry.name === "tsconfig.json" ||
+        entry.name === "README.md"
+      )
+        continue;
+      const path = join(packageRoot, entry.name);
+      if (
+        entry.isFile() &&
+        (SOURCE_EXTENSIONS.has(extname(path)) || EXECUTABLE_EXTENSIONS.has(extname(path)))
+      )
+        push(
+          result,
+          root,
+          path,
+          "source-location",
+          "source file is outside a recognized production or test surface",
+        );
+      if (entry.isDirectory()) {
+        const stack = [path];
+        while (stack.length) {
+          const current = stack.pop() as string;
+          for (const child of readdirSync(current, { withFileTypes: true })) {
+            const childPath = join(current, child.name);
+            if (child.isDirectory()) stack.push(childPath);
+            else if (child.isSymbolicLink())
+              push(result, root, childPath, "source-tree", "symlinked unclassified entry");
+            else if (
+              SOURCE_EXTENSIONS.has(extname(childPath)) ||
+              EXECUTABLE_EXTENSIONS.has(extname(childPath))
+            )
+              push(
+                result,
+                root,
+                childPath,
+                "source-location",
+                "source file is outside a recognized production or test surface",
+              );
+          }
+        }
+      }
+    }
+  }
+  return { production, tests };
+}
+
+function owningPackage(root: string, path: string): PackageName | undefined {
+  const local = portable(relative(join(root, "packages"), path));
+  return PACKAGES.find((name) => local === name || local.startsWith(`${name}/`));
+}
+function resolveRelative(from: string, specifier: string): string | undefined {
+  const base = resolve(dirname(from), specifier);
+  const candidates = [
+    base,
+    ...[".ts", ".tsx", ".mts", ".cts"].map((extension) => `${base}${extension}`),
+    ...["index.ts", "index.tsx", "index.mts", "index.cts"].map((file) => join(base, file)),
+  ];
+  return candidates.find((candidate) => existsSync(candidate) && lstatSync(candidate).isFile());
+}
+function workspaceSpecifier(specifier: string): PackageName | undefined {
+  return PACKAGES.find(
+    (name) => specifier === EXPECTED_NAMES[name] || specifier.startsWith(`${EXPECTED_NAMES[name]}/`),
+  );
+}
+function checkReference(
+  root: string,
+  owner: PackageName,
+  _packageRoot: string,
+  file: string,
+  source: ts.SourceFile,
+  node: ts.Node,
+  specifier: string,
+  result: Violation[],
+): void {
+  const at = location(source, node);
+  if (specifier.startsWith(".") || specifier.startsWith("/")) {
+    const target = resolveRelative(file, specifier);
+    if (!target) {
+      push(result, root, file, "boundary-unresolved", `${at} cannot resolve ${specifier}`);
+      return;
+    }
+    const targetOwner = owningPackage(root, target);
+    if (!targetOwner)
+      push(result, root, file, "boundary-target", `${at} resolves outside the workspace: ${specifier}`);
+    else if (portable(relative(join(root, "packages", targetOwner), target)).startsWith("testing/"))
+      push(
+        result,
+        root,
+        file,
+        "testing-import",
+        `${at} production resolves to ${targetOwner}/testing via ${specifier}`,
+      );
+    else if (!ALLOWED_WORKSPACE_EDGES[owner].includes(EXPECTED_NAMES[targetOwner]) && targetOwner !== owner)
+      push(
+        result,
+        root,
+        file,
+        "workspace-edge",
+        `${at} forbidden ${owner} -> ${targetOwner} via ${specifier}`,
+      );
+    return;
+  }
+  const workspace = workspaceSpecifier(specifier);
+  if (workspace) {
+    if (specifier === "@loredu/kernel/testing" || specifier.startsWith("@loredu/kernel/testing/")) {
+      push(result, root, file, "testing-import", `${at} production imports ${specifier}`);
+      return;
+    }
+    const packageName = EXPECTED_NAMES[workspace];
+    const subpath = specifier === packageName ? "." : `./${specifier.slice(packageName.length + 1)}`;
+    if (!(subpath in EXPECTED_EXPORTS[workspace])) {
+      push(result, root, file, "boundary-unresolved", `${at} package subpath is not exported: ${specifier}`);
+      return;
+    }
+    if (workspace !== owner && !ALLOWED_WORKSPACE_EDGES[owner].includes(packageName))
+      push(result, root, file, "workspace-edge", `${at} forbidden ${owner} -> ${workspace} via ${specifier}`);
+    return;
+  }
+  if (owner === "kernel") {
+    const kind =
+      BUILTINS.has(specifier) || specifier.startsWith("node:") || specifier.startsWith("bun:")
+        ? "environment module"
+        : "external package";
+    push(result, root, file, "kernel-import", `${at} kernel imports ${kind} ${specifier}`);
+  }
+}
+
+function analyzeFile(root: string, owner: PackageName, file: string, result: Violation[]): void {
+  let text: string;
+  try {
+    text = readFileSync(file, "utf8");
+  } catch {
+    push(result, root, file, "source-read", "source could not be read");
+    return;
+  }
+  const source = ts.createSourceFile(file, text, ts.ScriptTarget.Latest, true, sourceKind(file));
+  const parseDiagnostics = (source as ts.SourceFile & { readonly parseDiagnostics: readonly ts.Diagnostic[] })
+    .parseDiagnostics;
+  for (const diagnostic of parseDiagnostics) {
+    const point =
+      diagnostic.start === undefined
+        ? "?:?"
+        : (() => {
+            const position = source.getLineAndCharacterOfPosition(diagnostic.start);
+            return `${position.line + 1}:${position.character + 1}`;
+          })();
+    push(
+      result,
+      root,
+      file,
+      "source-parse",
+      `${point} ${ts.flattenDiagnosticMessageText(diagnostic.messageText, " ")}`,
+    );
+  }
+  if (parseDiagnostics.length) return;
+  const packageRoot = join(root, "packages", owner);
+  const shadows = new Set<string>();
+  const aliases = new Map<string, string>();
+  const collect = (node: ts.Node): void => {
+    if (ts.isVariableDeclaration(node)) {
+      const initial = node.initializer && unwrap(node.initializer);
+      if (ts.isIdentifier(node.name)) {
+        const name = node.name.text;
+        if (initial && globalObject(initial, "Date")) aliases.set(name, "Date");
+        else {
+          const member = initial && propertyName(initial);
+          if (member && globalObject(member.object, "Date") && member.name === "now")
+            aliases.set(name, "Date.now");
+          else if (member && globalObject(member.object, "Math") && member.name === "random")
+            aliases.set(name, "Math.random");
+          else shadows.add(name);
+        }
+      } else if (ts.isObjectBindingPattern(node.name) && initial) {
+        const capability = globalObject(initial, "Date")
+          ? "Date.now"
+          : globalObject(initial, "Math")
+            ? "Math.random"
+            : undefined;
+        for (const element of node.name.elements) {
+          const property = element.propertyName?.getText(source) ?? element.name.getText(source);
+          if (
+            capability &&
+            property === (capability === "Date.now" ? "now" : "random") &&
+            ts.isIdentifier(element.name)
+          )
+            aliases.set(element.name.text, capability);
+          else if (ts.isIdentifier(element.name)) shadows.add(element.name.text);
+        }
+      }
+    }
+    if (
+      (ts.isFunctionDeclaration(node) ||
+        ts.isClassDeclaration(node) ||
+        ts.isInterfaceDeclaration(node) ||
+        ts.isTypeAliasDeclaration(node)) &&
+      node.name
+    )
+      shadows.add(node.name.text);
+    ts.forEachChild(node, collect);
+  };
+  collect(source);
+  const isGlobal = (expression: ts.Expression, name: string): boolean =>
+    globalObject(expression, name) && !shadows.has(name);
+  const visit = (node: ts.Node): void => {
+    let reference: string | undefined;
+    let referenceNode: ts.Node = node;
+    if (ts.isImportDeclaration(node) || ts.isExportDeclaration(node)) {
+      if (node.moduleSpecifier) {
+        reference = staticText(node.moduleSpecifier);
+        referenceNode = node.moduleSpecifier;
+      }
+    } else if (ts.isImportEqualsDeclaration(node) && ts.isExternalModuleReference(node.moduleReference)) {
+      reference = staticText(node.moduleReference.expression);
+      referenceNode = node.moduleReference;
+    } else if (ts.isCallExpression(node)) {
+      const callee = unwrap(node.expression);
+      if (
+        callee.kind === ts.SyntaxKind.ImportKeyword ||
+        (ts.isIdentifier(callee) && callee.text === "require" && !shadows.has("require"))
+      ) {
+        reference = staticText(node.arguments[0]);
+        referenceNode = node;
+        if (node.arguments.length !== 1 || reference === undefined)
+          push(
+            result,
+            root,
+            file,
+            "boundary-dynamic",
+            `${location(source, node)} module reference is not one static string`,
+          );
+      }
+      const member = propertyName(callee);
+      const directDate =
+        isGlobal(callee, "Date") || (ts.isIdentifier(callee) && aliases.get(callee.text) === "Date");
+      const dateNow =
+        member &&
+        (isGlobal(member.object, "Date") ||
+          (ts.isIdentifier(member.object) && aliases.get(member.object.text) === "Date")) &&
+        member.name === "now";
+      const mathRandom = member && isGlobal(member.object, "Math") && member.name === "random";
+      const aliasCapability =
+        ts.isIdentifier(callee) && ["Date.now", "Math.random"].includes(aliases.get(callee.text) ?? "");
+      if (owner === "kernel" && (directDate || dateNow || mathRandom || aliasCapability))
+        push(
+          result,
+          root,
+          file,
+          "ambient-capability",
+          `${location(source, node)} ambient ${directDate ? "Date call" : dateNow || aliases.get(ts.isIdentifier(callee) ? callee.text : "") === "Date.now" ? "Date.now" : "Math.random"}`,
+        );
+    } else if (ts.isNewExpression(node)) {
+      const constructorExpression = unwrap(node.expression);
+      const date =
+        isGlobal(constructorExpression, "Date") ||
+        (ts.isIdentifier(constructorExpression) && aliases.get(constructorExpression.text) === "Date");
+      if (
+        owner === "kernel" &&
+        date &&
+        (!node.arguments || node.arguments.length === 0 || node.arguments.some(ts.isSpreadElement))
+      )
+        push(
+          result,
+          root,
+          file,
+          "ambient-capability",
+          `${location(source, node)} zero-or-uncertain-argument new Date`,
+        );
+    }
+    if (reference !== undefined)
+      checkReference(root, owner, packageRoot, file, source, referenceNode, reference, result);
+    const parent = node.parent;
+    const propertyNameOnly =
+      !!parent &&
+      ((ts.isPropertyAccessExpression(parent) && parent.name === node) ||
+        (ts.isPropertyAssignment(parent) && parent.name === node) ||
+        (ts.isPropertySignature(parent) && parent.name === node));
+    if (
+      owner === "kernel" &&
+      ts.isIdentifier(node) &&
+      ["Bun", "process", "Buffer"].includes(node.text) &&
+      !shadows.has(node.text) &&
+      !propertyNameOnly &&
+      (!parent || (!ts.isTypeReferenceNode(parent) && !ts.isTypeAliasDeclaration(parent)))
+    )
+      push(result, root, file, "ambient-capability", `${location(source, node)} ambient global ${node.text}`);
+    ts.forEachChild(node, visit);
+  };
+  visit(source);
+}
+
+function checkKernelCompiler(root: string, result: Violation[]): void {
+  const configPath = join(root, "packages/kernel/tsconfig.json");
+  if (!existsSync(configPath)) {
+    push(result, root, configPath, "kernel-tsconfig", "kernel project config is missing");
+    return;
+  }
+  const loaded = ts.readConfigFile(configPath, ts.sys.readFile);
+  if (loaded.error) {
+    push(
+      result,
+      root,
+      configPath,
+      "kernel-tsconfig",
+      ts.flattenDiagnosticMessageText(loaded.error.messageText, " "),
+    );
+    return;
+  }
+  const parsed = ts.parseJsonConfigFileContent(loaded.config, ts.sys, dirname(configPath));
+  if (parsed.errors.length) {
+    push(result, root, configPath, "kernel-tsconfig", "kernel project config cannot be resolved");
+    return;
+  }
+  if (JSON.stringify(parsed.options.types ?? []) !== "[]")
+    push(result, root, configPath, "kernel-tsconfig", "effective compilerOptions.types must be []");
+  const libraries = (parsed.options.lib ?? []).map((value) =>
+    value.toLowerCase().replace(/^lib\.|\.d\.ts$/g, ""),
+  );
+  if (JSON.stringify(libraries) !== JSON.stringify(["es2023"]))
+    push(
+      result,
+      root,
+      configPath,
+      "kernel-tsconfig",
+      "effective compilerOptions.lib must be exactly [ES2023]",
+    );
+}
+
+export function scanWorkspace(root: string): Violation[] {
+  const result: Violation[] = [];
+  const packagesRoot = join(root, "packages");
+  const discovered = discover(root, result);
+  for (const name of PACKAGES) {
+    const packageRoot = join(packagesRoot, name);
+    const manifestPath = join(packageRoot, "package.json");
+    if (!existsSync(manifestPath)) {
+      push(result, root, manifestPath, "package-location", "package has no package.json");
+      continue;
+    }
+    let value: Manifest;
+    try {
+      value = manifest(manifestPath);
+    } catch {
+      push(result, root, manifestPath, "package-manifest", "manifest is not valid JSON");
+      continue;
+    }
+    if (value.name !== EXPECTED_NAMES[name])
+      push(result, root, manifestPath, "package-name", `expected ${EXPECTED_NAMES[name]}`);
+    const dependencies = runtimeDependencies(value);
+    if (name === "kernel" && dependencies.length)
+      push(
+        result,
+        root,
+        manifestPath,
+        "runtime-dependencies",
+        `kernel must have none; found [${dependencies.join(", ")}]`,
+      );
+    const workspaceDependencies = dependencies.filter((dependency) => dependency.startsWith("@loredu/"));
+    for (const dependency of workspaceDependencies)
+      if (!ALLOWED_WORKSPACE_EDGES[name].includes(dependency))
+        push(
+          result,
+          root,
+          manifestPath,
+          "workspace-edge",
+          `forbidden manifest edge ${name} -> ${dependency}`,
+        );
+    for (const required of REQUIRED_WORKSPACE_EDGES[name])
+      if (!workspaceDependencies.includes(required))
+        push(
+          result,
+          root,
+          manifestPath,
+          "workspace-edge",
+          `missing required manifest edge ${name} -> ${required}`,
+        );
+    const expected = EXPECTED_EXPORTS[name];
+    if (JSON.stringify(value.exports ?? {}) !== JSON.stringify(expected))
+      push(result, root, manifestPath, "package-exports", `exports must equal ${JSON.stringify(expected)}`);
+    for (const [key, target] of Object.entries(expected)) {
+      const targetPath = join(packageRoot, target);
+      if (!existsSync(targetPath) || !lstatSync(targetPath).isFile())
+        push(result, root, manifestPath, "package-exports", `export ${key} target does not exist: ${target}`);
+    }
+    for (const file of discovered.production.get(name) ?? []) analyzeFile(root, name, file, result);
+  }
+  checkKernelCompiler(root, result);
+  return result.sort((left, right) =>
+    `${left.path}:${left.rule}:${left.detail}`.localeCompare(`${right.path}:${right.rule}:${right.detail}`),
+  );
+}
+export function formatViolations(violations: readonly Violation[]): string {
+  return violations.map((item) => `${item.path}: [${item.rule}] ${item.detail}`).join("\n");
+}
+
+const invokedPath = process.argv[1];
+if (invokedPath && realpathSync(fileURLToPath(import.meta.url)) === realpathSync(invokedPath)) {
+  const root = process.argv[2] ?? join(dirname(fileURLToPath(import.meta.url)), "..");
+  const violations = scanWorkspace(root);
+  if (violations.length) {
+    console.error(formatViolations(violations));
+    process.exit(1);
+  }
+  console.log("workspace boundaries: ok");
+}

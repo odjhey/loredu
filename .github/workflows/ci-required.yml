@@ -130,6 +130,8 @@ jobs:
       - name: gates fire on synthetic violations
         run: bun run check:gates
 
+      - name: workspace boundaries
+        run: bun run check:boundaries
       - name: typecheck
         run: bun run typecheck
       - name: tests
