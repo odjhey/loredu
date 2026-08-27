@@ -52,9 +52,9 @@ Basis is the exact closed structural `{stream_position, ruleset, query}` object;
 
 ## Pagination and continuation
 
-Any section that hits its budget states its full count and carries a continuation handle — a basis-pinned cursor plus the runnable command to fetch more ([decision 0009](../../decisions/0009-hypermedia-pagination.md)). Truncation is never silent: a bounded view that looks complete is a contract violation. Continuation pages replay against the packet's basis, so the chain stays consistent while writers append.
+Any section that hits its budget states its full matching count and carries a continuation handle using the opaque, query-bound, pinned-head-anchor cursor semantics in the [application and CLI contract](./application-cli.md), plus a surface-neutral continuation affordance ([decision 0009](../../decisions/0009-hypermedia-pagination.md)). Truncation is never silent: a bounded view that looks complete is a contract violation. Continuation pages replay against the packet's complete Basis, so the chain stays consistent while writers append.
 
-Every identifier in the packet is a handle: the caller reaches claim detail, evidence, history, and raw entries purely by following embedded commands — hypermedia-style navigation is the disclosure mechanism, so a caller's context holds one packet and its links, never the tool's full surface.
+Every Loredu record identifier in the packet is a `RecordHandle` with show/history affordances: the caller reaches claim detail, evidence, history, and raw entries purely by following rendered actions. External SourceRefs are explicit terminal values. Hypermedia-style navigation is the disclosure mechanism, so a caller's context holds one packet and its links, never the tool's full surface.
 
 ## Disclosure levels
 

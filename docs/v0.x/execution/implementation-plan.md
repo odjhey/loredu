@@ -55,21 +55,28 @@ Exit: both adapters pass the shared full-port suite; deleting all derived/contro
 
 ## M1.5 — Agent-operable CLI (`lor`)
 
-Pulled ahead of full reconciliation ([decision 0008](../../decisions/0008-cli-first-agent-reactive.md)) so real usage and dogfooding start as early as possible. Implement:
+Pulled ahead of full reconciliation ([decision 0008](../../decisions/0008-cli-first-agent-reactive.md)) so real usage and dogfooding start as early as possible. Implement [decision 0026](../../decisions/0026-m15-application-cli-contract.md) and the exact [application/CLI contract](../../architecture/contracts/application-cli.md):
 
-- commands: `init`, `add entry`, `add claim`, `relate`, `resolve`, `add verification`, `show`, `history`, `claims` (query engine: composable filters over any key/envelope field — scope, subject-type, subject, predicate, value, actor, since), `head`, `status` (`--check`), `skill`;
-- the agent-reactive response envelope (`ok`, `result`, `reconciliation`, `advice`, `basis`) in text and `--json`, with stable exit codes;
-- surface-neutral affordances from the application layer rendered by the CLI as runnable commands; literal `lor ...` strings remain CLI-adapter behavior ([decision 0009](../../decisions/0009-hypermedia-pagination.md));
-- cursor pagination on every list command (`--limit`/`--cursor`, basis-pinned, explicit `returned`/`total`, continuation affordance/advice) and disclosure handles on every printed id;
-- the mechanical key-overlap slice using default ClaimPolicy semantics: same exact key + same value → corroboration; same key + different value under `exclusive` → conflict candidate; health checks plus the generic non-blocking key-divergence advisory, which is core-ruleset behavior rather than policy advice;
-- namespacing stays consumer-imposed: the kernel/default policy validates shape and exact identity, while examples and agent guidance encourage discovering existing vocabulary before inventing keys;
-- the CLI composition root supplies the production `Clock` and secure `RandomSource` implementations when assembling the application; no dedicated clock/random package is introduced;
-- embedded agent guide printed by `lor skill` ([draft](./agent-skill.md));
+- additive surface-neutral application operations `add`, `show`, `history`, `claims`, `status`, and `readHead`, while preserving M0 `append` exactly;
+- commands: `init`, `add entry`, `add claim`, `relate`, `resolve`, `add verification`, `show`, `history`, `claims`, `head`, `status` (`--check`), and `skill`; bare `lor` is status orientation;
+- no M1.5 `current`, temporal projection flags, or `lore`: M2 owns `current`/`as-of`/`valid-at`, and M3 owns Working Lore;
+- exact success and failure envelopes, surface-neutral affordances plus CLI-rendered runnable commands, text/JSON behavior, and stable exit categories;
+- AND-composed exact Claim filters above the kind-only store port: scope subset, subject type/id, predicate, perspective, JSON value, Actor, and inclusive normalized `since`;
+- bounded position-ordered `claims`/`history` pages, explicit returned/total counts, and opaque `loredu.cursor.v1.` cursors bound to operation/query/Basis/pinned-head anchor/last position; continuation rereads only that prefix and rejects invalid or foreign snapshots;
+- handles pairing every returned Loredu id with show/history affordances, plus deterministic corrective and continuation affordances;
+- the mechanical key-overlap slice: same exact key + same value → corroboration; same key + different value under `exclusive` → conflict candidate; `coexisting` remains non-conflicting;
+- exact health: unresolved exclusive groups not fully covered by a Resolution and dangling record references; provider corruption is a store failure, not partial health;
+- generic same-scope/equal-value/different-key divergence as non-blocking versioned core mechanics suppressible by explicit duplicate Relations, never cross-key reconciliation or ClaimPolicy advice; M1.5 executes no policy advice callback;
+- consumer-owned namespacing, with examples and skill guidance requiring query-before-key invention;
+- CLI-internal production Clock and secure cryptographic RandomSource at the composition root, with no weak fallback, ambient kernel access, export, or dedicated package;
+- one build-time embedded guide source, with text `lor skill` printing the frontmatter-stripped Markdown bytes and JSON returning the same guide string;
 - compiled single-file binary via `bun build --compile`.
 
 During this phase the agent performs judgment manually: it records explicit Relations and Resolutions through the CLI. Those canonical records become the fixture corpus that M2's deterministic ruleset is validated against.
 
-Exit: an agent given only the binary and `lor skill` completes journeys 1–5 and 3b of the [first user journey](./first-user-journey.md) on a fresh store, ending with `lor status --check` passing; acceptance scenario A is executable manually end to end.
+T50–T75 are protocol-ready under this contract, but implementation remains staged: M1.5 owns its record/query/chain rows, M2 owns scenario/Current Knowledge rows, and M3 owns packet-started disclosure and Working Lore budget continuation. Contract closure changes no catalog claim.
+
+Exit: an agent given only the binary and `lor skill` completes the M1.5 portions of journeys 0, 1, 2, 3, 3b, 7, 8, and 9 on a fresh store, follows pagination/disclosure commands, records manual judgment, and ends with `lor status --check` passing. Acceptance scenario A's records and manual relations are executable; its Current Knowledge and Working Lore assertions remain M2/M3 exits.
 
 ## M2 — Reconciliation and projection
 

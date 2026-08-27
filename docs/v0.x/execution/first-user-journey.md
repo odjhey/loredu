@@ -9,46 +9,39 @@ created_at: 2026-08-26T00:00:00+08:00
 
 # First user journey and behavioral test cases
 
-The first user is the project owner plus their agents, driving Loredu through the CLI ([decision 0007](../../decisions/0007-typescript-bun.md)). The binary is `lor` — short enough for agents to type constantly. This document describes how usage is expected to work, step by step, and derives the behavioral tests that must be automated. The behavior is the contract; command spellings are provisional adapter surface.
+The first user is the project owner plus their agents, driving Loredu through the CLI ([decision 0007](../../decisions/0007-typescript-bun.md)). The binary is `lor` — short enough for agents to type constantly. This document describes usage step by step and derives the behavioral tests that must be automated. [Decision 0026](../../decisions/0026-m15-application-cli-contract.md) now fixes the M1.5 spellings and protocol; M2/M3 additions remain staged.
 
-The CLI arrives early — right after M1, before full reconciliation — and every response is **agent-reactive** ([decision 0008](../../decisions/0008-cli-first-agent-reactive.md)): each call returns the result plus deterministic next-step advice, so an agent can chain calls until the store is healthy.
+The CLI arrives right after M1, before full reconciliation, and its semantic responses are **agent-reactive** ([decision 0008](../../decisions/0008-cli-first-agent-reactive.md)): each returns deterministic next actions so an agent can chain calls until health passes. M1.5 orientation is status plus filtered record queries. Current Knowledge does not exist until M2; Working Lore does not exist until M3.
 
 ## Response envelope
 
-Every command returns the same envelope shape in text and `--json`:
+The exact [application and CLI contract](../../architecture/contracts/application-cli.md) owns field shapes, errors, exits, filters, cursors, and rendering. A Claim mutation success has this shape (record and handle internals are abridged in this explanatory example):
 
 ```json
 {
   "ok": true,
-  "result": { "id": "clm_3333333333333333", "kind": "claim" },
-  "reconciliation": { "state": "conflict-candidate", "key": "(repo=rozoro code-area command-registration).location", "related": ["clm_1111111111111111"] },
+  "result": {"record": {"kind": "claim", "id": "clm_3333333333333333"}, "position": 6, "handles": [{"id": "clm_3333333333333333", "kind": "claim", "affordances": []}]},
+  "reconciliation": {"state": "conflict-candidate", "key": {"scope": {"repo": "rozoro"}, "subject": {"type": "code-area", "id": "command-registration"}, "predicate": "location"}, "related": [{"id": "clm_1111111111111111", "kind": "claim", "affordances": []}]},
   "advice": [
-    { "why": "another claim exists under this key with a different value", "run": "lor show clm_1111111111111111" },
-    { "why": "record your judgment once verified against the source", "run": "lor resolve --targets clm_1111111111111111,clm_3333333333333333 --decision prefer --replacement clm_3333333333333333 --reason \"...\"" }
+    {"rel": "show", "action": "record.show", "params": {"id": "clm_1111111111111111"}, "why": "inspect the earlier claim", "run": "lor show clm_1111111111111111"},
+    {"rel": "show", "action": "record.show", "params": {"id": "clm_3333333333333333"}, "why": "inspect the new claim", "run": "lor show clm_3333333333333333"}
   ],
   "basis": {
     "stream_position": 6,
-    "ruleset": { "core": "loredu.reconciliation/v1", "claim_policy": { "id": "loredu.default", "version": "1" } },
-    "query": {}
+    "ruleset": {"core": "loredu.reconciliation/v1", "claim_policy": {"id": "loredu.default", "version": "1"}},
+    "query": {"operation": "add", "id": "clm_3333333333333333"}
   }
 }
 ```
 
-Rules: `advice` is derived only from deterministic checks (key overlap, dangling references, unresolved groups) — the envelope never speculates. Its shape is stable across milestones; only who computes `reconciliation` changes (mechanical key-overlap in the early CLI, the full ruleset from M2). Text mode mirrors it compactly as `advice:` lines.
+List responses add `page: {returned,total,cursor?}`. Every list is ordered by stream position and bounded to 50 by default (maximum 200). A continuation command carries only its opaque `loredu.cursor.v1.` cursor; the token binds operation, normalized query, Basis, pinned-head record-id anchor, and last position. It rejects invalid/foreign snapshots rather than restarting. Every returned Loredu id is paired with show/history affordances; SourceRefs end Loredu disclosure.
 
-List-returning commands add a `page` object and a navigational entry in `advice` ([decision 0009](../../decisions/0009-hypermedia-pagination.md)):
+Application advice contains surface-neutral `{rel,action,params,why}`; only CLI JSON adds `run`. Advice is deterministic mechanics, never model output. Exact-key overlap and core key-divergence are not ClaimPolicy advice.
 
-```json
-"page": { "returned": 20, "total": 143, "cursor": "eyJwb3MiOjQyLCJpZCI6ImNsbV8wMTIwIn0" },
-"advice": [ { "why": "123 more claims under this filter", "run": "lor claims --scope repo=rozoro --cursor eyJwb3MiOjQyLCJpZCI6ImNsbV8wMTIwIn0" } ]
-```
+Two suites automate the same staged journeys:
 
-Cursors are opaque and pinned to the basis position: a page chain is a consistent snapshot even while writers append; a cursorless query picks up the new head. Truncation is never silent (`returned`/`total` always present when a bound applies), ordering is deterministic (position/timestamp, id tiebreak), and every id printed anywhere is a handle — the response embeds or implies the command that expands it, so an agent navigates disclosure levels 0→4 by following links, never by memorizing the surface.
-
-Two suites automate the same journeys:
-
-- **application suite** (`bun:test`, fast, majority of cases) — drives the application API directly;
-- **CLI conformance suite** — drives the compiled binary with `--json`, asserting parseable output and stable exit codes for every journey step.
+- **application suite** (`bun:test`, fast, majority of cases) — drives the surface-neutral application API directly;
+- **CLI conformance suite** — drives the compiled binary with `--json`, asserting equivalent semantic results, parseable envelopes, runnable renderings, and stable exits.
 
 ## Journey 0 — install and init
 
@@ -61,18 +54,19 @@ One directory per store, human-inspectable, Git-friendly ([decision 0003](../../
 
 Store resolution is predictable and follows the [plain-file provider contract](../../architecture/contracts/plain-file-store.md): an explicit path is used outside Loredu home (an explicit relative path is intentionally resolved from cwd), a validated name resolves to `$LOREDU_HOME/stores/<name>` with `LOREDU_HOME` defaulting to `~/.loredu`, and with no selector resolution uses the default name `default`. A one-token `--store` value is path-like only when absolute, prefixed by `.` plus a platform separator, or containing a platform separator; every other token is a name. If the resolved store does not exist, the command fails with an actionable error suggesting `lor init`—no upward discovery or silent creation. Stores live under `stores/` so the home root stays free for configuration and other concerns; multiple named stores have disjoint roots/locks/positions, and tests isolate by pointing `LOREDU_HOME` at a temp directory.
 
-## Journey 1 — first activity on an empty store
+## Journey 1 — first M1.5 orientation on an empty store
 
 ```text
-$ lor lore --activity investigate --scope repo=rozoro
-no knowledge yet for this scope
-basis:
-  stream_position: 0
-  ruleset: { core: loredu.reconciliation/v1, claim_policy: { id: loredu.default, version: "1" } }
-  query: { activity: investigate, scope: { repo: rozoro } }
+$ lor status
+healthy: true
+open exclusive groups: 0    dangling record refs: 0
+advisories: 0
+$ lor claims --scope repo=rozoro
+no claims
+page: returned=0 total=0
 ```
 
-A definitive empty state (borrowed agent-ergonomics principle), never an error, and even the empty packet carries a basis.
+Both are definitive empty successes with Basis position zero. Bare `lor` is exactly the first status view. This is the M1.5 orientation promised by ADR 0008; the empty Working Lore packet is deferred to M3 and appears in journey 4.
 
 ## Journey 2 — record what was learned
 
@@ -81,15 +75,15 @@ Free text first, always cheap:
 ```text
 $ echo "Command registration is concentrated in src/commands, but plugins
   can register commands dynamically elsewhere." | lor add entry \
-    --type finding --title "command registration" \
-    --source repo=rozoro --locator src/commands --snapshot 3a1d8b7 --body -
+    --actor agent:example.agent --type finding --title "command registration" \
+    --source-json '{"ref":"repo=rozoro","locator":"src/commands","snapshot":"3a1d8b7"}' --body -
 ent_0123456789abcdef
 ```
 
 Then the structured claim, keyed ([decision 0004](../../decisions/0004-claim-identity-key.md)):
 
 ```text
-$ lor add claim --scope repo=rozoro \
+$ lor add claim --actor agent:example.agent --scope repo=rozoro \
     --subject-type code-area --subject command-registration \
     --predicate location --value src/commands \
     --derived-from ent_0123456789abcdef --confidence observed
@@ -113,10 +107,10 @@ A later run finds the world changed:
 $ lor add claim ... --predicate location --value src/cli/commands ...
 clm_3333333333333333  conflict candidate under key with clm_1111111111111111
 advice: lor show clm_1111111111111111
-advice: lor resolve --targets clm_1111111111111111,clm_3333333333333333 --decision prefer --replacement clm_3333333333333333 --reason "..."
+advice: lor show clm_3333333333333333
 ```
 
-Nothing is deleted or overwritten; the conflict is now visible knowledge, and the advice tells the same agent how to close it.
+Nothing is deleted or overwritten. The advice is executable mechanics: inspect both facts. It does not prejudge a preferred claim, actor, or reason; after verification, the embedded skill supplies the explicit Resolution grammar.
 
 ## Journey 3b — chain until healthy
 
@@ -124,16 +118,17 @@ The agent follows the advice in the same session: inspect, verify against the so
 
 ```text
 $ lor status
-open attention: 0    malformed: 0    dangling refs: 0
-healthy
+healthy: true
+open exclusive groups: 0    dangling record refs: 0
+advisories: 0
 ```
 
 `lor status` is the "am I done?" check that terminates the chain. It has two tiers:
 
-- **health** (blocks `--check`): unresolved same-key groups, malformed records, dangling `derived_from` references;
-- **advisories** (reported, never blocking): cheap divergence hints, e.g. the same value recorded under different keys within one scope — a sign two writers named the same fact differently.
+- **health** (blocks `--check`): unresolved `exclusive` exact-key groups and dangling persisted record references;
+- **advisories** (reported, never blocking): generic equal-value/different-key divergence within one exact scope, suppressible by explicit `duplicates` Relations connecting the key components.
 
-All checks are mechanical and available before full reconciliation exists. `lor status --check` exits nonzero only on health failures.
+Malformed canonical files are provider corruption: status fails with the store-error envelope rather than claiming partial health. All successful checks are mechanical and available before full reconciliation. `lor status --check` exits 5 only when health is false; advisories alone exit 0.
 
 Content first (borrowed agent-ergonomics principle): bare `lor` with no arguments prints this orientation view — live data, never a help screen. Help stays consistent and concise: `lor <command> --help` prints a per-command reference; `lor skill` remains the full agent guide.
 
@@ -149,7 +144,9 @@ $ lor claims --scope repo=rozoro --json | jq -r '.result[] | select(.confidence 
 
 The shell is the rest of the query engine; lor does not need to grow one.
 
-## Journey 4 — working lore reflects it
+## Journey 4 — M3 Working Lore reflects it
+
+This journey begins only when M3 lands. On an empty matching scope, the same command returns a definitive empty packet with Basis and exit 0. With the earlier records:
 
 ```text
 $ lor lore --activity investigate --scope repo=rozoro
@@ -165,17 +162,27 @@ basis:
 
 Bounded, ranked, with stable handles — not a record dump.
 
-## Journey 5 — resolve
+## Journey 5 — resolve in M1.5; project in M2
+
+M1.5 records the judgment and then proves mechanical health:
 
 ```text
-$ lor resolve --targets clm_1111111111111111,clm_3333333333333333 --decision prefer --replacement clm_3333333333333333 \
+$ lor resolve --actor agent:example.agent --target clm_1111111111111111 --target clm_3333333333333333 \
+    --decision prefer --replacement clm_3333333333333333 \
     --reason "verified against snapshot 9f21c44; registration moved"
 res_4444444444444444
+$ lor status --check
+healthy: true
+```
+
+M2 adds the projection command; it is not accepted by an M1.5 binary:
+
+```text
 $ lor current --scope repo=rozoro
 (code-area command-registration) location = src/cli/commands  [clm_3333333333333333, resolved]
 ```
 
-## Journey 6 — time travel
+## Journey 6 — M2 time travel
 
 ```text
 $ lor current --scope repo=rozoro --as-of 2026-08-26T12:00:00Z
@@ -194,18 +201,18 @@ $ lor show ent_0123456789abcdef        # the original free text
 
 Every id printed anywhere is resolvable — the progressive-disclosure promise.
 
-## Journey 8 — staleness and replay
+## Journey 8 — M1.5 head; later projection staleness
 
 ```text
 $ lor head
 stream_position=6
 ```
 
-A cached lore packet with `basis.stream_position=4` is stale the moment `head` moves past it for the scope. And deleting every derived artifact then replaying the plain files reproduces identical projections for the same basis and query ([decision 0006](../../decisions/0006-explicit-version-basis.md)).
+M1.5 can compare any response Basis to this store-wide head and can continue an older list through its pinned cursor. Once projections exist, a cached Current Knowledge or Working Lore response with `basis.stream_position=4` is conservatively stale when head is 6. Deleting derived artifacts and replaying plain files must reproduce later derived content for the same basis and query ([decision 0006](../../decisions/0006-explicit-version-basis.md)).
 
 ## Journey 9 — teach the agents
 
-The skill ships **inside the binary**: `lor skill` prints the agent guide, so distributing the executable distributes the integration — no separate file to install. The guide ([agent skill draft](./agent-skill.md)) instructs agents: orient with `lor status` (later `lor lore`); record findings as entries as you go; write a claim whenever a finding is stable enough to key; follow every `advice:` line until `lor status` reports healthy; never fight a conflict — record it, verify, resolve with a reason. A repo-level `.agents/skills` wrapper can simply defer to `lor skill`.
+The skill ships **inside the binary**: build embeds [the one agent guide source](./agent-skill.md). Text `lor skill` strips only YAML frontmatter and prints the remaining Markdown bytes exactly without resolving a store; `--json` returns the same guide string. The M1.5 guide instructs agents to orient with status/claims, provide actor and provenance, follow embedded commands/cursors, and record rather than guess judgment. `current` and `lore` appear only in its M2/M3 revision triggers. A repo-level `.agents/skills` wrapper can simply defer to `lor skill`.
 
 ## Behavioral test catalog
 
@@ -273,40 +280,40 @@ Grouped by milestone; **AC n** = acceptance criterion in [goal and scope](../sco
 
 | # | Given / When / Then | Covers |
 |---|---|---|
-| T50 | every command supports `--json`; output parses and matches the application-suite result | agent ergonomics |
-| T51 | exit codes: 0 success, distinct nonzero for validation error vs not-found vs store error | agent ergonomics |
+| T50 | every semantic command supports `--json`; success/failure is one LF-terminated object, and application-backed semantic fields match the application result after CLI advice rendering | agent ergonomics, ADR 0026 |
+| T51 | exits are exact: 0 executed, 2 usage/validation/reference/cursor, 3 not-found, 4 store/provider, 5 unhealthy `--check`, 6 capability/internal | agent ergonomics, ADR 0026 |
 | T52 | `add entry --body -` reads stdin; body round-trips byte-exact through store and `show` | journey 2 |
 | T53 | `add claim` prints the reconciliation feedback line (new / corroborates / conflict candidate) | journey 2–3 |
-| T54 | end-to-end scenario A (three runs, revalidation surfaced) through the binary | S A |
-| T55 | end-to-end scenario B (30→60-day amendment, all four temporal queries) through the binary | S B |
-| T56 | end-to-end journey 0→8 as one scripted session on a fresh temp dir | AC 12 (ergonomics) |
-| T57 | AC 12 measured: journey 2 (entry + claim) is ≤ 2 commands; journey 1 (lore) is 1 command | AC 12 |
+| T54 | after M2/M3 commands exist, end-to-end scenario A (three runs, revalidation surfaced) through the binary | S A, staged M2/M3 |
+| T55 | after M2 temporal projection exists, end-to-end scenario B (30→60-day amendment, all four temporal queries) through the binary | S B, staged M2 |
+| T56 | staged end-to-end journey 0→8 as one scripted fresh-store session: M1.5 record/query/health first, then M2 current/time and M3 lore when those commands land | AC 12 (ergonomics), ADR 0026 |
+| T57 | AC 12 measured at M1.5: journey 2 (entry + claim) is ≤ 2 commands; empty orientation is one bare `lor` status command (a scoped claims query is optional follow-up) | AC 12, ADR 0026 |
 | T58 | content first: bare `lor` prints the orientation/status view (live data, exit 0), not help; `lor <command> --help` prints a concise per-command reference; an unknown flag fails with an actionable error, never ignored | agent ergonomics, journey 3b |
 
 ### Agent-reactive envelope (ships with the early CLI)
 
 | # | Given / When / Then | Covers |
 |---|---|---|
-| T60 | every mutation response (`--json`) contains `ok`, `result`, `reconciliation`, `advice`, `basis`; every `advice` entry is a runnable command | ADR 0008 |
+| T60 | every mutation response (`--json`) contains exact `ok`, `result`, `reconciliation`, rendered `advice`, and `basis`; each application affordance becomes a runnable command without putting CLI strings in the application | ADR 0008/0026 |
 | T61 | second claim, same key + same value → corroboration feedback, no attention raised | journey 3 |
 | T62 | second claim, same key + different value → conflict-candidate feedback with `advice` entries naming both ids | journey 3 |
-| T63 | agent chain: execute the `advice` commands from T62 (show → resolve) → `lor status` reports healthy, `--check` exits 0 | journey 3b |
-| T64 | `lor status` flags dangling `derived_from`, malformed records, and same-key groups with no relation/resolution among them | journey 3b |
-| T65 | `lor skill` prints the agent guide; a fresh store + only the guide's commands completes journeys 1–5 | journey 9 |
-| T66 | `advice` is deterministic: same store state → byte-identical advice; no advice on healthy state | ADR 0008 |
-| T67 | `lor claims` filters compose across fields (scope + predicate + value, etc.) and return stable ordering with `--json` | key hygiene |
-| T68 | versioned core mechanics (not ClaimPolicy advice) finds canonically equal values under different exact keys in one exact scope → non-blocking advisory, never cross-key reconciliation | key hygiene |
+| T63 | agent chain: execute both show commands from T62, make the manual judgment using the embedded skill's resolve grammar, then `lor status` reports healthy and `--check` exits 0 | journey 3b, ADR 0026 |
+| T64 | `lor status` flags every dangling persisted record reference and unresolved exclusive group; a Resolution covering all current members closes it, while malformed canonical files fail as store corruption rather than partial health | journey 3b, ADR 0026 |
+| T65 | text `lor skill` equals frontmatter-stripped embedded source bytes and needs no store; a fresh store using only its M1.5 commands completes orientation, record/query/disclosure/manual-resolution, and healthy exit | journey 9, ADR 0026 |
+| T66 | for the same pinned state, corrective/navigational affordance fields and order are identical; healthy state has no corrective advice, though record handles and list continuation remain navigational | ADR 0008/0026 |
+| T67 | `lor claims` AND-composes exact scope-subset + key/value/actor/since filters, orders by stream position, and returns the contract page under `--json` | key hygiene, ADR 0026 |
+| T68 | versioned core mechanics (not ClaimPolicy advice) finds canonically equal values under different exact keys in one exact scope → non-blocking advisory, never cross-key reconciliation; duplicate Relations connecting components suppress it | key hygiene, ADR 0026 |
 
 ### Pagination and link-following (ADR 0009)
 
 | # | Given / When / Then | Covers |
 |---|---|---|
-| T70 | any list over the default limit → `page` with `returned`/`total`/`cursor` plus a runnable continuation in `advice`; under the limit → counts, no cursor | ADR 0009 |
-| T71 | append records mid-pagination → the cursor chain yields no duplicates or skips (basis-pinned); a fresh query reflects the new head | ADR 0009 + 0006 |
-| T72 | invalid or foreign `--cursor` → actionable error, distinct exit code, never a silent restart | ADR 0009 |
-| T73 | link-following: starting from a `lor lore` packet, disclosure levels 0→4 (packet → claim → evidence/history → entry → source ref) are reachable using only commands embedded in responses | ADR 0009, journey 7 |
-| T74 | no dead ends: every id printed by any command resolves via `show`/`history` (generalizes T44 to all output) | ADR 0009 |
-| T75 | a Working Lore section hitting its budget states its full count and carries a continuation handle | working-lore contract |
+| T70 | any list beyond its effective limit → `page` with returned/total/cursor plus runnable continuation preserving a nondefault limit; at completion → counts and omitted cursor | ADR 0009/0026 |
+| T71 | append mid-pagination → `loredu.cursor.v1.` chain verifies pinned anchor and yields no duplicates/skips from that prefix; a fresh cursorless query reflects new head | ADR 0009/0006/0026 |
+| T72 | malformed, wrong-operation/query/ruleset, or foreign-snapshot cursor → actionable `INVALID_CURSOR`/`CURSOR_MISMATCH`, exit 2, never restart | ADR 0009/0026 |
+| T73 | M1.5 link-following starts from status/query/add responses and reaches record/history/entry/source using only affordances; once M3 lands the same path starts from `lor lore` | ADR 0009/0026, journey 7 |
+| T74 | no dead ends: every Loredu id returned by any command is paired with show/history affordances; SourceRefs are explicit terminal external values | ADR 0009/0026 |
+| T75 | when M3 lands, a Working Lore section hitting its budget states its full count and carries a Basis-pinned continuation under the same cursor contract | working-lore contract, staged M3 |
 
 ### Kernel invariants and the policy seam (issue #6)
 

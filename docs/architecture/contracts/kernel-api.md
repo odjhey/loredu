@@ -1,6 +1,6 @@
 ---
 name: kernel_api_contract
-description: "Exact M0 kernel surface plus the additive M1 RecordStore and reusable testing-conformance exports."
+description: "Exact staged kernel surface through M1.5: records/application, M1 RecordStore conformance, and response/query additions."
 type: contract
 tags: [contracts, kernel, api, typescript]
 generated: "OpenAI coding agent and ChatGPT GPT-5.6 Sol, 2026-08-28"
@@ -200,3 +200,33 @@ interface RecordStoreConformanceCase {
 ```
 
 `recordStoreConformance` is runner-neutral: it returns bound named async cases and imports no Bun/Node runner API. Each case owns a fresh empty fixture and always disposes it. `InMemoryStore` becomes M1-complete under the same `RecordStore` interface; `FixedClock` and `SeededRandomSource` are unchanged. No conformance or helper value moves to the normal entrypoint.
+
+## Additive M1.5 surface
+
+[Decision 0026](../../decisions/0026-m15-application-cli-contract.md) adds no entrypoint, testing export, or normal runtime value. It adds these type-only normal exports exactly:
+
+```text
+Affordance Page RecordHandle ReconciliationState ReconciliationFeedback
+ApplicationResponse ApplicationListResponse AddedRecordResult ShownRecordResult
+RecordSummary HistoryItem ClaimItem HeadResult ClaimFilters ClaimQuery HistoryQuery
+UnresolvedExclusiveGroup DanglingRecordReference HealthItem
+KeyDivergenceAdvisory StatusResult
+```
+
+The existing `LoreduApplication` interface additively gains:
+
+```ts
+interface LoreduApplication {
+  append<D extends RecordDraft>(draft: D):
+    Promise<AppendRecordResult<PersistedRecordFor<D>>>
+  add<D extends RecordDraft>(draft: D):
+    Promise<ApplicationResponse<AddedRecordResult<PersistedRecordFor<D>>>>
+  show(id: RecordId): Promise<ApplicationResponse<ShownRecordResult>>
+  history(query: HistoryQuery): Promise<ApplicationListResponse<HistoryItem>>
+  claims(query?: ClaimQuery): Promise<ApplicationListResponse<ClaimItem>>
+  status(): Promise<ApplicationResponse<StatusResult>>
+  readHead(): Promise<ApplicationResponse<HeadResult>>
+}
+```
+
+`createLoreduApplication` and its dependency object do not change. The complete response, filter, overlap, health, cursor, and affordance semantics are in the [application and CLI contract](./application-cli.md). `INVALID_CURSOR`, `CURSOR_MISMATCH`, and `RECORD_NOT_FOUND` are additive `LoreduErrorCode` members. CLI envelope/error/exit types are adapter contract rather than kernel exports. Production host Clock and RandomSource implementations remain internal to the CLI composition root; they are not kernel exports.
