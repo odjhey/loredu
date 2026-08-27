@@ -1,4 +1,4 @@
-import type { PersistedRecord, RecordId } from "../domain/entry";
+import type { PersistedRecord, RecordId, RecordKind } from "../domain/entry";
 
 export type Instant = number & { readonly __brand: "Instant" };
 export type StreamPosition = number & { readonly __brand: "StreamPosition" };
@@ -27,7 +27,24 @@ export interface Clock {
 export interface RandomSource {
   nextBytes(count: number): Uint8Array;
 }
+export interface RecordFilter {
+  readonly kinds?: readonly RecordKind[];
+}
+export interface PositionedRecord {
+  readonly position: StreamPosition;
+  readonly record: PersistedRecord;
+}
+export interface RecordScan {
+  readonly head: StreamPosition;
+  readonly records: readonly PositionedRecord[];
+}
+export interface RecordStreamOptions {
+  readonly after?: StreamPosition;
+}
 export interface RecordStore {
   append(record: PersistedRecord): Promise<StreamPosition>;
   get(id: RecordId): Promise<PersistedRecord | undefined>;
+  scan(filter?: RecordFilter): Promise<RecordScan>;
+  stream(options?: RecordStreamOptions): AsyncIterable<PositionedRecord>;
+  head(): Promise<StreamPosition>;
 }

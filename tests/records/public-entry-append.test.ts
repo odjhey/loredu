@@ -11,6 +11,7 @@ import {
   type StreamPosition,
 } from "@loredu/kernel";
 import { FixedClock, InMemoryStore, SeededRandomSource } from "@loredu/kernel/testing";
+import { unusedRecordStoreQueries } from "../support/application-store";
 
 const draft: EntryDraft = {
   kind: "entry",
@@ -219,6 +220,7 @@ describe("public Entry assembly", () => {
         },
         clock: { now: () => invalid as never },
         store: {
+          ...unusedRecordStoreQueries,
           get: async () => undefined,
           append: async () => {
             storeCalls++;
@@ -270,6 +272,7 @@ describe("public Entry assembly", () => {
           },
         },
         store: {
+          ...unusedRecordStoreQueries,
           get: async () => undefined,
           append: async () => {
             calls.push("store");
@@ -304,6 +307,7 @@ describe("public Entry assembly", () => {
           },
         },
         store: {
+          ...unusedRecordStoreQueries,
           get: async () => undefined,
           append: async () => {
             calls.push("store");
@@ -334,6 +338,7 @@ describe("public Entry assembly", () => {
           },
         },
         store: {
+          ...unusedRecordStoreQueries,
           get: async () => undefined,
           append: async () => {
             calls.push("store");
@@ -453,6 +458,7 @@ describe("public Entry assembly", () => {
           },
         },
         store: {
+          ...unusedRecordStoreQueries,
           get: async () => undefined,
           append: async () => {
             storeCalls++;
@@ -484,6 +490,7 @@ describe("public Entry assembly", () => {
     const backing = new InMemoryStore();
     let failure: LoreduError | undefined = foreign;
     const store = {
+      ...unusedRecordStoreQueries,
       get: backing.get.bind(backing),
       async append(record: Parameters<typeof backing.append>[0]) {
         if (failure) throw failure;
@@ -513,6 +520,7 @@ describe("public Entry assembly", () => {
   test("invalid adapter positions become controlled failures", async () => {
     for (const position of [0, -1, 1.5, Number.NaN, Number.MAX_SAFE_INTEGER + 1]) {
       const store = {
+        ...unusedRecordStoreQueries,
         async append() {
           return position as StreamPosition;
         },
@@ -549,6 +557,7 @@ describe("public Entry assembly", () => {
     };
     const backing = new InMemoryStore();
     const store = {
+      ...unusedRecordStoreQueries,
       get: backing.get.bind(backing),
       async append(record: Parameters<typeof backing.append>[0]) {
         calls.push("store");

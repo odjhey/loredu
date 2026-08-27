@@ -19,6 +19,7 @@ import {
   type Verification,
 } from "@loredu/kernel";
 import { FixedClock, InMemoryStore, SeededRandomSource } from "@loredu/kernel/testing";
+import { unusedRecordStoreQueries } from "../support/application-store";
 
 const actor = { type: "agent" as const, id: "test.agent" };
 const id = {
@@ -266,6 +267,7 @@ describe("generic M0 application append", () => {
       const calls: string[] = [];
       let read = 0;
       const store: RecordStore = {
+        ...unusedRecordStoreQueries,
         async get(reference) {
           calls.push(`get:${reference}`);
           return item.returned[read++];
@@ -290,6 +292,7 @@ describe("generic M0 application append", () => {
     const mismatchedIdCalls: string[] = [];
     const mismatchedId = inertCapabilities(
       {
+        ...unusedRecordStoreQueries,
         async get(reference) {
           mismatchedIdCalls.push(`get:${reference}`);
           return persisted("claim");
@@ -310,6 +313,7 @@ describe("generic M0 application append", () => {
     const calls: string[] = [];
     const sourceOnly = inertCapabilities(
       {
+        ...unusedRecordStoreQueries,
         async get(reference) {
           calls.push(`get:${reference}`);
           return undefined;
@@ -352,6 +356,7 @@ describe("generic M0 application append", () => {
       },
     };
     const store: RecordStore = {
+      ...unusedRecordStoreQueries,
       async get(referenceId) {
         events.push(`get:${referenceId}`);
         return reference;
@@ -445,6 +450,7 @@ describe("generic M0 application append", () => {
 
     const referenceFailure = createLoreduApplication({
       store: {
+        ...unusedRecordStoreQueries,
         get: async () => {
           throw new LoreduError("STORE_APPEND_FAILED", "foreign", [
             { code: "TYPE", path: "/foreign", message: "foreign" },
@@ -464,6 +470,7 @@ describe("generic M0 application append", () => {
     let attempted: PersistedRecord | undefined;
     let fail = true;
     const failureStore: RecordStore = {
+      ...unusedRecordStoreQueries,
       get: backing.get.bind(backing),
       async append(record) {
         attempted = record;
@@ -518,6 +525,7 @@ describe("generic M0 application append", () => {
     let appends = 0;
     const app = createLoreduApplication({
       store: {
+        ...unusedRecordStoreQueries,
         get: async () => {
           gets++;
           return undefined;
@@ -620,6 +628,7 @@ describe("generic M0 application append", () => {
     const events: string[] = [];
     const activeOutput = createLoreduApplication({
       store: {
+        ...unusedRecordStoreQueries,
         get: async () => {
           events.push("get");
           return undefined;

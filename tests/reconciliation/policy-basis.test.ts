@@ -344,7 +344,7 @@ describe("M0 ClaimPolicy seam", () => {
     }
   });
 
-  test("normal and testing runtime export allowlists are exact after M0-P", () => {
+  test("normal and testing runtime export allowlists remain exact through M1-K", () => {
     expect(Object.keys(kernel).sort()).toEqual(
       [
         "DEFAULT_CLAIM_POLICY",
@@ -367,6 +367,8 @@ describe("M0 ClaimPolicy seam", () => {
         "recordKindOfIdPrefix",
       ].sort(),
     );
-    expect(Object.keys(testing).sort()).toEqual(["FixedClock", "InMemoryStore", "SeededRandomSource"].sort());
+    expect(Object.keys(testing).sort()).toEqual(
+      ["FixedClock", "InMemoryStore", "SeededRandomSource", "recordStoreConformance"].sort(),
+    );
   });
 });

@@ -3,11 +3,6 @@
   "catalog": "docs/v0.x/execution/first-user-journey.md",
   "note": "Every catalog T-number is either claimed by an executable test under tests/ (via an @covers annotation) or listed here with the milestone that will implement it. Never both, never neither. See ADR 0015.",
   "deferred": {
-    "T10": {
-      "milestone": "M1",
-      "group": "M1 — plain-file store",
-      "reason": "plain-file store adapter not implemented yet"
-    },
     "T11": {
       "milestone": "M1",
       "group": "M1 — plain-file store",
@@ -18,17 +13,7 @@
       "group": "M1 — plain-file store",
       "reason": "plain-file store adapter not implemented yet"
     },
-    "T13": {
-      "milestone": "M1",
-      "group": "M1 — plain-file store",
-      "reason": "plain-file store adapter not implemented yet"
-    },
     "T14": {
-      "milestone": "M1",
-      "group": "M1 — plain-file store",
-      "reason": "plain-file store adapter not implemented yet"
-    },
-    "T15": {
       "milestone": "M1",
       "group": "M1 — plain-file store",
       "reason": "plain-file store adapter not implemented yet"

@@ -17,23 +17,23 @@ path, reconciliation, projections, and Working Lore.
 Anything the kernel needs from its environment arrives through a port in
 `src/ports/`, implemented by an adapter.
 
-## Public M0 surface
+## Public surface
 
-Only `@loredu/kernel` and `@loredu/kernel/testing` are entrypoints; deep imports are unsupported. The exact final M0 value/type allowlists and signatures are the [kernel API contract](../../docs/architecture/contracts/kernel-api.md). The completed M0 runtime exports the five draft/record families, portable JSON codec/equality, ClaimKey, Instant/position constructors, versioned ClaimPolicy/default semantics, structural RulesetIdentity/Basis primitives, and the family-narrowed generic append application. Testing exports exactly InMemoryStore, FixedClock, and SeededRandomSource. Scaffold-only `AppendResult`, `RecordRef`, `stream`, `head`, and `StoreUnderTest` do not survive M0.
+Only `@loredu/kernel` and `@loredu/kernel/testing` are entrypoints; deep imports are unsupported. The exact value/type allowlists and signatures are the [kernel API contract](../../docs/architecture/contracts/kernel-api.md). The normal runtime exports the five draft/record families, portable JSON codec/equality, ClaimKey, Instant/position constructors, versioned ClaimPolicy/default semantics, structural RulesetIdentity/Basis primitives, and the family-narrowed generic append application. M1 adds the full RecordStore query types without adding a normal-entrypoint runtime value. Testing exports exactly InMemoryStore, FixedClock, SeededRandomSource, and the runner-neutral `recordStoreConformance`; its fixture, subject, and case shapes are type-only exports.
 
 ## Layout
 
 ```text
 src/domain/    records, ids, JSON codec/equality, claim keys, Basis, validation
-src/ports/     M0 append/get RecordStore, Clock, RandomSource, ClaimPolicy
-testing/       M0 InMemoryStore, FixedClock, SeededRandomSource; M1 conformance,
+src/ports/     M1 RecordStore, Clock, RandomSource, ClaimPolicy
+testing/       M1 InMemoryStore, FixedClock, SeededRandomSource, conformance kit;
                published only as @loredu/kernel/testing
 ```
 
 `@loredu/kernel/testing` is test support, never product surface: production code in
-any package must not import it. M0's three helpers implement the public contracts;
-full scan/stream/head and reusable durable-store conformance remain M1.
+any package must not import it. Its pure in-memory adapter implements the full M1
+port; durable-provider conformance remains later M1 work.
 
 ## State
 
-M0 is complete. The landed P0 Entry behavior and entropy hardening remain intact; M0-R supplies all five canonical draft/record families and M0-P supplies the closed policy/Basis primitives. M0-A completes the family-narrowed generic append path: descriptor-safe structural and ClaimPolicy validation, ordered reference reads, one entropy call, one clock call, canonical deep freezing, immediate append, phase-owned failures, and detached InMemoryStore snapshots. Catalog rows T01–T08, T19, T80–T85, and T87 are executable. Scan/stream/head, reusable store conformance, durable persistence, policy advice, and reconciliation remain M1 or later.
+M0 is complete and its behavior remains intact. M1-K adds the exact kind-only atomic scan, snapshot-bounded exclusive-after stream, head, positioned records, M1-complete InMemoryStore, and reusable runner-neutral conformance kit. Catalog rows T10, T13, and T15 run against InMemoryStore. PlainFileStore representation, replay across instances, locking, roots, and durability remain owned by later M1 work; policy advice and reconciliation remain later milestones.
