@@ -2229,9 +2229,7 @@ test("compiled M2 scenario B preserves all four temporal modes and canonical his
     },
   });
 
-  const disclosedClaims = json(
-    await invokeShell(home, `${projectedItem(current).claims.run} --json`),
-  );
+  const disclosedClaims = json(await invokeShell(home, `${projectedItem(current).claims.run} --json`));
   const claimSummaries = disclosedClaims.result as {
     id: string;
     handles: { id: string; affordances: { action: string; run: string }[] }[];
@@ -2265,9 +2263,7 @@ test("compiled M2 scenario B preserves all four temporal modes and canonical his
         handles: { id: string; affordances: { action: string; run: string }[] }[];
       }
     ).handles.find(({ id }) => id === evidence.entryId);
-    const entryShowRun = entryHandle?.affordances.find(
-      ({ action }) => action === "record.show",
-    )?.run;
+    const entryShowRun = entryHandle?.affordances.find(({ action }) => action === "record.show")?.run;
     expect(entryShowRun).toBeDefined();
     const shownEntry = json(await invokeShell(home, `${entryShowRun as string} --json`));
     expect(shownEntry.result).toMatchObject({ record: { sources: [evidence.source] } });
