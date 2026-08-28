@@ -674,7 +674,10 @@ function runFor(affordance: Affordance, selector: string | undefined): string {
     if (params.limit !== undefined) command += ` --limit ${String(params.limit)}`;
     return command;
   }
-  if (affordance.action === "store.init") return `lor init ${shellWord(String(params.selector))}`;
+  if (affordance.action === "store.init") {
+    const target = shellWord(String(params.selector));
+    return String(params.selector).startsWith("--") ? `lor init --store ${target}` : `lor init ${target}`;
+  }
   if (affordance.action === "history.list") {
     let command = `${prefix} history --cursor ${shellWord(String(params.cursor))}`;
     if (params.limit !== undefined) command += ` --limit ${String(params.limit)}`;
@@ -717,7 +720,7 @@ function rendered(value: unknown, selector: string | undefined): unknown {
   if (Array.isArray(value)) return value.map((item) => rendered(item, selector));
   if (typeof value !== "object" || value === null) return value;
   const object = value as Record<string, unknown>;
-  const output: Record<string, unknown> = {};
+  const output = Object.create(null) as Record<string, unknown>;
   for (const [key, item] of Object.entries(object)) output[key] = rendered(item, selector);
   if (
     typeof object.rel === "string" &&
@@ -968,7 +971,7 @@ async function execute(
     if (bodyOption === "-") {
       let body: string;
       try {
-        body = new TextDecoder("utf-8", { fatal: true }).decode(await io.readStdin());
+        body = new TextDecoder("utf-8", { fatal: true, ignoreBOM: true }).decode(await io.readStdin());
       } catch {
         throw new LoreduError("VALIDATION_FAILED", "stdin is not valid UTF-8", [
           Object.freeze({ code: "FORMAT", path: "/body", message: "stdin must be valid UTF-8" }),

@@ -17,9 +17,10 @@ async function invoke(
   home: string,
   args: readonly string[],
   stdin?: string | Uint8Array,
+  cwd: string = workspace,
 ): Promise<Invocation> {
   const process = Bun.spawn([binary, ...args], {
-    cwd: workspace,
+    cwd,
     env: { ...Bun.env, LOREDU_HOME: home },
     stdin: stdin === undefined ? "ignore" : new Blob([stdin]),
     stdout: "pipe",
@@ -282,6 +283,19 @@ test("explicit path selection initializes and opens only that store", async () =
   expect(implicit.exitCode).toBe(3);
 });
 
+test("missing leading-dash path advice remains executable", async () => {
+  const home = await freshHome();
+  const selector = "--missing/store";
+  const missing = json(await invoke(home, ["head", "--store", selector, "--json"], undefined, home));
+  expect((missing.advice as { run: string }[])[0]?.run).toBe("lor init --store --missing/store");
+
+  const initialized = json(await invoke(home, ["init", "--store", selector, "--json"], undefined, home));
+  expect((initialized.result as { selector: string }).selector).toBe(selector);
+  expect((initialized.result as { root: string }).root).toEndWith("/--missing/store");
+  const head = json(await invoke(home, ["head", "--store", selector, "--json"], undefined, home));
+  expect((head.result as { stream_position: number }).stream_position).toBe(0);
+});
+
 test("text mode renders primary results and semantic labels", async () => {
   const home = await freshHome();
   const initialized = await invoke(home, ["init"]);
@@ -330,6 +344,43 @@ test("stdin Entry body survives compiled storage and show byte-exact — @covers
   const id = (added.result as { id: string }).id;
   const shown = json(await invoke(home, ["show", id, "--json"]));
   expect((shown.result as { record: { body: string } }).record.body).toBe(body);
+
+  const bomBody = new Uint8Array([0xef, 0xbb, 0xbf, ...new TextEncoder().encode(body)]);
+  const bomAdded = json(
+    await invoke(home, ["add", "entry", "--actor", "agent:compiled-test", "--body", "-", "--json"], bomBody),
+  );
+  const bomShown = json(await invoke(home, ["show", (bomAdded.result as { id: string }).id, "--json"]));
+  expect((bomShown.result as { record: { body: string } }).record.body).toBe(`\uFEFF${body}`);
+});
+
+test("portable JSON object keys survive rendering", async () => {
+  const home = await freshHome();
+  expect((await invoke(home, ["init", "--json"])).exitCode).toBe(0);
+  const added = json(
+    await invoke(home, [
+      "add",
+      "claim",
+      "--actor",
+      "agent:compiled-test",
+      "--subject-type",
+      "code-area",
+      "--subject",
+      "rendering",
+      "--predicate",
+      "state",
+      "--value-json",
+      '{"__proto__":"kept","nested":{"__proto__":"nested"}}',
+      "--confidence",
+      "observed",
+      "--json",
+    ]),
+  );
+  const shown = json(await invoke(home, ["show", (added.result as { id: string }).id, "--json"]));
+  const value = (shown.result as { record: { value: Record<string, unknown> } }).record.value;
+  expect(Object.getOwnPropertyDescriptor(value, "__proto__")?.value).toBe("kept");
+  expect(Object.getOwnPropertyDescriptor(value.nested as Record<string, unknown>, "__proto__")?.value).toBe(
+    "nested",
+  );
 });
 
 test("bare binary is live orientation and command help is strict — @covers T58", async () => {
