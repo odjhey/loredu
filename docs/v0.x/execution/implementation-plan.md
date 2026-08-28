@@ -111,7 +111,7 @@ M3 is implemented under [decision 0030](../../decisions/0030-working-lore-ranker
 - global first-packet defaults `max_items=40`/`max_chars=12000`, Unicode-scalar summary accounting, longest-prefix selection, all five orientation/section count lines, and one Basis-pinned cursor per truncated section;
 - section-only continuation that can change budgets, preserves the original head/query/valid point/computed time/core-policy-ranker identities, binds pure-SHA-256/base64url global permutation digest/count plus exact occurrence resume identity or `before-first`, consumes no Clock, and fails closed on a changed valid permutation before partial output;
 - Working Lore-specific structural Basis extension with Ranker identity, shared ordinary/Working Lore-aware `basisEquals`, conservative store-wide staleness, semantic replay equality, stable handles, and recursive surface-neutral disclosure;
-- additive CLI `lore` grammar/rendering plus `claims --same-key-as` anchored disclosure under the implemented envelope/error/exit/store rules, and the M3 embedded-skill revision only when code lands.
+- additive CLI `lore` grammar/rendering plus `claims --same-key-as` anchored disclosure under the implemented envelope/error/exit/store rules, including the embedded M3 skill revision.
 
 Do not require embeddings or a model reranker. Ranking quality remains an M4 consumer judgment. A consumer may substitute a lexical, embedding, graph, or model Ranker without core changes, but core still owns section membership, counts, budgets, and disclosure and the Ranker version must appear in Working Lore Basis. Do not persist derived content, crawl sources, count model-specific tokens, or reinterpret M2 Resolution/projection semantics.
 
