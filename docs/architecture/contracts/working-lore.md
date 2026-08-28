@@ -279,8 +279,8 @@ interface WorkingLoreRankCursorBinding {
 
 Validation and execution are fail closed in this order:
 
-1. Validate the closed query/cursor shape and requested budgets. A malformed digest alphabet/length, unsupported algorithm, malformed count/index/ordinal, or impossible sentinel shape is `INVALID_CURSOR` before callbacks.
-2. For continuation, check pinned store head/anchor, operation, normalized query, and complete core/ClaimPolicy/Ranker identities before ClaimPolicy or Ranker invocation. A mismatch is `CURSOR_MISMATCH`.
+1. Apply the shared cursor admission and error classification owned by the [application and CLI contract](./application-cli.md#opaque-cursors-and-pinned-snapshots), then validate requested budgets. A malformed lore digest alphabet/length, unsupported algorithm, malformed count/index/ordinal, or impossible sentinel shape is therefore `INVALID_CURSOR` before callbacks; only a fully valid cursor presented to a different operation is `CURSOR_MISMATCH`.
+2. For a lore continuation, check the pinned store head/anchor and complete core/ClaimPolicy/Ranker identities before ClaimPolicy or Ranker invocation. A mismatch is `CURSOR_MISMATCH`.
 3. Rebuild M2 semantics from only the pinned prefix under that ClaimPolicy, then construct the same occurrence array and context.
 4. Invoke Ranker exactly once and validate its complete output. A throw or malformed, duplicate, omitted, or out-of-range output is fresh `VALIDATION_FAILED`, with no partial packet.
 5. Compute candidate count and digest. A valid permutation whose count or digest differs from the cursor is `CURSOR_MISMATCH`.
