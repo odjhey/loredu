@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, expect, test } from "bun:test";
-import { mkdtemp, readFile, rename, rm } from "node:fs/promises";
+import { mkdtemp, readdir, readFile, readlink, rename, rm } from "node:fs/promises";
 import { homedir, tmpdir } from "node:os";
 import { isAbsolute, join, resolve } from "node:path";
 import {
@@ -134,6 +134,37 @@ async function freshHome(): Promise<string> {
   const home = await mkdtemp(join(tmpdir(), "loredu-cli-"));
   homes.push(home);
   return home;
+}
+
+interface StoreArtifact {
+  readonly path: string;
+  readonly kind: "directory" | "file" | "symbolic-link" | "other";
+  readonly bytes?: readonly number[];
+  readonly target?: string;
+}
+
+async function snapshotStoreArtifacts(root: string): Promise<readonly StoreArtifact[]> {
+  const artifacts: StoreArtifact[] = [];
+  const visit = async (directory: string, prefix: string): Promise<void> => {
+    const entries = await readdir(directory, { withFileTypes: true });
+    entries.sort(({ name: left }, { name: right }) => left.localeCompare(right));
+    for (const entry of entries) {
+      const path = prefix === "" ? entry.name : `${prefix}/${entry.name}`;
+      const absolutePath = join(directory, entry.name);
+      if (entry.isDirectory()) {
+        artifacts.push({ path, kind: "directory" });
+        await visit(absolutePath, path);
+      } else if (entry.isFile()) {
+        artifacts.push({ path, kind: "file", bytes: Array.from(await readFile(absolutePath)) });
+      } else if (entry.isSymbolicLink()) {
+        artifacts.push({ path, kind: "symbolic-link", target: await readlink(absolutePath) });
+      } else {
+        artifacts.push({ path, kind: "other" });
+      }
+    }
+  };
+  await visit(root, "");
+  return artifacts;
 }
 
 async function invokeWithFeedbackReadFailure(
@@ -1811,6 +1842,7 @@ test("M2 scenario A compares technical derivation with manual judgment without c
     "--reason",
     "code-v3 confirms both the move and dynamic registration",
   ]);
+  const artifactsBeforeProjection = await snapshotStoreArtifacts(root);
 
   const current = await run("2026-04-01T00:00:00.000Z", ["current", "--scope", "repo=loredu"]);
   const currentItem = (current.result as { items: Record<string, unknown>[] }).items[0] as {
@@ -1965,6 +1997,7 @@ test("M2 scenario A compares technical derivation with manual judgment without c
   ).toBe("supports");
   expect(await run("2026-04-01T00:00:00.000Z", ["current", "--scope", "repo=loredu"])).toEqual(current);
   expect(Number(await new PlainFileStore(root).head())).toBe(10);
+  expect(await snapshotStoreArtifacts(root)).toEqual(artifactsBeforeProjection);
 });
 
 test("compiled M2 scenario B preserves all four temporal modes and canonical history — @covers T55", async () => {
@@ -2147,6 +2180,7 @@ test("compiled M2 scenario B preserves all four temporal modes and canonical his
       values: { value: unknown; representative: { id: string }; claim_count: number }[];
       history: Record<string, unknown>;
       evidence: Record<string, unknown>;
+      claims: { run: string };
     };
 
   expect(current).toMatchObject({
@@ -2194,6 +2228,51 @@ test("compiled M2 scenario B preserves all four temporal modes and canonical his
       verification: { confirmed: 1, contradicted: 0, unchanged: 0, needs_revalidation: 0 },
     },
   });
+
+  const disclosedClaims = json(
+    await invokeShell(home, `${projectedItem(current).claims.run} --json`),
+  );
+  const claimSummaries = disclosedClaims.result as {
+    id: string;
+    handles: { id: string; affordances: { action: string; run: string }[] }[];
+  }[];
+  expect(claimSummaries.map(({ id }) => id)).toEqual([baseClaimId, amendmentClaimId]);
+  expectRenderedAffordances(disclosedClaims, selector);
+  const evidenceChains = [
+    {
+      claimId: baseClaimId,
+      entryId: (baseEntry.result as { id: string }).id,
+      source: { ref: "agreement=vendor", locator: "section-12", snapshot: "base-v1" },
+    },
+    {
+      claimId: amendmentClaimId,
+      entryId: (amendmentEntry.result as { id: string }).id,
+      source: { ref: "agreement=vendor", locator: "amendment-2", snapshot: "signed-v2" },
+    },
+  ];
+  for (const evidence of evidenceChains) {
+    const summary = claimSummaries.find(({ id }) => id === evidence.claimId);
+    const claimShowRun = summary?.handles
+      .find(({ id }) => id === evidence.claimId)
+      ?.affordances.find(({ action }) => action === "record.show")?.run;
+    expect(claimShowRun).toBeDefined();
+    const shownClaim = json(await invokeShell(home, `${claimShowRun as string} --json`));
+    expect(shownClaim.result).toMatchObject({
+      record: { derived_from: [evidence.entryId], sources: [evidence.source] },
+    });
+    const entryHandle = (
+      shownClaim.result as {
+        handles: { id: string; affordances: { action: string; run: string }[] }[];
+      }
+    ).handles.find(({ id }) => id === evidence.entryId);
+    const entryShowRun = entryHandle?.affordances.find(
+      ({ action }) => action === "record.show",
+    )?.run;
+    expect(entryShowRun).toBeDefined();
+    const shownEntry = json(await invokeShell(home, `${entryShowRun as string} --json`));
+    expect(shownEntry.result).toMatchObject({ record: { sources: [evidence.source] } });
+  }
+
   expect(asOf.basis).toMatchObject({
     stream_position: 7,
     query: {
@@ -2479,6 +2558,41 @@ test("M2 scenario C keeps legal and process identities mechanical across default
   ]);
   expectRenderedAffordances(disclosed, selector);
   expect(Number(await new PlainFileStore(root).head())).toBe(8);
+
+  const headBeforeMalformedClaim = await new PlainFileStore(root).head();
+  const malformedClaim = await invokeConformance(
+    home,
+    [
+      "add",
+      "claim",
+      "--actor",
+      "program:contract-parser",
+      "--scope",
+      "agreement=client",
+      "--subject-type",
+      "agreement-clause",
+      "--subject",
+      "notice period",
+      "--predicate",
+      "duration",
+      "--value",
+      "30 days",
+      "--confidence",
+      "observed",
+      "--store",
+      selector,
+      "--json",
+    ],
+    scenarioCapabilities("2026-04-02T00:00:00.000Z", ordinal++),
+  );
+  expect(malformedClaim.exitCode).toBe(2);
+  const malformedEnvelope = json(malformedClaim);
+  expect(malformedEnvelope.error).toMatchObject({
+    code: "VALIDATION_FAILED",
+    issues: [expect.objectContaining({ path: "/subject/id" })],
+  });
+  expect(malformedEnvelope.result).toBeNull();
+  expect(await new PlainFileStore(root).head()).toBe(headBeforeMalformedClaim);
 
   const customSelector = "scenario-c-custom";
   const customInitialized = json(await invoke(home, ["init", customSelector, "--json"]));
