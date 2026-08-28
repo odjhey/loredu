@@ -491,6 +491,11 @@ describe("M3 Working Lore public application", () => {
     await expect(application.lore({ cursor: encodeCursor(tampered) })).rejects.toMatchObject({
       code: "CURSOR_MISMATCH",
     });
+    const driftedTime = cursorPayload(currentCursor);
+    driftedTime.computed_at = "2026-01-02T03:04:06.000Z";
+    await expect(application.lore({ cursor: encodeCursor(driftedTime) })).rejects.toMatchObject({
+      code: "INVALID_CURSOR",
+    });
 
     const stable = app().application;
     await stable.add(claim("one", { subject: "one", confidence: "candidate", claimClass: "pattern" }));
@@ -534,6 +539,12 @@ describe("M3 Working Lore public application", () => {
     const page = await application.lore({ activity: "rank", max_items: 1 });
     expect(assemblyCalls).toBe(2);
     const cursor = must(must(page.result.packet.sections.find(({ page }) => page.cursor)).page.cursor);
+    const drifted = cursorPayload(cursor);
+    drifted.computed_at = "2026-01-02T03:04:06.000Z";
+    await expect(application.lore({ cursor: encodeCursor(drifted) })).rejects.toMatchObject({
+      code: "INVALID_CURSOR",
+    });
+    expect(assemblyCalls).toBe(2);
 
     let wrongVersionCalls = 0;
     const wrongVersion = app({

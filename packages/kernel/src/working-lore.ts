@@ -703,7 +703,13 @@ function decodeLoreCursor(token: string): LoreCursor {
     });
     const timestampIssues: LoreduIssue[] = [];
     const computedAt = normalizeTimestamp(parsed.computed_at, "/computed_at", timestampIssues);
-    if (!computedAt || computedAt !== parsed.computed_at || timestampIssues.length > 0) cursorInvalid();
+    if (
+      !computedAt ||
+      computedAt !== parsed.computed_at ||
+      timestampIssues.length > 0 ||
+      query.valid_at !== computedAt
+    )
+      cursorInvalid();
     const rank = parsed.rank as Record<string, unknown>;
     if (
       !rank ||
