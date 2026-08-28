@@ -655,13 +655,16 @@ function runFor(affordance: Affordance, selector: string | undefined): string {
   if (affordance.action === "record.history") return `${prefix} history ${shellWord(String(params.id))}`;
   if (affordance.action === "status.read") {
     const cursor = params.cursor;
-    return cursor === undefined
-      ? `${prefix} status`
-      : `${prefix} status --cursor ${shellWord(String(cursor))}`;
+    let command =
+      cursor === undefined ? `${prefix} status` : `${prefix} status --cursor ${shellWord(String(cursor))}`;
+    if (params.limit !== undefined) command += ` --limit ${String(params.limit)}`;
+    return command;
   }
   if (affordance.action === "store.init") return `lor init ${shellWord(String(params.selector))}`;
   if (affordance.action === "history.list") {
-    return `${prefix} history --cursor ${shellWord(String(params.cursor))}`;
+    let command = `${prefix} history --cursor ${shellWord(String(params.cursor))}`;
+    if (params.limit !== undefined) command += ` --limit ${String(params.limit)}`;
+    return command;
   }
   const query = params.query as Record<string, JsonValue> | undefined;
   let command = `${prefix} claims`;
@@ -670,8 +673,29 @@ function runFor(affordance: Affordance, selector: string | undefined): string {
     if (scope !== undefined) {
       for (const key of Object.keys(scope).sort()) command += ` --scope ${shellWord(`${key}=${scope[key]}`)}`;
     }
+    if (query.scope_match === "exact") command += " --exact-scope";
+    if (query.subject_type !== undefined)
+      command += ` --subject-type ${shellWord(String(query.subject_type))}`;
+    if (query.subject !== undefined) command += ` --subject ${shellWord(String(query.subject))}`;
+    if (query.predicate !== undefined) command += ` --predicate ${shellWord(String(query.predicate))}`;
+    if (Object.hasOwn(query, "perspective")) {
+      command +=
+        query.perspective === null
+          ? " --without-perspective"
+          : ` --perspective ${shellWord(String(query.perspective))}`;
+    }
+    if (query.value !== undefined) {
+      command += ` --value-json ${shellWord(JSON.stringify(query.value))}`;
+    }
+    if (query.actor !== undefined) {
+      const actor = query.actor as Record<string, JsonValue>;
+      command += ` --actor ${shellWord(`${String(actor.type)}:${String(actor.id)}`)}`;
+    }
+    if (query.since !== undefined) command += ` --since ${shellWord(String(query.since))}`;
+    if (query.limit !== undefined) command += ` --limit ${String(query.limit)}`;
   }
   if (params.cursor !== undefined) command += ` --cursor ${shellWord(String(params.cursor))}`;
+  if (params.limit !== undefined) command += ` --limit ${String(params.limit)}`;
   return command;
 }
 

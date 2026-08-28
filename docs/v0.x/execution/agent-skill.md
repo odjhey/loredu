@@ -12,6 +12,12 @@ created_at: 2026-08-26T00:00:00+08:00
 
 This is the source draft of the guide embedded in the `lor` binary and printed by `lor skill`. Version 1 targets the M1.5 manual-reconciliation era; it is revised when M2 (computed reconciliation) and M3 (`lor lore`) land. A repo-level `.agents/skills` wrapper should defer to `lor skill` rather than duplicating this text.
 
+The first compiled slice embeds this guide before query integration is complete.
+Its record mutations, `show`, `head`, `status`, and `status --check` are live;
+`history`, `claims`, pagination, Claim feedback, and the complete advice chain
+land with M15-Q. Until then, a rendered `history` or `claims` action is a staged
+forward reference rather than an executable command.
+
 ---
 
 ## SKILL: recording operational knowledge with lor

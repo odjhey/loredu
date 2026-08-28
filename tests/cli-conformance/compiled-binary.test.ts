@@ -238,6 +238,8 @@ test("compiled binary maps stable execution categories — @covers T51", async (
     "claim",
     "--actor",
     "agent:compiled-test",
+    "--scope",
+    "repo=loredu",
     "--subject-type",
     "code-area",
     "--subject",
@@ -255,10 +257,14 @@ test("compiled binary maps stable execution categories — @covers T51", async (
   expect((json(ordinaryStatus).result as { healthy: boolean }).healthy).toBe(false);
   const checkedStatus = await invoke(home, ["status", "--check", "--json"]);
   expect(checkedStatus.exitCode).toBe(5);
+  const checkedEnvelope = json(checkedStatus);
   expect(
-    (json(checkedStatus).result as { health: { unresolved_exclusive_groups: number } }).health
+    (checkedEnvelope.result as { health: { unresolved_exclusive_groups: number } }).health
       .unresolved_exclusive_groups,
   ).toBe(1);
+  expect((checkedEnvelope.advice as { run: string }[])[0]?.run).toBe(
+    "lor claims --scope repo=loredu --exact-scope --subject-type code-area --subject status --predicate state --without-perspective",
+  );
 });
 
 test("explicit path selection initializes and opens only that store", async () => {

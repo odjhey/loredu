@@ -1,12 +1,12 @@
 # `@loredu/cli` — the `lor` binary
 
-Argv in, rendered commands out. The CLI is a rendering adapter over the
-application API: it parses arguments, renders the response envelope and its
-affordances as text or `--json`, and embeds the agent skill at compile time
-([ADR 0011](../../docs/decisions/0011-repo-package-architecture.md),
+Argv in, rendered commands out. The target boundary keeps query and health
+mechanics in the application API while the CLI parses arguments, renders the
+response envelope and its affordances as text or `--json`, and embeds the agent
+skill at compile time ([ADR 0011](../../docs/decisions/0011-repo-package-architecture.md),
 [ADR 0008](../../docs/decisions/0008-cli-first-agent-reactive.md),
-[ADR 0026](../../docs/decisions/0026-m15-application-cli-contract.md)).
-No domain logic lives here.
+[ADR 0026](../../docs/decisions/0026-m15-application-cli-contract.md)). The
+first-slice containment exception is recorded below.
 
 ```sh
 bun run build     # bun build --compile → ./dist/lor
@@ -19,9 +19,12 @@ The first compiled-binary slice is implemented: exact store selection and `init`
 all five record mutation forms, `show`, `head`, stdin Entry bodies, JSON/text
 rendering, bare empty-store orientation, direct version/help, stable failure
 categories, production host capabilities, and the build-time embedded `lor skill`.
-The application query/feedback crew supplies Claim feedback and full status
-mechanics; the query integration crew supplies `history`, `claims`, pagination,
-and the complete agent chain. M2/M3 still own `current` and `lore`.
+For this slice, direct `show`/`head` reads and unpaginated status health and
+advisories are contained in the CLI so bare orientation and `status --check` are
+live. The application query/feedback crew still owns their application-layer
+forms and Claim feedback; the query integration crew supplies `history`,
+`claims`, pagination, and the complete agent chain. M2/M3 still own `current`
+and `lore`.
 
 Compiled-binary evidence lives in
 [`../../tests/cli-conformance/`](../../tests/cli-conformance/README.md). T50–T52
