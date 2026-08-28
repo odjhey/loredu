@@ -114,7 +114,7 @@ async function invokeWithFeedbackReadFailure(
         "i=0\n" +
         'while [ "$i" -lt 10000 ]; do\n' +
         '  : > "$LOREDU_TEST_ROOT/.loredu/write.lock/padding-$i" 2>/dev/null || break\n' +
-        '  i=$((i + 1))\n' +
+        "  i=$((i + 1))\n" +
         "done\n" +
         'while [ -d "$LOREDU_TEST_ROOT/.loredu/write.lock" ]; do :; done\n' +
         'mv "$LOREDU_TEST_ROOT/records" "$LOREDU_TEST_ROOT/records-feedback-unavailable"',
@@ -442,9 +442,11 @@ test("compiled Claim additions render default-policy feedback and committed fall
     "cli-query",
   );
   expect(
-    (json(await invoke(home, ["head", "--store", "feedback", "--json"])).result as {
-      stream_position: number;
-    }).stream_position,
+    (
+      json(await invoke(home, ["head", "--store", "feedback", "--json"])).result as {
+        stream_position: number;
+      }
+    ).stream_position,
   ).toBe(5);
 
   const unavailableText = await invokeWithFeedbackReadFailure(home, join(home, "stores", "feedback"), [
