@@ -1,13 +1,14 @@
 #!/usr/bin/env bun
 import { run } from "../src/index";
 
-const code = run(process.argv.slice(2), {
-  out: (line) => {
-    process.stdout.write(`${line}\n`);
+const code = await run(process.argv.slice(2), {
+  out: (text) => {
+    process.stdout.write(text);
   },
-  err: (line) => {
-    process.stderr.write(`${line}\n`);
+  err: (text) => {
+    process.stderr.write(text);
   },
+  readStdin: async () => new Uint8Array(await Bun.stdin.arrayBuffer()),
 });
 
-process.exit(code);
+process.exitCode = code;

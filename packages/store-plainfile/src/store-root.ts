@@ -25,6 +25,11 @@ function nonempty(value: unknown, label: string): asserts value is string {
   }
 }
 
+function absolute(value: unknown, label: string): asserts value is string {
+  nonempty(value, label);
+  if (!isAbsolute(value)) throw new TypeError(`${label} must be an absolute path`);
+}
+
 function isHostError(error: unknown, code: string): boolean {
   return (
     typeof error === "object" &&
@@ -93,7 +98,7 @@ function assertPhysicalDescendant(home: string, path: string, label: string): vo
 
 function validatedNamedRoot(name: string, home: string): string {
   validateStoreName(name);
-  nonempty(home, "Loredu home");
+  absolute(home, "Loredu home");
   const root = join(home, STORES_DIRNAME, name);
   const stores = join(home, STORES_DIRNAME);
   inspectNamedBoundary(stores, "named-store directory");
@@ -103,14 +108,18 @@ function validatedNamedRoot(name: string, home: string): string {
   return root;
 }
 
-/** The Loredu home: nonempty `LOREDU_HOME`, otherwise `<osHome>/.loredu`. */
+/** The Loredu home: absolute `LOREDU_HOME`, otherwise `<osHome>/.loredu`. */
 export function defaultLoreduHome(
   env: Readonly<Record<string, string | undefined>> = process.env,
   osHome: string = homedir(),
 ): string {
-  nonempty(osHome, "OS home");
+  absolute(osHome, "OS home");
   const configured = env.LOREDU_HOME;
-  return configured !== undefined && configured !== "" ? configured : join(osHome, ".loredu");
+  if (configured !== undefined && configured !== "") {
+    absolute(configured, "LOREDU_HOME");
+    return configured;
+  }
+  return join(osHome, ".loredu");
 }
 
 /** Where a validated named store lives: `<home>/stores/<name>`. */

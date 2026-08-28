@@ -1,6 +1,6 @@
 import { type Dirent, lstatSync, readdirSync, readFileSync, realpathSync } from "node:fs";
 import { builtinModules } from "node:module";
-import { dirname, extname, join, relative, sep } from "node:path";
+import { dirname, extname, join, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import ts from "typescript";
 
@@ -356,6 +356,29 @@ function checkReference(
   options: ts.CompilerOptions,
 ): void {
   const at = location(source, node);
+  const embeddedSkill = resolve(dirname(file), specifier);
+  if (owner === "cli" && portable(relative(root, embeddedSkill)) === "docs/v0.x/execution/agent-skill.md") {
+    const asset = inspect(embeddedSkill);
+    if (!asset?.isFile() || asset.isSymbolicLink()) {
+      push(result, root, file, "boundary-unresolved", `${at} embedded skill source is not a regular file`);
+    } else {
+      let canonical = false;
+      try {
+        canonical =
+          realpathSync(embeddedSkill) ===
+          join(realpathSync(root), "docs", "v0.x", "execution", "agent-skill.md");
+      } catch {}
+      if (!canonical)
+        push(
+          result,
+          root,
+          file,
+          "boundary-unresolved",
+          `${at} embedded skill source is outside its canonical workspace path`,
+        );
+    }
+    return;
+  }
   // Workspace identity is a property of source syntax. It is deliberately
   // decided before configured resolution so `paths` cannot launder an edge.
   const workspace = workspaceSpecifier(specifier);

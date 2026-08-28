@@ -91,22 +91,12 @@
     "T50": {
       "milestone": "M1.5",
       "group": "CLI conformance (compiled binary)",
-      "reason": "lor binary not built yet"
-    },
-    "T51": {
-      "milestone": "M1.5",
-      "group": "CLI conformance (compiled binary)",
-      "reason": "lor binary not built yet"
-    },
-    "T52": {
-      "milestone": "M1.5",
-      "group": "CLI conformance (compiled binary)",
-      "reason": "lor binary not built yet"
+      "reason": "literal every-semantic-command coverage lands when M15-Q adds history and claims"
     },
     "T53": {
       "milestone": "M1.5",
       "group": "CLI conformance (compiled binary)",
-      "reason": "lor binary not built yet"
+      "reason": "complete compiled Claim feedback forms and committed-success fallback evidence land with M15-Q"
     },
     "T54": {
       "milestone": "M3",
@@ -126,27 +116,22 @@
     "T57": {
       "milestone": "M1.5",
       "group": "CLI conformance (compiled binary)",
-      "reason": "lor binary not built yet"
-    },
-    "T58": {
-      "milestone": "M1.5",
-      "group": "CLI conformance (compiled binary)",
-      "reason": "lor binary not built yet"
+      "reason": "the complete measured M1.5 orientation and two-command recording journey lands with M15-Q"
     },
     "T65": {
       "milestone": "M1.5",
       "group": "Agent-reactive envelope (ships with the early CLI)",
-      "reason": "embedded skill and compiled CLI journey belong to M15-B/M15-Q"
+      "reason": "source-exact embedded skill output is implemented; the complete query/disclosure/manual-resolution journey lands with M15-Q"
     },
     "T73": {
       "milestone": "M1.5",
       "group": "Pagination and link-following (ADR 0009)",
-      "reason": "compiled end-to-end affordance chain belongs to M15-Q"
+      "reason": "mutation, status, and show affordances are implemented; the complete query/history chain lands with M15-Q"
     },
     "T74": {
       "milestone": "M1.5",
       "group": "Pagination and link-following (ADR 0009)",
-      "reason": "recursive CLI rendering and store-preserving links belong to M15-B/M15-Q"
+      "reason": "direct add/show disclosure is implemented; list disclosure and application equivalence land at M1.5 fan-in"
     },
     "T75": {
       "milestone": "M3",
