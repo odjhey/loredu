@@ -102,7 +102,7 @@ Exit is implemented: from public exports, T20–T30/T86 pass against both defaul
 
 ## M3 — Working Lore
 
-Implement [decision 0030](../../decisions/0030-working-lore-ranker-contract.md) and the exact [Working Lore contract](../../architecture/contracts/working-lore.md):
+M3-L implements the published kernel/application and Ranker slice under [decision 0030](../../decisions/0030-working-lore-ranker-contract.md) and the exact [Working Lore contract](../../architecture/contracts/working-lore.md). Its executable public-API evidence owns T41–T45/T75. The sequential M3-E slice still owns T40, CLI wiring/rendering, the skill revision, and completed compiled journeys T54/T56:
 
 - additive surface-neutral `lore(query)` with required Activity token, optional subset scope/current corpus SourceRef, one current valid-time Clock sample, and exact normalized query;
 - compact closed sections `current|patterns|candidates|conflicts|needs_revalidation`, with membership derived mechanically from M2 state, Claim class/confidence, Verifications, and exact corpus snapshot mismatch;
@@ -115,9 +115,9 @@ Implement [decision 0030](../../decisions/0030-working-lore-ranker-contract.md) 
 
 Do not require embeddings or a model reranker. Ranking quality remains an M4 consumer judgment. A consumer may substitute a lexical, embedding, graph, or model Ranker without core changes, but core still owns section membership, counts, budgets, and disclosure and the Ranker version must appear in Working Lore Basis. Do not persist derived content, crawl sources, count model-specific tokens, or reinterpret M2 Resolution/projection semantics.
 
-T40–T45/T75 are contract-ready but remain deferred until executable coverage exists. M3-C changes no code or catalog row.
+T41–T45/T75 are implemented by the M3-L application tests. T40/T54/T56 remain deferred until M3-E supplies their required compiled CLI evidence; application-only placeholders do not claim them.
 
-Exit: the acceptance activity receives useful context that remains bounded as history grows 10× and under very large historical Scope cardinality; empty scope is definitive with five visible counts; conflicts/revalidation and omitted superseded history have complete anchored disclosure; every section truncation carries full counts and a digest/occurrence-bound continuation; one append makes a cached packet stale; ordinary/Working Lore Basis comparisons and replay/baseline/custom Ranker order reproduce representative ids/order and all other contract semantics.
+M3-L exit: the application returns useful context that remains bounded as history grows and under very large Scope cardinality; conflicts/revalidation and omitted superseded history have complete anchored disclosure; every section truncation carries full counts and a digest/occurrence-bound continuation; one append makes a cached packet stale; and ordinary/Working Lore Basis comparisons plus replay/baseline/custom Ranker order reproduce representative ids/order and all other application semantics. The full M3 exit remains open for M3-E's definitive compiled empty packet/five visible lines, CLI journeys, and skill integration.
 
 ## M4 — First real consumer
 

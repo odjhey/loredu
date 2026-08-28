@@ -1,6 +1,8 @@
 # cli-conformance — the compiled binary
 
-Compiled-binary assertions **T50–T58**, **T65**, and **T73–T75** belong here.
+Compiled-binary assertions **T40**, **T50–T58**, **T65**, and **T73–T74** belong here.
+T75 is implemented by the M3-L public application continuation tests; M3-E adds only
+unannotated compiled reinforcement for that already-owned row.
 T50–T53 also prove that the CLI adapts and renders the surface-neutral semantics
 covered by **T60–T64**, **T66–T68**, and **T70–T72** in
 [`tests/application`](../application/README.md). The

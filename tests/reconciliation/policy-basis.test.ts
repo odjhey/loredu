@@ -647,6 +647,7 @@ describe("M0 ClaimPolicy seam", () => {
     expect(Object.keys(kernel).sort()).toEqual(
       [
         "DEFAULT_CLAIM_POLICY",
+        "DEFAULT_RANKER",
         "DEFAULT_RULESET_IDENTITY",
         "LoreduError",
         "RECORD_ID_PREFIX",

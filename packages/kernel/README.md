@@ -1,7 +1,7 @@
 # `@loredu/kernel`
 
-The application kernel: record semantics, ports, append path, reconciliation, and
-projections. M3 will add Working Lore.
+The application kernel: record semantics, ports, append path, reconciliation,
+projections, and the M3 Working Lore application.
 
 ## Invariants this package is built to keep
 
@@ -19,7 +19,7 @@ Anything the kernel needs from its environment arrives through a port in
 
 ## Public surface
 
-Only `@loredu/kernel` and `@loredu/kernel/testing` are entrypoints; deep imports are unsupported. The exact value/type allowlists and signatures are the [kernel API contract](../../docs/architecture/contracts/kernel-api.md). The normal runtime exports the five draft/record families, portable JSON codec/equality, ClaimKey, Instant/position constructors, versioned ClaimPolicy/default semantics, structural RulesetIdentity/Basis primitives, and the assembled application. M1 adds the full RecordStore query types; M1.5 adds type exports for surface-neutral responses, queries, diagnostics, and affordances; M2 adds ADR 0027's pair/state, policy-context/advisory, positioned-record, Current Knowledge, temporal query, summary, and projection-response type shapes while keeping reconciliation runtime helpers internal. None adds a normal-entrypoint runtime value. Testing exports exactly InMemoryStore, FixedClock, SeededRandomSource, and the runner-neutral `recordStoreConformance`; its fixture, subject, and case shapes are type-only exports.
+Only `@loredu/kernel` and `@loredu/kernel/testing` are entrypoints; deep imports are unsupported. The exact value/type allowlists and signatures are the [kernel API contract](../../docs/architecture/contracts/kernel-api.md). The normal runtime exports the five draft/record families, portable JSON codec/equality, ClaimKey, Instant/position constructors, versioned ClaimPolicy/default semantics, structural RulesetIdentity/Basis primitives, and the assembled application. M1 adds the full RecordStore query types; M1.5 adds type exports for surface-neutral responses, queries, diagnostics, and affordances; M2 adds ADR 0027's pair/state, policy-context/advisory, positioned-record, Current Knowledge, temporal query, summary, and projection-response type shapes while keeping reconciliation runtime helpers internal. M3 adds the closed Working Lore/Ranker types and the sole new runtime value `DEFAULT_RANKER`. Testing exports exactly InMemoryStore, FixedClock, SeededRandomSource, and the runner-neutral `recordStoreConformance`; its fixture, subject, and case shapes are type-only exports.
 
 ## Layout
 
@@ -37,4 +37,4 @@ port. Concrete adapter status lives in the
 
 ## State
 
-M0, M1, and M1.5 remain intact. M2 exposes `current` over one atomic snapshot with all four temporal modes, complete Resolution/Relation precedence, bounded history/evidence summaries, policy advisories, Basis-pinned combined-stream cursors, and deterministic replay/invalidation semantics. The engine never appends or caches derived records. Deterministic compiled M2 scenarios now exercise this public surface end to end; M3 Working Lore remains separately staged. CLI adapter status is in [`packages/cli`](../cli/README.md).
+M0, M1, M1.5, and M2 remain intact. M3-L now exposes `lore` with mechanical five-section membership, M2-owned representatives, compact descriptors, global and section budgets, validated versioned Ranker permutations, digest-bound continuation, conservative staleness, and anchored exact-key Claim disclosure. The engine never appends or caches derived records. M3-E still owns CLI wiring, rendering, skill text, and compiled journeys; adapter status is in [`packages/cli`](../cli/README.md).

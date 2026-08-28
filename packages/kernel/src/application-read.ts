@@ -26,6 +26,7 @@ import { claimKeyOf, claimKeysEqual } from "./domain/claim-key";
 import type {
   Actor,
   Claim,
+  ClaimId,
   ClaimKey,
   JsonObject,
   JsonValue,
@@ -249,6 +250,7 @@ function parseClaimsQuery(input: unknown): ParsedClaimRequest {
   const data = inspectObject(value, "", issues);
   if (!data) validationFailed(issues);
   const allowed = new Set([
+    "same_key_as",
     "scope",
     "scope_match",
     "subject_type",
@@ -279,6 +281,16 @@ function parseClaimsQuery(input: unknown): ParsedClaimRequest {
   }
 
   const filters: Record<string, unknown> = {};
+  if (hasOwnDescriptor(data, "same_key_as")) {
+    const id = parseRecordId(ownValue(data, "same_key_as"), "/same_key_as", issues);
+    if (id !== undefined && !id.startsWith("clm_"))
+      issues.push(makeIssue("FORMAT", "/same_key_as", "must be a Claim id"));
+    else if (id !== undefined) filters.same_key_as = id as ClaimId;
+    for (const key of Object.keys(data)) {
+      if (key !== "same_key_as" && key !== "limit")
+        issues.push(makeIssue("UNKNOWN_FIELD", `/${escapePointer(key)}`, "cannot accompany same_key_as"));
+    }
+  }
   let scope: Scope | undefined;
   if (hasOwnDescriptor(data, "scope")) {
     scope = parseScope(ownValue(data, "scope"), "/scope", issues);
@@ -1246,9 +1258,22 @@ export function createApplicationReadServices(
       )
         cursorMismatch();
       const resume = parsed.cursor === undefined ? 0 : (parsed.cursor.resume as number);
+      let anchoredKey: ClaimKey | undefined;
+      if (parsed.filters.same_key_as !== undefined) {
+        const anchor = snapshot.records.find((item) => item.record.id === parsed.filters.same_key_as);
+        if (!anchor)
+          throw new LoreduError("RECORD_NOT_FOUND", `Record does not exist: ${parsed.filters.same_key_as}`);
+        if (anchor.record.kind !== "claim")
+          validationFailed(Object.freeze([makeIssue("FORMAT", "/same_key_as", "must identify a Claim")]));
+        anchoredKey = claimKeyOf(anchor.record as Claim);
+      }
       const matches = snapshot.records
         .filter((item): item is PositionedRecord & { record: Claim } => item.record.kind === "claim")
-        .filter((item) => claimsMatch(item.record, parsed.filters));
+        .filter((item) =>
+          anchoredKey === undefined
+            ? claimsMatch(item.record, parsed.filters)
+            : claimKeysEqual(claimKeyOf(item.record), anchoredKey as ClaimKey),
+        );
       if (parsed.cursor && !matches.some((item) => Number(item.position) === resume)) cursorInvalid();
       const remaining = matches.filter((item) => Number(item.position) > resume);
       const selected = remaining.slice(0, parsed.limit);

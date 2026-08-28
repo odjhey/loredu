@@ -30,6 +30,7 @@ export type {
   ProjectionFilters,
   ProjectionHistorySummary,
   ProjectionReconciliationSummary,
+  Ranker,
   ReconciliationFeedback,
   RecordHandle,
   RecordSummary,
@@ -37,8 +38,32 @@ export type {
   StatusQuery,
   StatusResult,
   UnresolvedExclusiveGroup,
+  WorkingLoreApplicationResponse,
+  WorkingLoreBudget,
+  WorkingLoreFilterDescriptor,
+  WorkingLoreFilters,
+  WorkingLoreItem,
+  WorkingLoreKeyDescriptor,
+  WorkingLoreKnowledgeItem,
+  WorkingLoreKnowledgeSummary,
+  WorkingLoreOrientation,
+  WorkingLorePacket,
+  WorkingLoreQuery,
+  WorkingLoreRankCandidate,
+  WorkingLoreRankContext,
+  WorkingLoreResult,
+  WorkingLoreScopePair,
+  WorkingLoreScopePreview,
+  WorkingLoreSection,
+  WorkingLoreSectionName,
 } from "./application-types";
-export type { Basis, RulesetIdentity } from "./domain/basis";
+export type {
+  Basis,
+  RankerIdentity,
+  RulesetIdentity,
+  WorkingLoreBasis,
+  WorkingLoreRulesetIdentity,
+} from "./domain/basis";
 export {
   basisEquals,
   createBasis,
@@ -103,6 +128,7 @@ export type {
 export { createInstant, createStreamPosition } from "./ports/capabilities";
 export type { ClaimPolicy, ClaimSemantics } from "./ports/claim-policy";
 export { DEFAULT_CLAIM_POLICY } from "./ports/claim-policy";
+export { DEFAULT_RANKER } from "./ranker";
 export type {
   ClaimPolicyAdviceContext,
   CurrentKnowledgeState,
