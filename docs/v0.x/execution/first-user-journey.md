@@ -234,7 +234,7 @@ M1.5 can compare any response Basis to this store-wide head and can continue an 
 
 ## Journey 9 — teach the agents
 
-The skill ships **inside the binary**: build embeds [the one agent guide source](./agent-skill.md). Text `lor skill` strips only YAML frontmatter and prints the remaining Markdown bytes exactly without resolving a store; `--json` returns the same guide string. The M1.5 guide instructs agents to orient with status/claims, provide actor and provenance, follow embedded commands/cursors, and record rather than guess judgment. `current` and `lore` appear only in its M2/M3 revision triggers. A repo-level `.agents/skills` wrapper can simply defer to `lor skill`.
+The skill ships **inside the binary**: build embeds [the one agent guide source](./agent-skill.md). Text `lor skill` strips only YAML frontmatter and prints the remaining Markdown bytes exactly without resolving a store; `--json` returns the same guide string. The M2 guide instructs agents to orient with bounded `current`, check status, inspect canonical Claims, provide actor and provenance, follow embedded commands/cursors, and record rather than guess judgment. Only `lore` remains a future M3 revision trigger. A repo-level `.agents/skills` wrapper can simply defer to `lor skill`.
 
 ## Behavioral test catalog
 

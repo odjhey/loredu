@@ -10,6 +10,7 @@ import {
   type JsonObject,
   type PersistedRecord,
   type RecordId,
+  type Resolution,
 } from "@loredu/kernel";
 import { FixedClock, InMemoryStore, SeededRandomSource } from "@loredu/kernel/testing";
 
@@ -89,15 +90,19 @@ function relation(from: ClaimId, to: ClaimId): PersistedRecord {
 
 function resolution(
   targets: readonly ClaimId[],
-  replacement: ClaimId,
+  replacement: ClaimId | undefined,
   recordedAt = "2026-03-06T00:00:00.000Z",
+  options: {
+    readonly decision?: Resolution["decision"];
+    readonly effectiveAt?: string;
+  } = {},
 ): PersistedRecord {
   return decodePersistedRecord({
     ...base("resolution", ids.resolution, recordedAt),
     targets,
-    decision: "prefer",
-    replacement,
-    effective_at: "2026-02-01T00:00:00.000Z",
+    decision: options.decision ?? "prefer",
+    ...(replacement === undefined ? {} : { replacement }),
+    effective_at: options.effectiveAt ?? "2026-02-01T00:00:00.000Z",
     reason: "the signed amendment controls from February",
   });
 }
@@ -206,18 +211,112 @@ describe("public M2 Current Knowledge projection", () => {
     expect(knowledge(reopened)[0]?.values.map((value) => value.value)).toEqual(["60 days", "90 days"]);
   });
 
-  test("a Resolution replacement is the exposed representative while equal-value contributors stay counted", async () => {
-    const store = new InMemoryStore();
+  test("incomplete Resolutions and future replacements cannot select Current Knowledge", async () => {
+    const incompleteStore = new InMemoryStore();
     await append(
-      store,
+      incompleteStore,
+      claim(ids.old, "30 days", "2026-01-01T00:00:00.000Z"),
+      claim(ids.amendment, "60 days", "2026-01-02T00:00:00.000Z"),
+      claim(ids.later, "90 days", "2026-01-03T00:00:00.000Z"),
+      resolution([ids.old, ids.amendment], ids.amendment),
+    );
+    const incomplete = await application(incompleteStore).current({
+      valid_at: "2026-03-10T00:00:00Z",
+    });
+    expect(knowledge(incomplete)[0]).toMatchObject({ state: "disputed", value_count: 3 });
+
+    const futureStore = new InMemoryStore();
+    await append(
+      futureStore,
+      claim(ids.old, "30 days", "2026-01-01T00:00:00.000Z"),
+      claim(ids.amendment, "60 days", "2026-01-02T00:00:00.000Z", {
+        validFrom: "2026-02-01T00:00:00.000Z",
+      }),
+      resolution([ids.old, ids.amendment], ids.amendment, "2026-01-03T00:00:00.000Z", {
+        effectiveAt: "2026-01-01T00:00:00.000Z",
+      }),
+    );
+    const beforeReplacement = await application(futureStore).current({
+      valid_at: "2026-01-15T00:00:00Z",
+    });
+    expect(knowledge(beforeReplacement)[0]).toMatchObject({
+      state: "preferred",
+      values: [{ value: "30 days", representative: { id: ids.old } }],
+      history: { resolution_count: 1, latest_resolution: { id: ids.resolution } },
+    });
+  });
+
+  test("prefer retains equal-value contributors while supersede retains only its replacement", async () => {
+    const preferredStore = new InMemoryStore();
+    await append(
+      preferredStore,
       claim(ids.old, "60 days", "2026-01-01T00:00:00.000Z"),
       claim(ids.amendment, "60 days", "2026-01-02T00:00:00.000Z"),
       resolution([ids.old, ids.amendment], ids.amendment),
     );
-    const result = await application(store).current({ valid_at: "2026-03-10T00:00:00Z" });
-    expect(knowledge(result)[0]).toMatchObject({
+    const preferred = await application(preferredStore).current({
+      valid_at: "2026-03-10T00:00:00Z",
+    });
+    expect(knowledge(preferred)[0]).toMatchObject({
       state: "preferred",
       values: [{ value: "60 days", representative: { id: ids.amendment }, claim_count: 2 }],
+    });
+
+    const supersededStore = new InMemoryStore();
+    await append(
+      supersededStore,
+      claim(ids.old, "60 days", "2026-01-01T00:00:00.000Z", {
+        sources: [{ ref: "agreement", snapshot: "base" }],
+      }),
+      claim(ids.amendment, "60 days", "2026-01-02T00:00:00.000Z", {
+        sources: [{ ref: "agreement", snapshot: "amendment" }],
+      }),
+      resolution([ids.old, ids.amendment], ids.amendment, undefined, { decision: "supersede" }),
+    );
+    const superseded = await application(supersededStore).current({
+      valid_at: "2026-03-10T00:00:00Z",
+    });
+    expect(knowledge(superseded)[0]).toMatchObject({
+      state: "preferred",
+      values: [{ value: "60 days", representative: { id: ids.amendment }, claim_count: 1 }],
+      evidence: { source_count: 1 },
+    });
+  });
+
+  test("retracted knowledge has no current evidence", async () => {
+    const store = new InMemoryStore();
+    const entry = decodePersistedRecord({
+      ...base("entry", ids.entry, "2026-01-01T00:00:00.000Z"),
+      body: "The original agreement was inspected.",
+      sources: [{ ref: "agreement", snapshot: "base" }],
+    });
+    const old = claim(ids.old, "30 days", "2026-01-02T00:00:00.000Z", {
+      derivedFrom: [ids.entry],
+      sources: [{ ref: "agreement", snapshot: "claim" }],
+    });
+    const verification = decodePersistedRecord({
+      ...base("verification", ids.verification, "2026-01-03T00:00:00.000Z"),
+      targets: [ids.old],
+      verified_against: [{ ref: "registry", snapshot: "signed" }],
+      result: "confirmed",
+    });
+    await append(
+      store,
+      entry,
+      old,
+      verification,
+      resolution([ids.old], undefined, "2026-03-06T00:00:00.000Z", { decision: "retract" }),
+    );
+    const result = await application(store).current({ valid_at: "2026-03-10T00:00:00Z" });
+    expect(knowledge(result)[0]).toMatchObject({
+      state: "retracted",
+      value_count: 0,
+      values: [],
+      evidence: {
+        entry_count: 0,
+        source_count: 0,
+        verification: { confirmed: 0, contradicted: 0, unchanged: 0, needs_revalidation: 0 },
+      },
     });
   });
 
@@ -388,6 +487,45 @@ describe("public M2 Current Knowledge projection", () => {
     const empty = await emptyApp.current();
     expect(emptyCalls).toBe(1);
     expect(empty.page).toEqual({ returned: 0, total: 0 });
+  });
+
+  test("pagination emits corrective advice only for returned disputed knowledge", async () => {
+    const store = new InMemoryStore();
+    const firstOld = "clm_0000000000000011" as ClaimId;
+    const firstNew = "clm_0000000000000012" as ClaimId;
+    const secondOld = "clm_0000000000000013" as ClaimId;
+    const secondNew = "clm_0000000000000014" as ClaimId;
+    await append(
+      store,
+      claim(firstOld, "documented-a", "2026-01-01T00:00:00.000Z", { perspective: "documented" }),
+      claim(firstNew, "observed-a", "2026-01-02T00:00:00.000Z", { perspective: "documented" }),
+      claim(secondOld, "documented-b", "2026-01-03T00:00:00.000Z", { perspective: "observed" }),
+      claim(secondNew, "observed-b", "2026-01-04T00:00:00.000Z", { perspective: "observed" }),
+    );
+
+    const first = await application(store).current({ limit: 1 });
+    expect(first.result.items).toHaveLength(1);
+    expect(first.advice.map(({ action }) => action)).toEqual([
+      "claims.list",
+      "record.show",
+      "record.show",
+      "current.read",
+    ]);
+    expect(first.advice.slice(1, 3).map(({ params }) => params)).toEqual([
+      { id: firstOld },
+      { id: firstNew },
+    ]);
+
+    const second = await application(store).current({ cursor: first.page.cursor as string });
+    expect(second.advice.map(({ action }) => action)).toEqual([
+      "claims.list",
+      "record.show",
+      "record.show",
+    ]);
+    expect(second.advice.slice(1).map(({ params }) => params)).toEqual([
+      { id: secondOld },
+      { id: secondNew },
+    ]);
   });
 
   test("advisory continuation resumes after canonical bound identity even when primary positions descend", async () => {

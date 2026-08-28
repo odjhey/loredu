@@ -349,12 +349,17 @@ export function reconcileApplicableClaimGroup(input: {
         cycle: false,
       });
     const replacement = claimsById.get(winner.record.replacement as ClaimId) as PositionedClaim;
-    const selected = Object.freeze([
-      replacement,
-      ...claims.filter(
-        (claim) => claim !== replacement && jsonValuesEqual(claim.record.value, replacement.record.value),
-      ),
-    ]);
+    const selected = Object.freeze(
+      winner.record.decision === "prefer"
+        ? [
+            replacement,
+            ...claims.filter(
+              (claim) =>
+                claim !== replacement && jsonValuesEqual(claim.record.value, replacement.record.value),
+            ),
+          ]
+        : [replacement],
+    );
     return Object.freeze({
       key,
       semantics: input.semantics,

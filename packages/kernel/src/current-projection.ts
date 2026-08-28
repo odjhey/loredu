@@ -527,7 +527,6 @@ function computeProjection(
 ): {
   readonly items: readonly CurrentComputedItem[];
   readonly summary: ProjectionReconciliationSummary;
-  readonly advice: readonly Affordance[];
 } {
   const visible = visibleRecords(snapshot, filters.as_of);
   const byId = new Map<RecordId, PositionedRecord>(visible.map((item) => [item.record.id, item]));
@@ -554,7 +553,6 @@ function computeProjection(
   };
   const knowledgeCounts = { preferred: 0, coexisting: 0, disputed: 0, retracted: 0 };
   const computed: CurrentComputedItem[] = [];
-  const corrective: Affordance[] = [];
   for (const group of groups) {
     const derived = allDerived(group);
     for (const pair of derived) relationCounts[pair.relation]++;
@@ -577,7 +575,11 @@ function computeProjection(
       value_count: reconciled.values.length,
       values: valueTuple,
       history: historySummary(group, derived, relations, resolutions),
-      evidence: evidenceSummary(reconciled.claims, visible, byId),
+      evidence: evidenceSummary(
+        reconciled.values.flatMap((value) => value.claims),
+        visible,
+        byId,
+      ),
       claims: keyClaimsAffordance(group.key),
     });
     computed.push(
@@ -586,10 +588,6 @@ function computeProjection(
         value: item,
       }),
     );
-    if (item.state === "disputed") {
-      corrective.push(item.claims);
-      for (const value of item.values) corrective.push(value.representative.affordances[0] as Affordance);
-    }
   }
 
   const drafts = evaluateClaimPolicyAdvice(policy, context);
@@ -625,8 +623,17 @@ function computeProjection(
       policy_advisories: drafts.length,
       related: Object.freeze([]) as readonly [],
     }),
-    advice: deduplicateAdvice(corrective),
   });
+}
+
+function correctiveAdvice(items: readonly CurrentComputedItem[]): readonly Affordance[] {
+  const corrective: Affordance[] = [];
+  for (const { value: item } of items) {
+    if (item.kind !== "knowledge" || item.state !== "disputed") continue;
+    corrective.push(item.claims);
+    for (const value of item.values) corrective.push(value.representative.affordances[0] as Affordance);
+  }
+  return deduplicateAdvice(corrective);
 }
 
 function clockSample(clock: Clock): string {
@@ -692,7 +699,7 @@ export function createCurrentService(
         items: Object.freeze(selected.map((item) => item.value)),
       }),
       reconciliation: projection.summary,
-      advice: deduplicateAdvice([...projection.advice, ...continuation]),
+      advice: deduplicateAdvice([...correctiveAdvice(selected), ...continuation]),
       basis,
       page: page(selected.length, projection.items.length, cursor),
     });
