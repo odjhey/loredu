@@ -683,9 +683,7 @@ function emitText(io: CliIo, response: BaseResponse, selector: string | undefine
       const page = section?.page as
         | { readonly returned: number; readonly total: number; readonly cursor?: string }
         | undefined;
-      io.out(
-        `${name}: returned=${page?.returned ?? 0} total=${page?.total ?? orientation[count]}\n`,
-      );
+      io.out(`${name}: returned=${page?.returned ?? 0} total=${page?.total ?? orientation[count]}\n`);
       for (const item of (section?.items as readonly Record<string, unknown>[] | undefined) ?? []) {
         const knowledge = item.knowledge as Record<string, unknown>;
         io.out(`  item: ${String(item.summary)}\n`);
