@@ -111,6 +111,21 @@ test("string root APIs, physical explicit paths, relocation, and cross-root isol
     expect(() => resolveStoreRoot({ kind: "default" }, { loreduHome: "relative-home", osHome, cwd })).toThrow(
       TypeError,
     );
+    const otherCwd = join(base, "other-work");
+    await mkdir(otherCwd);
+    for (const selection of [{ kind: "default" }, { kind: "name", name: "alpha" }] as const) {
+      expect(() => resolveStoreRoot(selection, { loreduHome: "relative-home", osHome, cwd })).toThrow(
+        TypeError,
+      );
+      expect(() =>
+        resolveStoreRoot(selection, { loreduHome: "relative-home", osHome, cwd: otherCwd }),
+      ).toThrow(TypeError);
+    }
+    const explicitWithRelativeHome = resolveStoreRoot(
+      { kind: "path", path: "./explicit-store" },
+      { loreduHome: "relative-home", osHome: "relative-os-home", cwd },
+    );
+    expect(explicitWithRelativeHome).toBe(join(await realpath(cwd), "explicit-store"));
     const named = resolveStoreRoot({ kind: "name", name: "alpha" }, { loreduHome: home, osHome, cwd });
     const defaultRoot = resolveStoreRoot({ kind: "default" }, { loreduHome: home, osHome, cwd });
     const explicitMissing = resolveStoreRoot(

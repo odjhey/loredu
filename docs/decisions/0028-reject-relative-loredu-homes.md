@@ -7,7 +7,7 @@ generated: "OpenAI coding agent gpt-5.6-sol, 2026-08-28"
 created_at: 2026-08-28T11:58:04+08:00
 ---
 
-# 0027: Reject relative Loredu homes
+# 0028: Reject relative Loredu homes
 
 ## Context
 

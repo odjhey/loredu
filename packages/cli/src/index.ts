@@ -355,9 +355,19 @@ function selectionFor(selector: string | undefined): StoreRootSelection {
 }
 
 function resolveRoot(selector: string | undefined): string {
+  const selection = selectionFor(selector);
+  const loreduHome = process.env.LOREDU_HOME;
+  if (selection.kind !== "path" && loreduHome !== undefined && loreduHome !== "" && !isAbsolute(loreduHome)) {
+    throw new LoreduError("VALIDATION_FAILED", "LOREDU_HOME must be an absolute path", [
+      Object.freeze({
+        code: "FORMAT",
+        path: "/environment/LOREDU_HOME",
+        message: "must be an absolute path",
+      }),
+    ]);
+  }
   try {
-    const loreduHome = process.env.LOREDU_HOME;
-    return resolveStoreRoot(selectionFor(selector), {
+    return resolveStoreRoot(selection, {
       ...(loreduHome === undefined ? {} : { loreduHome }),
       osHome: homedir(),
       cwd: process.cwd(),
@@ -417,7 +427,7 @@ function runFor(affordance: Affordance, selector: string | undefined): string {
   }
   if (affordance.action === "store.init") {
     const target = shellWord(String(params.selector));
-    return String(params.selector).startsWith("--") ? `lor init --store ${target}` : `lor init ${target}`;
+    return String(params.selector).startsWith("-") ? `lor init --store ${target}` : `lor init ${target}`;
   }
   if (affordance.action === "history.list") {
     let command = `${prefix} history --cursor ${shellWord(String(params.cursor))}`;
@@ -945,7 +955,7 @@ async function execute(
 }
 
 /** Renders the direct metadata line without resolving a store. */
-export function versionLine(home: string = defaultLoreduHome()): string {
+export function versionLine(home: string = defaultLoreduHome({}, homedir())): string {
   return `lor ${LOR_VERSION} (schema ${RECORD_SCHEMA_ID}, store ${STORE_ADAPTER_NAME}, home ${home})`;
 }
 

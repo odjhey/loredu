@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, expect, test } from "bun:test";
 import { mkdtemp, readFile, rm } from "node:fs/promises";
-import { tmpdir } from "node:os";
-import { join, resolve } from "node:path";
+import { homedir, tmpdir } from "node:os";
+import { isAbsolute, join, resolve } from "node:path";
 
 const workspace = resolve(import.meta.dir, "../..");
 const binary = join(workspace, "packages/cli/dist/lor");
@@ -18,10 +18,11 @@ async function invoke(
   args: readonly string[],
   stdin?: string | Uint8Array,
   cwd: string = workspace,
+  loreduHome: string = home,
 ): Promise<Invocation> {
   const process = Bun.spawn([binary, ...args], {
     cwd,
-    env: { ...Bun.env, LOREDU_HOME: home },
+    env: { ...Bun.env, LOREDU_HOME: loreduHome },
     stdin: stdin === undefined ? "ignore" : new Blob([stdin]),
     stdout: "pipe",
     stderr: "pipe",
@@ -295,6 +296,45 @@ test("compiled binary maps stable execution categories — @covers T51", async (
   );
 });
 
+test("relative Loredu homes reject named/default stores but not version or explicit paths", async () => {
+  const home = await freshHome();
+  const cwd = join(home, "cwd");
+  await Bun.write(join(cwd, ".keep"), "");
+  const relativeHome = "relative-home";
+  const expectedVersion = `lor 0.0.0 (schema loredu.record/v1, store plainfile, home ${join(homedir(), ".loredu")})\n`;
+  for (const flag of ["--version", "-v"]) {
+    const version = await invoke(home, [flag], undefined, cwd, relativeHome);
+    expect(version.exitCode).toBe(0);
+    expect(version.stdout).toBe(expectedVersion);
+    expect(version.stderr).toBe("");
+  }
+
+  for (const args of [
+    ["head", "--json"],
+    ["head", "--store", "named", "--json"],
+  ]) {
+    const failure = await invoke(home, args, undefined, cwd, relativeHome);
+    expect(failure.exitCode).toBe(2);
+    const envelope = json(failure);
+    expect((envelope.error as { code: string }).code).toBe("VALIDATION_FAILED");
+    expect((envelope.error as { issues: { path: string }[] }).issues).toEqual([
+      expect.objectContaining({ path: "/environment/LOREDU_HOME" }),
+    ]);
+    expect(failure.stdout).not.toContain(cwd);
+  }
+  expect(await Bun.file(join(cwd, relativeHome)).exists()).toBe(false);
+
+  const explicit = join(home, "explicit-store");
+  const initialized = json(await invoke(home, ["init", explicit, "--json"], undefined, cwd, relativeHome));
+  const initializedRoot = (initialized.result as { root: string }).root;
+  expect(isAbsolute(initializedRoot)).toBe(true);
+  expect(initializedRoot).toEndWith("/explicit-store");
+  expect(
+    (await invoke(home, ["head", "--store", explicit, "--json"], undefined, cwd, relativeHome)).exitCode,
+  ).toBe(0);
+  expect(await Bun.file(join(cwd, relativeHome)).exists()).toBe(false);
+});
+
 test("explicit path selection initializes and opens only that store", async () => {
   const home = await freshHome();
   const root = join(home, "outside", "chosen-store");
@@ -320,15 +360,21 @@ test("relative Loredu homes are rejected instead of drifting with cwd", async ()
 
 test("missing leading-dash path advice remains executable", async () => {
   const home = await freshHome();
-  const selector = "--missing/store";
-  const missing = json(await invoke(home, ["head", "--store", selector, "--json"], undefined, home));
-  expect((missing.advice as { run: string }[])[0]?.run).toBe("lor init --store --missing/store");
+  for (const selector of ["--missing/store", "-missing/store"]) {
+    const missingInvocation = await invoke(home, ["head", "--store", selector, "--json"], undefined, home);
+    expect(missingInvocation.exitCode).toBe(3);
+    const missing = json(missingInvocation);
+    expect((missing.error as { code: string }).code).toBe("STORE_NOT_FOUND");
+    expect((missing.advice as { run: string }[])[0]?.run).toBe(`lor init --store ${selector}`);
 
-  const initialized = json(await invoke(home, ["init", "--store", selector, "--json"], undefined, home));
-  expect((initialized.result as { selector: string }).selector).toBe(selector);
-  expect((initialized.result as { root: string }).root).toEndWith("/--missing/store");
-  const head = json(await invoke(home, ["head", "--store", selector, "--json"], undefined, home));
-  expect((head.result as { stream_position: number }).stream_position).toBe(0);
+    const initialized = json(await invoke(home, ["init", "--store", selector, "--json"], undefined, home));
+    expect((initialized.result as { selector: string }).selector).toBe(selector);
+    expect((initialized.result as { root: string }).root).toEndWith(`/${selector}`);
+    const head = json(await invoke(home, ["head", "--store", selector, "--json"], undefined, home));
+    expect((head.result as { stream_position: number }).stream_position).toBe(0);
+    expect((await invoke(home, ["head", "--json"], undefined, home)).exitCode).toBe(3);
+    expect((await invoke(home, ["head", "--store", "another", "--json"], undefined, home)).exitCode).toBe(3);
+  }
 });
 
 test("text mode renders primary results and semantic labels", async () => {

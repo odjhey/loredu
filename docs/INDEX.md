@@ -55,7 +55,7 @@ created_at: 2026-08-26T12:10:00+08:00
 | [0024: M0 policy and Basis runtime boundaries](./decisions/0024-m0-policy-and-basis-runtime-boundaries.md) | Closed policy assembly, callback-free ruleset snapshots, canonical Basis construction, and structural equality |
 | [0025: M0 application append phase boundaries](./decisions/0025-m0-application-append-phase-boundaries.md) | Custom-policy result validation, ordered reference failures, all-family stamping, and detached in-memory snapshots |
 | [0026: M1.5 application and CLI contract closure](./decisions/0026-m15-application-cli-contract.md) | Exact application/CLI protocol, mechanics, pagination, disclosure, host capabilities, embedded skill, and staged M2/M3 boundary |
-| [0027: Reject relative Loredu homes](./decisions/0027-reject-relative-loredu-homes.md) | Absolute configured/OS homes keep named and default store identity independent of cwd |
+| [0028: Reject relative Loredu homes](./decisions/0028-reject-relative-loredu-homes.md) | Absolute configured/OS homes keep named and default store identity independent of cwd |
 | [0018: Capability ports for time and identity](./decisions/0018-capability-ports.md) | `Clock` and `RandomSource` injected; the application stamps `id`/`recorded_at`, the store assigns only the position |
 | [0017: Branch protection posture](./decisions/0017-branch-protection-posture.md) | `ci-required` the only required status, zero reviews, squash-only, no bypass actors, up-to-date-before-merge on |
 
