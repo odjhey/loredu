@@ -141,7 +141,6 @@ describe("shared cursor transport and declared-schema parity", () => {
         (() => {
           const value = clone(decode(cursors.claims));
           delete value.query.filters;
-          delete value.basis.query.filters;
           return value;
         })(),
       ),
@@ -149,7 +148,6 @@ describe("shared cursor transport and declared-schema parity", () => {
         (() => {
           const value = clone(decode(cursors.history));
           delete value.query.id;
-          delete value.basis.query.id;
           return value;
         })(),
       ),
@@ -157,7 +155,6 @@ describe("shared cursor transport and declared-schema parity", () => {
         (() => {
           const value = clone(decode(cursors.status));
           value.query.excess = true;
-          value.basis.query.excess = true;
           return value;
         })(),
       ),
@@ -172,7 +169,6 @@ describe("shared cursor transport and declared-schema parity", () => {
         (() => {
           const value = clone(decode(cursors.lore));
           delete value.query.activity;
-          delete value.basis.query.activity;
           return value;
         })(),
       ),

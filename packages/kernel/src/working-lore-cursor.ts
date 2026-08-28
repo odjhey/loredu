@@ -42,10 +42,6 @@ function cursorInvalid(message = "Cursor is invalid"): never {
   throw new LoreduError("INVALID_CURSOR", message);
 }
 
-function cursorMismatch(message = "Cursor does not match this operation or snapshot"): never {
-  throw new LoreduError("CURSOR_MISMATCH", message);
-}
-
 function integer(value: unknown): value is number {
   return typeof value === "number" && Number.isSafeInteger(value) && value >= 0;
 }
@@ -155,8 +151,8 @@ export function decodeWorkingLoreCursorPayload(parsed: CursorTransportPayload): 
     const basisQueryIssues: LoreduIssue[] = [];
     const basisQuery = copyJsonObject(basisObject.query, "/basis/query", basisQueryIssues);
     if (!basisQuery || basisQueryIssues.length > 0) cursorInvalid();
-    if (!jsonValuesEqual(query, basisQuery)) cursorMismatch("Cursor Basis query does not match cursor query");
     validateLoreQuery(query);
+    if (!jsonValuesEqual(query, basisQuery)) cursorInvalid("Cursor Basis query does not match cursor query");
     const basis: WorkingLoreBasis = Object.freeze({
       stream_position: basisObject.stream_position as StreamPosition,
       ruleset: parseRuleset(basisObject.ruleset),
