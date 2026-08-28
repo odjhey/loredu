@@ -118,10 +118,7 @@ function parseRuleset(value: unknown, issues: LoreduIssue[]): RulesetIdentity | 
   });
 }
 
-export function rulesetIdentityFromValidatedPolicy({
-  id,
-  version,
-}: ValidatedClaimPolicy): RulesetIdentity {
+export function rulesetIdentityFromValidatedPolicy({ id, version }: ValidatedClaimPolicy): RulesetIdentity {
   return Object.freeze({
     core: CORE_RULESET_ID,
     claim_policy: Object.freeze({ id, version }),

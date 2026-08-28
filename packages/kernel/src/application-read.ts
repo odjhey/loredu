@@ -557,10 +557,7 @@ function decodeCursor(token: string): CursorPayload {
   try {
     return decodeCursorPayload(token);
   } catch (error) {
-    if (
-      error instanceof LoreduError &&
-      (error.code === "INVALID_CURSOR" || error.code === "CURSOR_MISMATCH")
-    )
+    if (error instanceof LoreduError && (error.code === "INVALID_CURSOR" || error.code === "CURSOR_MISMATCH"))
       throw error;
     cursorInvalid();
   }
@@ -824,13 +821,7 @@ function jsonIdentity(parts: readonly unknown[]): string {
 }
 
 function claimKeyIdentity(key: ClaimKey): string {
-  return jsonIdentity([
-    key.scope,
-    key.subject.type,
-    key.subject.id,
-    key.predicate,
-    key.perspective ?? null,
-  ]);
+  return jsonIdentity([key.scope, key.subject.type, key.subject.id, key.predicate, key.perspective ?? null]);
 }
 
 function cohortIdentity(scope: Scope, value: JsonValue): string {
@@ -959,7 +950,9 @@ function hasDifferentValues(members: readonly PositionedRecord[]): boolean {
   return first !== undefined && members.some((item) => !jsonValuesEqual((item.record as Claim).value, first));
 }
 
-function unresolvedGroups(index: StatusIndex): readonly { item: UnresolvedExclusiveGroup; position: number }[] {
+function unresolvedGroups(
+  index: StatusIndex,
+): readonly { item: UnresolvedExclusiveGroup; position: number }[] {
   const output: { item: UnresolvedExclusiveGroup; position: number }[] = [];
   for (const group of index.groups) {
     if (group.semantics !== "exclusive" || !hasDifferentValues(group.members)) continue;

@@ -119,10 +119,9 @@ async function followClaims(
 
 function cursorWithDeepQuery(cursor: string, depth: number): string {
   const prefix = "loredu.cursor.v1.";
-  const payload = JSON.parse(Buffer.from(cursor.slice(prefix.length), "base64url").toString("utf8")) as Record<
-    string,
-    unknown
-  >;
+  const payload = JSON.parse(
+    Buffer.from(cursor.slice(prefix.length), "base64url").toString("utf8"),
+  ) as Record<string, unknown>;
   const shallow = JSON.stringify({ ...payload, query: null });
   const marker = '"query":null';
   if (shallow === undefined || !shallow.includes(marker)) throw new TypeError("cursor query is absent");
