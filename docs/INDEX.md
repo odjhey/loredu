@@ -21,8 +21,8 @@ created_at: 2026-08-26T12:10:00+08:00
 | [Store port](./architecture/contracts/store.md) | Staged M0 append/get boundary and exact M1 snapshot scan, stream, head, commit, and conformance extension |
 | [Plain-file store contract](./architecture/contracts/plain-file-store.md) | M1 provider codec, layout, replay, locking, fsync, initialization, and named-root resolution |
 | [Clock and identity ports](./architecture/contracts/clock-and-identity.md) | Capability ports for `recorded_at` and record id entropy, and the single stamping point in the append path |
-| [Kernel API contract](./architecture/contracts/kernel-api.md) | Exact staged TypeScript entrypoints, exports, signatures, branded constructors, assembly, and M1.5 additions |
-| [Application and CLI contract](./architecture/contracts/application-cli.md) | Exact M1.5 application reads/responses/filters/cursors/health and CLI grammar/errors/exits/composition/skill behavior |
+| [Kernel API contract](./architecture/contracts/kernel-api.md) | Exact staged TypeScript entrypoints, exports, signatures, branded constructors, assembly, and M1.5/M2 additions |
+| [Application and CLI contract](./architecture/contracts/application-cli.md) | Exact M1.5 protocol plus the additive M2 Current Knowledge envelope, affordance, temporal grammar, and feedback upgrade |
 | [Projection contract](./architecture/contracts/projection.md) | Exact M2 relation/state semantics, Resolution precedence, bitemporal current API, bounded history/evidence, and rebuild/invalidation |
 | [Working Lore contract](./architecture/contracts/working-lore.md) | Bounded progressive-disclosure context for an activity |
 
