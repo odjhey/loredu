@@ -1,15 +1,15 @@
 ---
 name: application_cli_contract
-description: "Exact M1.5 application/CLI protocol plus the additive M2 Current Knowledge envelope, affordance, temporal grammar, and feedback upgrade."
+description: "Exact M1.5 application/CLI protocol plus additive M2 Current Knowledge and M3 Working Lore envelope, affordance, grammar, and cursor upgrades."
 type: contract
-tags: [contracts, application, cli, m1.5, m2, projection, pagination, agents]
+tags: [contracts, application, cli, m1.5, m2, m3, projection, working-lore, pagination, agents]
 generated: "OpenAI coding agent, 2026-08-28"
 created_at: 2026-08-28T06:00:00+08:00
 ---
 
 # M1.5 application and CLI contract
 
-[Decision 0026](../../decisions/0026-m15-application-cli-contract.md) closed this contract before M1.5 command implementation. This agreed contract remains pre-`current` until the two-consumer stabilization bar. M1.5 exposes records, exact-key overlap, health, and disclosure; it does **not** expose Current Knowledge or Working Lore, which remain M2 and M3.
+[Decision 0026](../../decisions/0026-m15-application-cli-contract.md) closed this contract before M1.5 command implementation. [Decision 0027](../../decisions/0027-m2-reconciliation-projection-contract.md) closes the additive M2 `current` upgrade, and [decision 0030](../../decisions/0030-working-lore-ranker-contract.md) closes the additive M3 `lore` upgrade. M1.5 itself exposes records, exact-key overlap, health, and disclosure; it does **not** claim either later projection.
 
 ## Boundary and application surface
 
@@ -160,6 +160,7 @@ A history or Claim result item carries only its own record handle. List summarie
 
 ```ts
 interface ClaimFilters {
+  readonly same_key_as?: ClaimId
   readonly scope?: Scope
   readonly scope_match?: "subset" | "exact"
   readonly subject_type?: string
@@ -181,11 +182,13 @@ type StatusQuery =
   | {readonly cursor: string; readonly limit?: number}
 ```
 
-All supplied filters combine with logical AND. Scope defaults to subset matching: every requested pair must exist with the exact same value; `{}` or omission matches every scope. `scope_match:"exact"` requires exact pair-set equality and is valid only with a supplied scope (including `{}`); `"subset"` is the normalized default and is omitted from Basis. Subject type/id, predicate, value, and Actor use exact structural equality with no normalization. A string perspective matches only Claims where it is present and equal; `null` matches only Claims with no perspective. `since` is an inclusive lower bound on canonical `recorded_at`. It accepts the caller timestamp grammar from the record contract and is normalized before query identity is constructed.
+Except for M3's anchored exact-key form below, all supplied filters combine with logical AND. Scope defaults to subset matching: every requested pair must exist with the exact same value; `{}` or omission matches every scope. `scope_match:"exact"` requires exact pair-set equality and is valid only with a supplied scope (including `{}`); `"subset"` is the normalized default and is omitted from Basis. Subject type/id, predicate, value, and Actor use exact structural equality with no normalization. A string perspective matches only Claims where it is present and equal; `null` matches only Claims with no perspective. `since` is an inclusive lower bound on canonical `recorded_at`. It accepts the caller timestamp grammar from the record contract and is normalized before query identity is constructed.
 
 Application query inputs are closed descriptor-safe inert data under the record boundary rules: excess fields, accessors, custom containers, present-own `undefined`, mixed cursor/filter forms, malformed ids/timestamps/limits, and invalid portable JSON reject as `VALIDATION_FAILED` before a store call. `show` likewise validates a complete record id before reading. Omitted `claims()` is the empty cursorless query.
 
 Claims and history order only by ascending stream position. Position is already a total order, so timestamp/id tiebreakers are neither needed nor permitted. The default limit is 50; accepted limits are safe integers from 1 through 200. Every list is bounded. Cursor continuation may select another valid limit, but may not supply filters or an id; those come from the cursor. A cursorless query may not combine `cursor` with any other query field except `limit`.
+
+M3 additively activates `same_key_as`. On a cursorless Claim query it is mutually exclusive with every other Claim filter but may combine with `limit`. Core resolves that visible Claim in the pinned scan, derives its complete exact ClaimKey, and returns all Claims with that key in normal stream order and pagination. A missing anchor is `RECORD_NOT_FOUND`; malformed or wrong-family input follows ordinary validation. No Scope preview participates in equality or filtering. Continuation uses the existing Claims cursor contract. The normalized Basis query is exactly `{operation:"claims",filters:{same_key_as:"<claim-id>"}}`.
 
 The normalized Basis query is exact portable JSON:
 
@@ -308,11 +311,11 @@ For a valid command path, `--help` writes its concise direct help text plus LF t
 
 `--body -` first validates argv and every non-body draft field, then resolves, opens, and checks the selected store. An invalid selector (exit 2) or missing store (exit 3 with selected-store init advice) therefore fails without reading stdin. Only after successful preflight does the command read stdin exactly once to EOF as UTF-8 and pass the decoded text unchanged: no trimming or newline insertion/removal. A leading UTF-8 BOM is preserved as the U+FEFF body character rather than consumed as a signature. Invalid UTF-8 is a usage/validation failure. The append reuses that opened store and application without resolving or opening them again, and this path never initializes a store. A terminal may supply `--body <text>` directly; stdin is not read for another spelling.
 
-Claim filters are repeated `--scope`, optional `--exact-scope` (with no scope pair it means exact empty scope), plus singular `--subject-type`, `--subject`, `--predicate`, mutually exclusive `--perspective <token>` or `--without-perspective`, `--value|--value-json`, `--actor`, and `--since`. A `--cursor` forbids every filter and the history positional id but may combine with one `--limit`; therefore continuation rendering is the command plus cursor and optional changed limit. Cursorless history requires its positional id; cursor history forbids it. `--check` is valid only on cursorless status, may combine with `--limit`, evaluates full pinned health regardless of the displayed page, and changes only the exit.
+Claim filters are repeated `--scope`, optional `--exact-scope` (with no scope pair it means exact empty scope), plus singular `--subject-type`, `--subject`, `--predicate`, mutually exclusive `--perspective <token>` or `--without-perspective`, `--value|--value-json`, `--actor`, and `--since`. M3 additively permits singular `--same-key-as <claim-id>` on `lor claims`; it is mutually exclusive with every other cursorless Claim filter, may combine with `--limit`, and is mutually exclusive with `--cursor` under the existing rule. A `--cursor` forbids every filter and the history positional id but may combine with one `--limit`; therefore continuation rendering is the command plus cursor and optional changed limit. Cursorless history requires its positional id; cursor history forbids it. `--check` is valid only on cursorless status, may combine with `--limit`, evaluates full pinned health regardless of the displayed page, and changes only the exit.
 
 Store selection follows the plain-file contract. Named/default selection rejects a nonempty relative `LOREDU_HOME` as `VALIDATION_FAILED` at `/environment/LOREDU_HOME` before initialization or store access. Explicit path selection is the sole cwd-relative mode and bypasses `LOREDU_HOME`, including an invalid relative value. For `init`, positional selector and global `--store` are mutually exclusive; omission initializes default. Init success returns `{root, selector}` where `root` is the adapter-resolved absolute path and `selector` is the supplied selector or `"default"`; its Basis has stream position zero and query `{operation:"init"}`. All other store-backed commands use global selection and never initialize. `skill`, version, and help do not resolve a store and reject `--store`; skill still permits `--json` as its documented mode. Bare `lor` is exactly the first status page for the selected store; it is not help and behaves as cursorless `lor status`, without `--check`.
 
-M1.5 intentionally has no `lore`, `current`, `--as-of`, or `--valid-at` grammar. M2 adds `current` and temporal flags without changing this envelope; M3 adds `lore` and Working Lore section continuations.
+M1.5 intentionally has no `lore`, `current`, `--as-of`, or `--valid-at` grammar. M2 adds `current` and temporal flags without changing this envelope; M3 adds the exact `lore` grammar and Working Lore section continuations under ADR 0030.
 
 ## JSON, text, errors, and exits
 
@@ -322,7 +325,7 @@ For store-backed commands, `--json` writes exactly one JSON object plus LF to st
 {"rel":"show","action":"record.show","params":{"id":"clm_..."},"why":"inspect the claim","run":"lor show clm_..."}
 ```
 
-`run` is added by the CLI and is shell-ready POSIX syntax using single-quote escaping where required. The CLI recursively renders every affordance: top-level `advice`, each `RecordHandle.affordances`, reconciliation-related handles, health/advisory handles, and result handles all gain the same `run` field. Removing only those `run` fields reproduces the application value. A store-backed rendered action preserves the originating explicit selector by placing the shell-quoted `--store <selector>` before its command; when selection was implicit default, it omits `--store`. Store-init advice renders the exact missing selector. Thus following a handle or cursor cannot silently switch stores. Generated Claim-query runs order scope pairs canonically, then `--exact-scope`, subject type/id, predicate, perspective/absence, canonical `--value-json`, Actor, normalized since, and limit. Generated continuation runs order cursor then optional limit. This fixed order plus POSIX quoting makes rendering deterministic. Output key insertion order is `ok`, `result`, `reconciliation`, `advice`, `basis`, then `page` when present; consumers must not rely on JSON object key order. No diagnostics accompany JSON on stdout.
+`run` is added by the CLI and is shell-ready POSIX syntax using single-quote escaping where required. The CLI recursively renders every affordance: top-level `advice`, each `RecordHandle.affordances`, reconciliation-related handles, health/advisory handles, and result handles all gain the same `run` field. Removing only those `run` fields reproduces the application value. A store-backed rendered action preserves the originating explicit selector by placing the shell-quoted `--store <selector>` before its command; when selection was implicit default, it omits `--store`. Store-init advice renders the exact missing selector. Thus following a handle or cursor cannot silently switch stores. Generated Claim-query runs use `--same-key-as` then limit for the anchored M3 form; otherwise they order scope pairs canonically, then `--exact-scope`, subject type/id, predicate, perspective/absence, canonical `--value-json`, Actor, normalized since, and limit. Generated continuation runs order cursor then optional limit. This fixed order plus POSIX quoting makes rendering deterministic. Output key insertion order is `ok`, `result`, `reconciliation`, `advice`, `basis`, then `page` when present; consumers must not rely on JSON object key order. No diagnostics accompany JSON on stdout.
 
 A CLI failure writes exactly one JSON object plus LF under `--json`:
 
@@ -380,7 +383,7 @@ The embedded M1.5 guide may name only commands available in this grammar. It ori
 
 ## Milestone upgrades and readiness
 
-M1.5 implements record commands, exact-key feedback, query/status, pagination, and disclosure. [Decision 0027](../../decisions/0027-m2-reconciliation-projection-contract.md) now fixes the additive M2 `current` upgrade below while preserving response/error/exit shapes. M3 may add `lore`, Working Lore budgets, and section continuation under the same cursor and affordance rules. T50–T75 therefore have fixed protocol semantics but retain their staged implementation owners; this contract is no implementation or catalog claim.
+M1.5 implements record commands, exact-key feedback, query/status, pagination, and disclosure. [Decision 0027](../../decisions/0027-m2-reconciliation-projection-contract.md) fixes the additive M2 `current` upgrade below, and [decision 0030](../../decisions/0030-working-lore-ranker-contract.md) fixes the additive M3 `lore` upgrade after it, while preserving response/error/exit shapes. T50–T75 therefore have fixed protocol semantics but retain their staged implementation owners; this contract is no implementation or catalog claim.
 
 ## Additive M2 Current Knowledge upgrade
 
@@ -423,4 +426,46 @@ lor current [--scope <key=value>]... [--as-of <rfc3339>]
 
 Text mode prints each knowledge key/state and at most its two value representatives, then policy advisories, reconciliation counts, advice, Basis, computed time, and page counts. JSON mode is exactly the recursively rendered application response plus LF. An empty matching projection is `ok:true`, `items:[]`, zero counts, Basis, `computed_at`, `page:{returned:0,total:0}`, and exit 0. Disputed or retracted knowledge does not make the command fail; this command is projection, not health. Existing exits are unchanged: query/cursor validation is 2, missing store is 3, provider failure is 4, Clock failure is 6. Exit 5 remains exclusive to unhealthy `status --check`.
 
-A cursorless `current` consumes one Clock call before its atomic scan; continuation consumes none. When the policy defines `advise`, every admitted first page and continuation invokes it exactly once after pinned reconciliation/context construction and before full combined-stream count/order/page; omitted advice means zero calls, and an invalid cursor fails before any call. Continuation stores no advisory output and recomputes it deterministically against the preserved Basis/ruleset/head/valid point/computed time before applying its combined-stream resume key. The CLI's existing internal production Clock supplies time. Bare `lor` remains status, not Current Knowledge. M2 adds no `reconcile` command and no `lore`; M3 still owns `lore` and Working Lore continuation. This section establishes T20–T30/T86 and staged T54–T56 protocol readiness only; it makes no implementation or catalog claim.
+A cursorless `current` consumes one Clock call before its atomic scan; continuation consumes none. When the policy defines `advise`, every admitted first page and continuation invokes it exactly once after pinned reconciliation/context construction and before full combined-stream count/order/page; omitted advice means zero calls, and an invalid cursor fails before any call. Continuation stores no advisory output and recomputes it deterministically against the preserved Basis/ruleset/head/valid point/computed time before applying its combined-stream resume key. The CLI's existing internal production Clock supplies time. Bare `lor` remains status, not Current Knowledge. M2 adds no `reconcile` command and no `lore`; M3 owns the additive contract below. This section establishes T20–T30/T86 and staged T54–T56 protocol readiness only; it makes no implementation or catalog claim.
+
+## Additive M3 Working Lore upgrade
+
+M3 does not replace an M1.5/M2 operation, error, exit, or envelope. It adds the application method and exact types in the [Working Lore contract](./working-lore.md):
+
+```ts
+interface LoreduApplication {
+  lore(query: WorkingLoreQuery): Promise<WorkingLoreApplicationResponse>
+}
+```
+
+`WorkingLoreApplicationResponse` keeps `ok`, mutation-neutral `reconciliation`, `advice`, and the operation result. Its `basis` is the exact `WorkingLoreBasis` extension containing core, ClaimPolicy, and Ranker identities. Its result is `{computed_at,packet}`. `packet.sections` owns per-section `Page` values rather than adding one misleading top-level page: a cursorless packet returns all five section descriptors, while continuation returns exactly its cursor-bound section. Orientation and every section total cover the full pinned query.
+
+M3 also adds the bounded exact-key disclosure path used by Working Lore. `ClaimFilters` gains optional `same_key_as?: ClaimId`; on a cursorless query it is mutually exclusive with every other Claim filter except `limit`. Core resolves the visible anchor Claim in the pinned scan and lists the complete exact-key group in ordinary Claim order/pagination. Missing anchors are `RECORD_NOT_FOUND`, malformed or wrong-family anchors follow ordinary validation, and continuation remains the existing Claims cursor. Its normalized query is `{operation:"claims",filters:{same_key_as:"<claim-id>"}}`.
+
+`Affordance` additively permits rel `lore`, action `lore.read`, and these exact valid pairs:
+
+```text
+lore/lore.read      params exactly {query}
+continue/lore.read  params exactly {cursor,max_items?,max_chars?}
+```
+
+The cursorless query contains typed activity and present scope/corpus only; budgets are paging controls. A continuation preserves nondefault effective budgets in params and may be called with new accepted budgets. A Working Lore item's exact-key Claim action is exactly `{query:{same_key_as:key.anchor_claim}}`; showing that anchor exposes the complete key/Scope and the anchored list exposes all same-key values/history. After whole-group corpus admission, every included item copies exactly the corresponding M2 `CurrentKnowledgeItem.values` representatives in exposed-value order into a detached frozen one- or two-handle tuple; retracted groups are omitted, and M3/Ranker/section/corpus-per-value choice/budgets never reselect or reorder it. Conflict advice emits the exact-key Claim action, then one show per tuple handle in order. Disputed A/B/C therefore emits claims, show A, show B; C remains reachable through the anchored list. General top-level affordance deduplication may suppress a later repeated show across conflict occurrences but never changes an item's tuple. Coexisting A/B/C emits no corrective top-level advice. Every truncated section emits one continuation in display order. Handles retain their implemented show/history affordances, and exact-key Claim affordances disclose omitted values. CLI rendering recursively adds `run` without changing semantic fields.
+
+The CLI grammar additively gains exactly:
+
+```text
+lor claims --same-key-as <claim-id> [--limit <n>] [--json]
+lor lore --activity <token> [--scope <key=value>]...
+    [--corpus-json <SourceRef>] [--max-items <n>] [--max-chars <n>]
+    [--cursor <token>] [--json]
+```
+
+`--store` remains global and every generated action preserves explicit selection. `--same-key-as` is mutually exclusive with every other cursorless Claim filter and with cursor, permits limit, and renders before limit. Cursorless lore requires exactly one activity; scope and corpus follow existing public decoders. A cursor forbids activity, scope, and corpus but may combine with each budget exactly once. Generated cursorless runs order activity, canonical scope pairs, corpus, max items, then max chars. Generated continuations order cursor, max items, then max chars. `lore --help` follows the direct-help rule.
+
+JSON mode is the recursively rendered application response plus exactly one LF. Text mode prints orientation, then all five count lines in fixed `current`, `patterns`, `candidates`, `conflicts`, `needs_revalidation` display order. Each always states returned/full total, including `0/0`; details appear only for returned items, and continuation prints whenever a section cursor exists, including `returned=0,total>0`. Page-local budget use, Basis, and computed time always render. An empty match is `ok:true`, five zero-total sections, zero budget use, Working Lore Basis, computed time, and exit 0.
+
+All existing failure forms and exits remain. Query/cursor/Ranker output validation is `VALIDATION_FAILED` or `INVALID_CURSOR|CURSOR_MISMATCH` and exits 2; missing store exits 3; provider failure exits 4; Clock or unexpected internal failure exits 6. Working Lore conflicts are semantic attention, not command failure and not `status --check` health; successful lore exits 0.
+
+A cursorless `lore` consumes one Clock call before its atomic scan. Continuation consumes none, preserves the original valid point/computed time/Basis, and recomputes rather than persists derived items or a full permutation. Its private cursor binds the pure-SHA-256/base64url digest and count of the validated global permutation plus exact `(section,occurrence_index)` resume identity/section ordinal (or `before-first`). Lore uses ClaimPolicy validation/semantics but does not invoke optional policy advice. Closed cursor/budget validation runs first; pinned head/query and complete core/policy/Ranker identity mismatch fails before callbacks. Only after pinned M2 rebuild does Ranker run once; malformed output is `VALIDATION_FAILED`, while a valid count/digest or exact-resume mismatch is `CURSOR_MISMATCH`, before budgeting or partial output. Appends during continuation do not enter the pinned packet; a fresh cursorless call sees the new head. Bare `lor` remains status. The shipped embedded skill adds lore orientation only when M3 implementation lands.
+
+This section establishes T40–T45/T75 protocol readiness only. It changes no command implementation, test coverage, or catalog status.

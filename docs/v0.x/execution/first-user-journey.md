@@ -9,7 +9,7 @@ created_at: 2026-08-26T00:00:00+08:00
 
 # First user journey and behavioral test cases
 
-The first user is the project owner plus their agents, driving Loredu through the CLI ([decision 0007](../../decisions/0007-typescript-bun.md)). The binary is `lor` — short enough for agents to type constantly. This document describes usage step by step and derives the behavioral tests that must be automated. [Decision 0026](../../decisions/0026-m15-application-cli-contract.md) fixes the implemented M1.5 protocol; [decision 0027](../../decisions/0027-m2-reconciliation-projection-contract.md) fixes the additive M2 `current`/temporal projection protocol. M2-R reconciliation mechanics are implemented, while public Current Knowledge and M3 remain staged.
+The first user is the project owner plus their agents, driving Loredu through the CLI ([decision 0007](../../decisions/0007-typescript-bun.md)). The binary is `lor` — short enough for agents to type constantly. This document describes usage step by step and derives the behavioral tests that must be automated. [Decision 0026](../../decisions/0026-m15-application-cli-contract.md) fixes the implemented M1.5 protocol; [decision 0027](../../decisions/0027-m2-reconciliation-projection-contract.md) fixes the additive M2 `current`/temporal projection protocol; [decision 0030](../../decisions/0030-working-lore-ranker-contract.md) fixes the additive M3 `lore`/Ranker/budget protocol. M2-R reconciliation mechanics are implemented, while public Current Knowledge and M3 implementation remain staged.
 
 The CLI arrives right after M1, before full projection wiring, and its semantic responses are **agent-reactive** ([decision 0008](../../decisions/0008-cli-first-agent-reactive.md)): they expose mechanical feedback, health, and deterministic affordances when applicable so an agent can chain calls until health passes. M1.5 orientation is status plus filtered record queries, now with M2-R Claim feedback and overlap-aware health. Public Current Knowledge does not exist yet; Working Lore does not exist until M3.
 
@@ -167,20 +167,25 @@ The shell is the rest of the query engine; lor does not need to grow one.
 
 ## Journey 4 — M3 Working Lore reflects it
 
-This journey begins only when M3 lands. On an empty matching scope, the same command returns a definitive empty packet with Basis and exit 0. After the complete Resolution in journey 3b, the current packet reflects that judgment:
+This journey begins only when M3 lands. On an empty matching scope, the same command returns a definitive packet with five zero-count sections, Basis, `computed_at`, zero budget use, and exit 0. After the complete Resolution in journey 3b, the current packet reflects that judgment:
 
 ```text
 $ lor lore --activity investigate --scope repo=rozoro
-current:
+orientation: current=1 patterns=0 candidates=0 conflicts=0 needs_revalidation=0
+current: returned=1 total=1
   (code-area command-registration) location = src/cli/commands   [clm_3333333333333333, resolved]
-attention: none
+patterns: returned=0 total=0
+candidates: returned=0 total=0
+conflicts: returned=0 total=0
+needs_revalidation: returned=0 total=0
+budget: used_items=1/40 used_chars=<bounded>/12000
 basis:
   stream_position: 5
-  ruleset: { core: loredu.reconciliation/v1, claim_policy: { id: loredu.default, version: "1" } }
-  query: { activity: investigate, scope: { repo: rozoro } }
+  ruleset: { core: loredu.reconciliation/v1, claim_policy: { id: loredu.default, version: "1" }, ranker: { id: loredu.baseline, version: "1" } }
+  query: { operation: lore, activity: investigate, valid_at: <computed point>, scope: { repo: rozoro } }
 ```
 
-Bounded, ranked, with stable handles — not a record dump.
+The application item carries compact state/count/evidence, a key descriptor with anchor Claim and at most two canonical Scope preview pairs, and exactly one or two representative handles copied from M2's exposed values in M2 order. M3 never independently selects them again or reorders them; the disclosure anchor may differ from a selected Resolution replacement representative. `lor claims --same-key-as <anchor-claim>` provides exact-key disclosure rather than raw values/history. `lor show <anchor-claim>` exposes the full key/Scope; the anchored list exposes every value/history under that exact key. All five count lines render even when zero. A section that truncates states full `returned`/`total` and emits its own `lor lore --cursor ...` continuation, including a `returned=0,total>0` section whose cursor resumes `before-first`. Bounded, ranked, and linked — not a record dump.
 
 ## Journey 5 — M2 projects the M1.5 Resolution
 
@@ -225,7 +230,7 @@ $ lor head
 stream_position=5
 ```
 
-M1.5 can compare any response Basis to this store-wide head and can continue an older list through its pinned cursor. Once projections exist, a cached Current Knowledge or Working Lore response with `basis.stream_position=4` is conservatively stale when head is 5. Equal head alone is insufficient: active structural ruleset and normalized query must also equal the cached Basis. Deleting derived artifacts and replaying plain files must reproduce semantic items, reconciliation counts, ordering, and affordance actions/params for the same Basis; separate `computed_at`, rendered prose/commands, and private cursor bytes do not participate ([decisions 0006](../../decisions/0006-explicit-version-basis.md) and [0027](../../decisions/0027-m2-reconciliation-projection-contract.md)).
+M1.5 can compare any response Basis to this store-wide head and can continue an older list through its pinned cursor. Once projections exist, a cached Current Knowledge or Working Lore response with `basis.stream_position=4` is conservatively stale when head is 5. Equal head alone is insufficient: active structural ruleset and normalized query must also equal the cached Basis; Working Lore additionally requires equal Ranker identity. Deleting derived artifacts and replaying plain files must reproduce semantic items, counts, ordering, selected budget prefix, and affordance actions/params for the same Basis; separate `computed_at`, rendered prose/commands, and private cursor bytes do not participate ([decisions 0006](../../decisions/0006-explicit-version-basis.md), [0027](../../decisions/0027-m2-reconciliation-projection-contract.md), and [0030](../../decisions/0030-working-lore-ranker-contract.md)).
 
 ## Journey 9 — teach the agents
 
@@ -286,12 +291,12 @@ Grouped by milestone; **AC n** = acceptance criterion in [goal and scope](../sco
 
 | # | Given / When / Then | Covers |
 |---|---|---|
-| T40 | empty scope → definitive empty packet with basis, exit 0 | journey 4 |
-| T41 | packet respects `max_items` / `max_chars` as record count grows 10× (S A: bounded, not raw entries) | AC 8, S A |
-| T42 | superseded claims omitted from default packet but reachable via handles | working-lore contract |
-| T43 | conflicts and needs-revalidation appear in attention sections | AC 8 |
-| T44 | every handle in a packet resolves via show/history | journey 7 |
-| T45 | packet with stale basis detected after exactly one new relevant record | AC 14 |
+| T40 | empty matching scope → `lore` returns a definitive packet whose text shows all five `returned=0 total=0` lines, Working Lore Basis/default Ranker identity, `computed_at`, zero budget use, and exit 0 | journey 4, ADR 0030 |
+| T41 | as scenario A history grows 10× and with 0/1/2/3/very-large Scope pair counts, global selection is the deterministic longest ranked prefix under exact `max_items` and Unicode-scalar `max_chars`; packet/Ranker structures expose only full pair count plus at most two canonical pairs, summaries stay ≤512, used chars are exact, and full counts ignore page size | AC 8, S A, ADR 0030 |
+| T42 | retracted knowledge is omitted entirely; included groups copy only M2's exposed representative tuple in M2 order while omitted/superseded Claims and additional values remain reachable through anchored exact-key/history affordances; groups with equal Scope previews remain distinct by anchor/full internal key | working-lore contract, ADR 0030 |
+| T43 | disputed knowledge, explicit `needs_revalidation` Verifications, and exact corpus-matching/different-snapshot evidence appear in their full-count attention sections without crawling or automatic judgment | AC 8, ADR 0030 |
+| T44 | every packet RecordHandle resolves through show then history; disputed A/B/C advice is claims then show A then show B in M2 order; `same_key_as` reaches C and the complete exact group with normal pagination and missing/wrong-family errors; full Scope/values are absent from repeated M3 descriptors; SourceRefs remain terminal | journey 7, ADR 0030 |
+| T45 | after exactly one new relevant record, the old store-wide Working Lore Basis is stale; a fresh packet advances head; equal-Basis replay reproduces representative ids/order; ordinary Basis equality and identical Working Lore equality succeed, ordinary-vs-working is false both ways, and equal-head query/core/policy/Ranker id/version mismatch is invalid | AC 14, ADR 0030 |
 
 ### CLI conformance (compiled binary)
 
@@ -330,7 +335,11 @@ Grouped by milestone; **AC n** = acceptance criterion in [goal and scope](../sco
 | T72 | malformed, wrong-operation/query/ruleset, or foreign-snapshot application cursor → `INVALID_CURSOR`/`CURSOR_MISMATCH`, never restart | ADR 0009/0026 |
 | T73 | M1.5 link-following starts from status/query/add responses and reaches record/history/entry/source using only affordances | ADR 0009/0026, journey 7 |
 | T74 | no dead ends: automatic add/list items expose only their own recursively rendered handle, `show` explicitly discloses complete valid references, store selection is preserved, and invalid-reference diagnostics/SourceRefs are terminal | ADR 0009/0026 |
-| T75 | when M3 lands, a Working Lore section hitting its budget states its full count and carries a Basis-pinned continuation under the same cursor contract | working-lore contract, staged M3 |
+| T75 | each globally truncated Working Lore section, including one with no returned item, states returned/full total and carries a Basis-pinned cursor with one shared pure-SHA-256/base64url global permutation digest/count plus exact `(section,occurrence_index)`/ordinal or `before-first`; unchanged order succeeds, budget changes preserve digest and representative tuples, alternating same-version order mismatches before partial output, malformed Ranker output remains validation failure, duplicate cross-section occurrences retain identical tuples, and pinned append continuation never adds, skips, or independently selects again | working-lore contract, ADR 0030, staged M3 |
+
+Representative vectors for T42/T44/T45/T75 are exact: retracted omission; preferred A and one-value disputed cycle as `[A]`; coexisting/disputed A/B as `[A,B]`; coexisting/disputed A/B/C with full `value_count:3` but exactly `[A,B]`; disputed advice `claims, show A, show B` while coexisting emits none; selected Resolution replacement copied even when distinct from anchor/earliest Claim; equal-value duplicate/corroborating Claims exposing one handle; identical tuples when one group occurs in multiple sections under custom ranking; and representative replay invariant under budgets and continuation.
+
+T75's digest fixtures are exact and ordered: `[]→T1PNoYwrqgwDVLtfmj7L5e0Sq02OEbqHPC8RFhICuUU`, `[0]→0LyhEfhigTetxMFvEjSW3N0dWQ0Gy12azWizn-ZW-5c`, `[1,0]→Wq8eGD8frxLDJ9wvuMIjAi8EaExh_DRTO_9i5-Vyx3Y`, `[0,2,1]→F-xKZQnI4WgcP4GTnO6egQd0keFR1WmtDMbwMZYgGBg`.
 
 ### Kernel invariants and the policy seam (issue #6)
 
@@ -344,4 +353,4 @@ Grouped by milestone; **AC n** = acceptance criterion in [goal and scope](../sco
 
 ### Deliberately not tested yet
 
-Ranking quality beyond determinism (Ranker port ships a baseline; quality is judged by the M4 consumer), concurrency beyond single-writer, performance at scale, and any model-assisted extraction — all deferred per [goal and scope](../scope/goal-and-scope.md).
+Ranking quality beyond ADR 0030's exact baseline/permutation determinism (quality is judged by the M4 consumer), concurrency beyond single-writer, performance at scale, and any model-assisted extraction — all deferred per [goal and scope](../scope/goal-and-scope.md).

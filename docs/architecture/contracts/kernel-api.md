@@ -1,6 +1,6 @@
 ---
 name: kernel_api_contract
-description: "Exact staged kernel surface through M2: records/application, store conformance, M1.5 response/query additions, and Current Knowledge projection types."
+description: "Exact staged kernel surface through M3: records/application, store conformance, M1.5 reads, Current Knowledge, and Working Lore/Ranker types."
 type: contract
 tags: [contracts, kernel, api, typescript]
 generated: "OpenAI coding agent and ChatGPT GPT-5.6 Sol, 2026-08-28"
@@ -122,7 +122,7 @@ Policy assembly and `createRulesetIdentity` are runtime validation boundaries ([
 
 Generic Claim append follows [decision 0025](../../decisions/0025-m0-application-append-phase-boundaries.md): assembly captures the validated callback functions and receiver; append calls `validateClaimKey` once with the core-constructed frozen declared key; and only an empty, descriptor-safe exact `LoreduIssue[]` result permits one `semantics` call. Returned policy issues reject before references, and semantics must be exactly `exclusive|coexisting`. Callback throws, malformed issue arrays, malformed issue objects/pointers, and unsupported semantics become fresh `VALIDATION_FAILED` failures without foreign details. A rejecting validator consumes no semantics call, and neither callback can remap identity.
 
-`RulesetIdentity` is closed with literal core `loredu.reconciliation/v1` and `{claim_policy:{id,version}}`. `Basis` is closed to `stream_position`, `ruleset`, and `query: JsonObject`; `createBasis` validates descriptors and exact nested shapes, detaches, canonicalizes, and freezes it and rejects `computed_at` with `VALIDATION_FAILED`. `basisEquals` compares constructed values across stream position, both structural ruleset components, and portable-JSON query equality; it does not repair forged malformed values.
+`RulesetIdentity` is closed with literal core `loredu.reconciliation/v1` and `{claim_policy:{id,version}}`. `Basis` is closed to `stream_position`, `ruleset`, and `query: JsonObject`; `createBasis` validates descriptors and exact nested shapes, detaches, canonicalizes, and freezes it and rejects `computed_at` with `VALIDATION_FAILED`. `basisEquals` compares constructed values across stream position, structural ruleset components, and portable-JSON query equality; it does not repair forged malformed values. M3 extends this shared runtime comparison without changing its ordinary behavior or `createBasis`: neither ruleset having Ranker identity uses the existing comparison, exactly one having it returns false, and both having it additionally compares exact Ranker id/version. `createBasis` still accepts and returns only ordinary `Basis`; only `lore` emits `WorkingLoreBasis`.
 
 ## Testing entrypoint
 
@@ -273,3 +273,60 @@ interface LoreduApplication {
 ```
 
 `ApplicationCurrentResponse` keeps the application envelope fields other than mutation feedback, replaces `reconciliation` with the exact projection summary, and adds `page`; its operation-specific result is `{computed_at, items}`. `ReconciliationFeedback` additively gains Claim-add states `duplicate|support|temporal-succession` beside its existing `corroboration`. Every added state has `{state,key,related_count,related:[earliest handle],claims}`; selection is conflict-candidate > duplicate > corroboration > support > coexisting > temporal-succession, and the related fields cover only the selected pair class. `new-key` requires no earlier same-key Claim, and temporal succession is non-blocking. Every preference tier operates only on the nonempty selected valid-time-applicable same-key Claim set; future or nonapplicable replacements and Relation endpoints remain history and cannot affect precedence. Absent a complete Resolution, any active participating `supersedes` cycle forces disputed even for one equal value. Status health uses only endpoints of overlapping different-value exclusive conflict pairs; purely disjoint succession does not block. The complete relation/state/result/evidence/history, temporal normalization, Resolution precedence, ordering, cursor, staleness, and rebuild semantics are in the [projection contract](./projection.md). No inferred Relation or Resolution is exported or appended.
+
+## Additive M3 surface
+
+[Decision 0030](../../decisions/0030-working-lore-ranker-contract.md) adds no entrypoint or testing export. It adds exactly one normal-entrypoint runtime value:
+
+```text
+DEFAULT_RANKER
+```
+
+and these type-only normal exports exactly:
+
+```text
+WorkingLoreSectionName WorkingLoreFilters WorkingLoreQuery
+RankerIdentity WorkingLoreRulesetIdentity WorkingLoreBasis
+WorkingLoreScopePair WorkingLoreScopePreview
+WorkingLoreKeyDescriptor WorkingLoreFilterDescriptor
+WorkingLoreKnowledgeSummary WorkingLoreKnowledgeItem
+WorkingLoreItem WorkingLoreSection
+WorkingLoreOrientation WorkingLoreBudget WorkingLorePacket WorkingLoreResult
+WorkingLoreApplicationResponse WorkingLoreRankCandidate WorkingLoreRankContext Ranker
+```
+
+At M3, the existing dependency object additively permits one optional port:
+
+```ts
+interface LoreduApplicationDependencies {
+  readonly store: RecordStore
+  readonly clock: Clock
+  readonly randomSource: RandomSource
+  readonly claimPolicy?: ClaimPolicy
+  readonly ranker?: Ranker
+}
+interface Ranker {
+  readonly id: string
+  readonly version: string
+  rank(context: WorkingLoreRankContext): readonly number[]
+}
+```
+
+Omission selects the frozen `DEFAULT_RANKER`, whose exact identity is `{id:"loredu.baseline",version:"1"}` and whose callback returns candidate indexes unchanged. Assembly validates/captures the exact closed ranker shape but does not invoke it. Existing operations ignore Ranker and keep their exact M0–M2 `RulesetIdentity`/`Basis`; only Working Lore uses `WorkingLoreRulesetIdentity`, which extends the structural identity with `ranker:{id,version}`.
+
+The M3 item shape narrows `WorkingLoreKnowledgeSummary.representatives` to `readonly [RecordHandle] | readonly [RecordHandle, RecordHandle]`. For every included item, core copies exactly `currentKnowledgeItem.values.map(value => value.representative)` into a newly detached, recursively frozen tuple in M2 order. Retracted zero-value M2 items are omitted. M3 performs no independent selection, sorting, filtering, replacement, preference, or deduplication; Ranker, section, corpus-per-value choice, budgets, and continuation cannot alter the tuple after whole-group admission, and `anchor_claim` remains separate.
+
+The application additively gains:
+
+```ts
+interface ClaimFilters {
+  readonly same_key_as?: ClaimId
+}
+interface LoreduApplication {
+  lore(query: WorkingLoreQuery): Promise<WorkingLoreApplicationResponse>
+}
+```
+
+The M3 `same_key_as` Claim filter is mutually exclusive with every other cursorless Claim filter except `limit`. It resolves one visible anchor Claim to its complete exact ClaimKey and lists that group through normal ordering/pagination; it is the bounded Working Lore exact-key disclosure path and does not alter M0–M2 Scope, ClaimKey, decoder, history, or replay behavior.
+
+A successful lore response has read feedback exactly `{state:"not-applicable",related:[]}`. The exact activity/scope/corpus query, bounded Scope/key/filter descriptors, compact section/item shapes, M2-authoritative representative tuples, summary truncation, baseline/custom Ranker validation, global budgets, pure-SHA-256 permutation-bound per-section cursors, anchored exact-key disclosure, staleness, replay, and CLI upgrade are in the [Working Lore contract](./working-lore.md). `Affordance` additively accepts `lore/lore.read` and `continue/lore.read` there. No Working Lore item, derived relation, rank result, or cursor is persisted.

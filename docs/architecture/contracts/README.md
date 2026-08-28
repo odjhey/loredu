@@ -15,9 +15,9 @@ The v0.x contracts are intentionally language-neutral and provider-neutral.
 - [Store](./store.md) — staged M0 append/get port and exact M1 snapshot scan, stream, head, commit, and conformance extension
 - [Plain-file store](./plain-file-store.md) — provider-specific M1 codec, layout, replay, locking, fsync, initialization, and root resolution
 - [Clock and identity](./clock-and-identity.md) — exact Instant, id encoding, and append capability order
-- [Kernel API](./kernel-api.md) — exact staged TypeScript entrypoints, exports, signatures, branded constructors, assembly, and M1.5/M2 additions
-- [Application and CLI](./application-cli.md) — exact M1.5 protocol plus the additive M2 Current Knowledge envelope, affordance, temporal grammar, and feedback upgrade
+- [Kernel API](./kernel-api.md) — exact staged TypeScript entrypoints, exports, signatures, branded constructors, assembly, and M1.5/M2/M3 additions
+- [Application and CLI](./application-cli.md) — exact M1.5 protocol plus additive M2 Current Knowledge and M3 Working Lore envelope/grammar upgrades
 - [Projection](./projection.md) — exact M2 reconciliation pairs, Resolution precedence, bitemporal Current Knowledge API, bounded history/evidence, and Basis/rebuild rules
-- [Working Lore](./working-lore.md) — bounded progressive-disclosure context
+- [Working Lore](./working-lore.md) — exact M3 activity query, Ranker, bounded descriptors, budgets, digest-bound continuation, anchored disclosure, and staleness contract
 
 Provider SDK types, SQL schemas, model APIs, and crawler implementation details do not belong in provider-neutral contracts. A deliberately provider-specific contract such as PlainFileStore may define its public representation and host guarantees without moving them into the kernel/domain model.

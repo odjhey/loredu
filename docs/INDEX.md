@@ -21,10 +21,10 @@ created_at: 2026-08-26T12:10:00+08:00
 | [Store port](./architecture/contracts/store.md) | Staged M0 append/get boundary and exact M1 snapshot scan, stream, head, commit, and conformance extension |
 | [Plain-file store contract](./architecture/contracts/plain-file-store.md) | M1 provider codec, layout, replay, locking, fsync, initialization, and named-root resolution |
 | [Clock and identity ports](./architecture/contracts/clock-and-identity.md) | Capability ports for `recorded_at` and record id entropy, and the single stamping point in the append path |
-| [Kernel API contract](./architecture/contracts/kernel-api.md) | Exact staged TypeScript entrypoints, exports, signatures, branded constructors, assembly, and M1.5/M2 additions |
-| [Application and CLI contract](./architecture/contracts/application-cli.md) | Exact M1.5 protocol plus the additive M2 Current Knowledge envelope, affordance, temporal grammar, and feedback upgrade |
+| [Kernel API contract](./architecture/contracts/kernel-api.md) | Exact staged TypeScript entrypoints, exports, signatures, branded constructors, assembly, and M1.5/M2/M3 additions |
+| [Application and CLI contract](./architecture/contracts/application-cli.md) | Exact M1.5 protocol plus additive M2 Current Knowledge and M3 Working Lore envelope/grammar upgrades |
 | [Projection contract](./architecture/contracts/projection.md) | Exact M2 relation/state semantics, Resolution precedence, bitemporal current API, bounded history/evidence, and rebuild/invalidation |
-| [Working Lore contract](./architecture/contracts/working-lore.md) | Bounded progressive-disclosure context for an activity |
+| [Working Lore contract](./architecture/contracts/working-lore.md) | Exact M3 activity query, Ranker, bounded descriptors, budgets, digest-bound continuation, anchored disclosure, and staleness contract |
 
 ## Decisions
 
@@ -39,7 +39,7 @@ created_at: 2026-08-26T12:10:00+08:00
 | [0006: Versioning is explicit at every layer](./decisions/0006-explicit-version-basis.md) | Stream/ruleset/Basis identity; same-Basis byte-identity wording narrowed to semantic content by ADR 0027 |
 | [0007: TypeScript on Bun](./decisions/0007-typescript-bun.md) | Strict TypeScript core, bun:test suites, CLI compiled to a single binary |
 | [0008: CLI before full reconciliation; agent-reactive responses](./decisions/0008-cli-first-agent-reactive.md) | Ship `lor` after M1 with deterministic next-step advice; agents chain until healthy |
-| [0009: Hypermedia responses and basis-pinned pagination](./decisions/0009-hypermedia-pagination.md) | Responses embed runnable affordances; lists paginate by basis-pinned cursor with explicit counts |
+| [0009: Hypermedia responses and basis-pinned pagination](./decisions/0009-hypermedia-pagination.md) | Responses embed runnable affordances and use pinned cursors/explicit counts; its generic Working Lore `--limit` requirement is narrowly superseded by ADR 0030 |
 | [0010: The ClaimPolicy extension seam](./decisions/0010-claim-policy-seam.md) | One versioned seam for consumer claim semantics; kernel invariants stay in core |
 | [0011: Repository and package architecture](./decisions/0011-repo-package-architecture.md) | Bun workspaces (kernel · store-plainfile · cli), structural dependency law, catalog-shaped tests |
 | [0012: Developer experience and CI gating](./decisions/0012-dx-and-ci-gating.md) | Biome + cspell, single fail-closed ci-required gate with fail-safe path selection, catalog drift check, AGENTS.md symlink convention |
@@ -58,6 +58,7 @@ created_at: 2026-08-26T12:10:00+08:00
 | [0027: M2 reconciliation and projection contract closure](./decisions/0027-m2-reconciliation-projection-contract.md) | Exact relations/states, advice, precedence, temporal current/status, history/evidence, invalidation, and ADR 0006 semantic-equality narrowing |
 | [0028: Reject relative Loredu homes](./decisions/0028-reject-relative-loredu-homes.md) | Absolute configured/OS homes keep named and default store identity independent of cwd |
 | [0029: CLI composition seam](./decisions/0029-cli-composition-seam.md) | Explicit application policy and host ports reuse the exact parser/renderer while shipped `lor` retains production defaults |
+| [0030: Working Lore and Ranker contract closure](./decisions/0030-working-lore-ranker-contract.md) | Exact activity query, bounded sections/descriptors, ordering-only Ranker, two-budget controls, permutation-bound cursors, anchored disclosure, and narrow ADR 0009 Working Lore `--limit` supersession |
 | [0018: Capability ports for time and identity](./decisions/0018-capability-ports.md) | `Clock` and `RandomSource` injected; the application stamps `id`/`recorded_at`, the store assigns only the position |
 | [0017: Branch protection posture](./decisions/0017-branch-protection-posture.md) | `ci-required` the only required status, zero reviews, squash-only, no bypass actors, up-to-date-before-merge on |
 
@@ -88,7 +89,7 @@ created_at: 2026-08-26T12:10:00+08:00
 | [Scope](./v0.x/scope/README.md) | v0.x scope index |
 | [Goal and scope](./v0.x/scope/goal-and-scope.md) | What v0.x proves and explicitly does not build |
 | [Execution](./v0.x/execution/README.md) | v0.x execution index |
-| [Implementation plan](./v0.x/execution/implementation-plan.md) | M0–M4 delivery sequence, including exact M1.5 and M2 contract exits, and acceptance scenarios |
+| [Implementation plan](./v0.x/execution/implementation-plan.md) | M0–M4 delivery sequence, including exact M1.5/M2/M3 contract exits and acceptance scenarios |
 | [First user journey](./v0.x/execution/first-user-journey.md) | Expected CLI usage journeys and the automated behavioral test catalog |
 | [Agent skill](./v0.x/execution/agent-skill.md) | The M1.5 guide embedded in the binary and printed by `lor skill` |
 | [Catalog status](./v0.x/execution/catalog-status.json) | Which behavioral-catalog T-numbers are deferred, and to which milestone |
