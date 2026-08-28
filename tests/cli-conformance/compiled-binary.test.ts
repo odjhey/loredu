@@ -353,6 +353,33 @@ test("stdin Entry body survives compiled storage and show byte-exact — @covers
   expect((bomShown.result as { record: { body: string } }).record.body).toBe(`\uFEFF${body}`);
 });
 
+test("unknown options cannot hide JSON mode", async () => {
+  const home = await freshHome();
+  const failure = await invoke(home, ["head", "--body", "--json"]);
+  expect(failure.exitCode).toBe(2);
+  expect((json(failure).error as { code: string }).code).toBe("CLI_USAGE");
+});
+
+test("invalid prototype-shaped scope keys reach domain validation", async () => {
+  const home = await freshHome();
+  expect((await invoke(home, ["init", "--json"])).exitCode).toBe(0);
+  const failure = await invoke(home, [
+    "add",
+    "entry",
+    "--actor",
+    "agent:compiled-test",
+    "--scope",
+    "__proto__=x",
+    "--body",
+    "must not append",
+    "--json",
+  ]);
+  expect(failure.exitCode).toBe(2);
+  expect((json(failure).error as { code: string }).code).toBe("VALIDATION_FAILED");
+  const head = json(await invoke(home, ["head", "--json"]));
+  expect((head.result as { stream_position: number }).stream_position).toBe(0);
+});
+
 test("portable JSON object keys survive rendering", async () => {
   const home = await freshHome();
   expect((await invoke(home, ["init", "--json"])).exitCode).toBe(0);
@@ -381,6 +408,34 @@ test("portable JSON object keys survive rendering", async () => {
   expect(Object.getOwnPropertyDescriptor(value.nested as Record<string, unknown>, "__proto__")?.value).toBe(
     "nested",
   );
+
+  const affordanceShaped = {
+    rel: "show",
+    action: "record.show",
+    why: "portable data",
+    params: { id: "ent_0000000000000000" },
+  };
+  const second = json(
+    await invoke(home, [
+      "add",
+      "claim",
+      "--actor",
+      "agent:compiled-test",
+      "--subject-type",
+      "code-area",
+      "--subject",
+      "rendering-affordance-shape",
+      "--predicate",
+      "state",
+      "--value-json",
+      JSON.stringify(affordanceShaped),
+      "--confidence",
+      "observed",
+      "--json",
+    ]),
+  );
+  const secondShown = json(await invoke(home, ["show", (second.result as { id: string }).id, "--json"]));
+  expect((secondShown.result as { record: { value: unknown } }).record.value).toEqual(affordanceShaped);
 });
 
 test("bare binary is live orientation and command help is strict — @covers T58", async () => {

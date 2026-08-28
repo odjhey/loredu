@@ -100,40 +100,6 @@ const GLOBAL_SPECS: Readonly<Record<string, OptionSpec>> = {
   "--json": { value: false },
   "--store": { value: true },
 };
-const VALUE_OPTIONS = new Set([
-  "--store",
-  "--actor",
-  "--body",
-  "--type",
-  "--title",
-  "--scope",
-  "--metadata-json",
-  "--source-json",
-  "--subject-type",
-  "--subject",
-  "--predicate",
-  "--value",
-  "--value-json",
-  "--confidence",
-  "--class",
-  "--perspective",
-  "--valid-from",
-  "--valid-until",
-  "--derived-from",
-  "--from",
-  "--to",
-  "--target",
-  "--decision",
-  "--replacement",
-  "--reason",
-  "--effective-at",
-  "--verified-against-json",
-  "--result",
-  "--limit",
-  "--cursor",
-  "--since",
-]);
-
 const HELP: Readonly<Record<string, string>> = {
   init: "usage: lor init [<selector>] [--json]",
   "add entry":
@@ -163,20 +129,69 @@ function usage(message: string): never {
   throw new CliUsageError(message);
 }
 
+function commandPath(argv: readonly string[]): string | undefined {
+  const words: string[] = [];
+  for (let index = 0; index < argv.length; index += 1) {
+    const token = argv[index];
+    if (token === "--store") {
+      index += 1;
+      continue;
+    }
+    if (token === "--json") continue;
+    if (token !== undefined) words.push(token);
+    if (words.length === 2 || (words.length === 1 && words[0] !== "add")) break;
+  }
+  if (words[0] === "add" && words[1] !== undefined) return `add ${words[1]}`;
+  return words[0];
+}
+
+function recognizedValueOptions(argv: readonly string[]): ReadonlySet<string> {
+  const path = commandPath(argv);
+  const values = new Set<string>(["--store"]);
+  const add = (...names: readonly string[]) => {
+    for (const name of names) values.add(name);
+  };
+  if (path?.startsWith("add ") || path === "relate" || path === "resolve") {
+    add("--actor", "--scope", "--metadata-json", "--source-json");
+  }
+  if (path === "add entry") add("--body", "--type", "--title");
+  if (path === "add claim") {
+    add(
+      "--subject-type",
+      "--subject",
+      "--predicate",
+      "--value",
+      "--value-json",
+      "--confidence",
+      "--class",
+      "--perspective",
+      "--valid-from",
+      "--valid-until",
+      "--derived-from",
+    );
+  }
+  if (path === "relate") add("--from", "--to", "--type");
+  if (path === "resolve") add("--target", "--decision", "--replacement", "--reason", "--effective-at");
+  if (path === "add verification") add("--target", "--verified-against-json", "--result");
+  return values;
+}
+
 function detectsJson(argv: readonly string[]): boolean {
+  const valueOptions = recognizedValueOptions(argv);
   for (let index = 0; index < argv.length; index += 1) {
     const token = argv[index];
     if (token === "--json") return true;
-    if (token !== undefined && VALUE_OPTIONS.has(token)) index += 1;
+    if (token !== undefined && valueOptions.has(token)) index += 1;
   }
   return false;
 }
 
 function containsVersionOption(argv: readonly string[]): boolean {
+  const valueOptions = recognizedValueOptions(argv);
   for (let index = 0; index < argv.length; index += 1) {
     const token = argv[index];
     if (token === "--version" || token === "-v") return true;
-    if (token !== undefined && VALUE_OPTIONS.has(token)) index += 1;
+    if (token !== undefined && valueOptions.has(token)) index += 1;
   }
   return false;
 }
@@ -242,6 +257,7 @@ function extractGlobals(argv: readonly string[]): {
   readonly store?: string;
 } {
   const rest: string[] = [];
+  const valueOptions = recognizedValueOptions(argv);
   let json = false;
   let store: string | undefined;
   for (let index = 0; index < argv.length; index += 1) {
@@ -261,7 +277,7 @@ function extractGlobals(argv: readonly string[]): {
       continue;
     }
     rest.push(token);
-    if (VALUE_OPTIONS.has(token)) {
+    if (valueOptions.has(token)) {
       const value = argv[index + 1];
       if (value !== undefined) {
         rest.push(value);
@@ -308,7 +324,7 @@ function parseActor(value: string): unknown {
 
 function parseScope(values: readonly string[]): Scope | undefined {
   if (values.length === 0) return undefined;
-  const scope: Record<string, string> = {};
+  const scope = Object.create(null) as Record<string, string>;
   for (const pair of values) {
     const separator = pair.indexOf("=");
     if (separator < 1 || separator === pair.length - 1) {
@@ -716,20 +732,75 @@ function runFor(affordance: Affordance, selector: string | undefined): string {
   return command;
 }
 
-function rendered(value: unknown, selector: string | undefined): unknown {
-  if (Array.isArray(value)) return value.map((item) => rendered(item, selector));
+function cloneProtocolValue(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(cloneProtocolValue);
   if (typeof value !== "object" || value === null) return value;
-  const object = value as Record<string, unknown>;
   const output = Object.create(null) as Record<string, unknown>;
-  for (const [key, item] of Object.entries(object)) output[key] = rendered(item, selector);
-  if (
-    typeof object.rel === "string" &&
-    typeof object.action === "string" &&
-    typeof object.why === "string" &&
-    typeof object.params === "object" &&
-    object.params !== null
-  ) {
-    output.run = runFor(object as unknown as Affordance, selector);
+  for (const [key, item] of Object.entries(value)) output[key] = cloneProtocolValue(item);
+  return output;
+}
+
+function renderAffordance(value: Affordance, selector: string | undefined): Record<string, unknown> {
+  const output = cloneProtocolValue(value) as Record<string, unknown>;
+  output.run = runFor(value, selector);
+  return output;
+}
+
+function renderHandle(value: unknown, selector: string | undefined): unknown {
+  if (typeof value !== "object" || value === null) return cloneProtocolValue(value);
+  const handleValue = value as Record<string, unknown>;
+  const output = cloneProtocolValue(value) as Record<string, unknown>;
+  if (Array.isArray(handleValue.affordances)) {
+    output.affordances = handleValue.affordances.map((item) =>
+      renderAffordance(item as Affordance, selector),
+    );
+  }
+  return output;
+}
+
+function renderSemanticNode(value: unknown, selector: string | undefined): unknown {
+  if (Array.isArray(value)) return value.map((item) => renderSemanticNode(item, selector));
+  if (typeof value !== "object" || value === null) return value;
+  const semantic = value as Record<string, unknown>;
+  const output = cloneProtocolValue(value) as Record<string, unknown>;
+  if (semantic.handle !== undefined) output.handle = renderHandle(semantic.handle, selector);
+  if (Array.isArray(semantic.handles)) {
+    output.handles = semantic.handles.map((item) => renderHandle(item, selector));
+  }
+  if (Array.isArray(semantic.related)) {
+    output.related = semantic.related.map((item) => renderHandle(item, selector));
+  }
+  if (semantic.representative !== undefined) {
+    output.representative = renderHandle(semantic.representative, selector);
+  }
+  if (Array.isArray(semantic.representatives)) {
+    output.representatives = semantic.representatives.map((item) => renderHandle(item, selector));
+  }
+  if (semantic.kind === "dangling-record-reference" && semantic.record !== undefined) {
+    output.record = renderHandle(semantic.record, selector);
+  }
+  if (semantic.claims !== undefined) {
+    output.claims = renderAffordance(semantic.claims as Affordance, selector);
+  }
+  if (Array.isArray(semantic.attention)) {
+    output.attention = semantic.attention.map((item) => renderSemanticNode(item, selector));
+  }
+  if (Array.isArray(semantic.advisories)) {
+    output.advisories = semantic.advisories.map((item) => renderSemanticNode(item, selector));
+  }
+  return output;
+}
+
+function rendered(value: unknown, selector: string | undefined): unknown {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) {
+    return cloneProtocolValue(value);
+  }
+  const response = value as Record<string, unknown>;
+  const output = cloneProtocolValue(value) as Record<string, unknown>;
+  if (response.result !== null) output.result = renderSemanticNode(response.result, selector);
+  output.reconciliation = renderSemanticNode(response.reconciliation, selector);
+  if (Array.isArray(response.advice)) {
+    output.advice = response.advice.map((item) => renderAffordance(item as Affordance, selector));
   }
   return output;
 }
@@ -763,13 +834,13 @@ function emitText(io: CliIo, response: BaseResponse, selector: string | undefine
       `healthy: ${result.healthy}\nopen exclusive groups: ${health.unresolved_exclusive_groups}    dangling record refs: ${health.dangling_record_references}\nadvisories: ${String(result.advisory_count)}\n`,
     );
     for (const item of (result.attention as readonly unknown[]) ?? []) {
-      io.out(`attention: ${JSON.stringify(rendered(item, selector))}\n`);
+      io.out(`attention: ${JSON.stringify(renderSemanticNode(item, selector))}\n`);
     }
     for (const item of (result.advisories as readonly unknown[]) ?? []) {
-      io.out(`advisory: ${JSON.stringify(rendered(item, selector))}\n`);
+      io.out(`advisory: ${JSON.stringify(renderSemanticNode(item, selector))}\n`);
     }
-  } else io.out(`${JSON.stringify(rendered(result, selector))}\n`);
-  io.out(`reconciliation: ${JSON.stringify(rendered(response.reconciliation, selector))}\n`);
+  } else io.out(`${JSON.stringify(renderSemanticNode(result, selector))}\n`);
+  io.out(`reconciliation: ${JSON.stringify(renderSemanticNode(response.reconciliation, selector))}\n`);
   for (const advice of response.advice) io.out(`advice: ${runFor(advice, selector)}\n`);
   if (response.basis !== null) io.out(`basis: ${JSON.stringify(response.basis)}\n`);
   if (response.page !== undefined) {
