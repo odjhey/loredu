@@ -74,13 +74,13 @@ Pulled ahead of full reconciliation ([decision 0008](../../decisions/0008-cli-fi
 
 During this phase the agent performs judgment manually: it records explicit Relations and Resolutions through the CLI. Those canonical records become the fixture corpus that M2's deterministic ruleset is validated against.
 
-The M1.5 exit is implemented. Executable `@covers` annotations and [`catalog-status.json`](./catalog-status.json) own current row-level accounting; M2 retains scenario/Current Knowledge work, and M3 retains packet-started disclosure and Working Lore budget continuation.
+The M1.5 exit is implemented. Executable `@covers` annotations and [`catalog-status.json`](./catalog-status.json) own current row-level accounting; M2-P has delivered public Current Knowledge, M2-E retains compiled scenario work, and M3 retains packet-started disclosure and Working Lore budget continuation.
 
 Exit: an agent given only the binary and `lor skill` completes the M1.5 portions of journeys 0, 1, 2, 3, 3b, 7, 8, and 9 on a fresh store, follows pagination/disclosure commands, records manual judgment, and ends with `lor status --check` passing. Acceptance scenario A's records and manual relations are executable; its Current Knowledge and Working Lore assertions remain M2/M3 exits.
 
 ## M2 — Reconciliation and projection
 
-Implement [decision 0027](../../decisions/0027-m2-reconciliation-projection-contract.md) and the exact [projection contract](../../architecture/contracts/projection.md). Delivery is staged: M2-R landed the bounded internal reconciliation foundation plus additive Claim feedback and overlap-aware status health; M2-P adds public Current Knowledge, temporal projection, summaries/evidence, cursor, and deterministic rebuild/invalidation wiring. Sequential M2-E retains the compiled end-to-end scenario exit after M2-P lands.
+Implement [decision 0027](../../decisions/0027-m2-reconciliation-projection-contract.md) and the exact [projection contract](../../architecture/contracts/projection.md). Delivery is staged: M2-R landed the bounded internal reconciliation foundation plus additive Claim feedback and overlap-aware status health; M2-P has now added public Current Knowledge, temporal projection, summaries/evidence, cursor, and deterministic rebuild/invalidation wiring. Sequential M2-E retains the compiled end-to-end scenario exit.
 
 The complete M2 scope is:
 
