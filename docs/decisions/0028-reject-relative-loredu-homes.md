@@ -22,16 +22,18 @@ ADR 0022 made an explicit relative store path the only intentionally cwd-relativ
 
 ## Choice
 
-`defaultLoreduHome` rejects a nonempty relative `LOREDU_HOME` and a relative `osHome`. Named-root helpers likewise reject a relative home supplied directly. Empty `LOREDU_HOME` remains absent and resolves to `<osHome>/.loredu`.
+`defaultLoreduHome` rejects a nonempty relative `LOREDU_HOME` and a relative `osHome`. Named-root helpers likewise reject a relative home supplied directly. Empty `LOREDU_HOME` remains absent and resolves to `<osHome>/.loredu`. Explicit path resolution bypasses `LOREDU_HOME` entirely, so it remains usable when the configured home is relative.
+
+`lor --version` and `lor -v` are store-free metadata operations, not default-store selections. They ignore `LOREDU_HOME` and render the absolute OS-default `<osHome>/.loredu` home.
 
 This narrowly supersedes ADR 0022's statement that any nonempty `LOREDU_HOME` is accepted. Its explicit relative store-path behavior is unchanged.
 
 ## Consequences
 
 - Named and default roots are absolute and cannot change identity merely because a later invocation uses another cwd.
-- A relative home configuration fails before initialization or store access instead of creating state in an accidental directory.
-- Callers and tests that override the home must provide an absolute path.
+- A relative home configuration fails before named/default initialization or store access instead of creating state in an accidental directory.
+- Callers and tests selecting a named/default store through an overridden home must provide an absolute path.
 
 ## Rule / follow-up
 
-Keep the absolute-home invariant at the shared plain-file root boundary. Do not canonicalize relative home configuration at a CLI-only call site.
+Keep the absolute-home invariant for named/default selection at the shared plain-file root boundary. Do not canonicalize relative home configuration at a CLI-only call site.
