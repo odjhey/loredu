@@ -333,6 +333,10 @@ function parseActor(value: string): unknown {
   return { type: value.slice(0, separator), id: value.slice(separator + 1) };
 }
 
+function escapePointer(value: string): string {
+  return value.replaceAll("~", "~0").replaceAll("/", "~1");
+}
+
 function parseScope(values: readonly string[]): Scope | undefined {
   if (values.length === 0) return undefined;
   const scope = Object.create(null) as Record<string, string>;
@@ -346,7 +350,11 @@ function parseScope(values: readonly string[]): Scope | undefined {
     const key = pair.slice(0, separator);
     if (Object.hasOwn(scope, key)) {
       throw new LoreduError("VALIDATION_FAILED", "scope keys must be unique", [
-        Object.freeze({ code: "DUPLICATE", path: `/scope/${key}`, message: "duplicates a scope key" }),
+        Object.freeze({
+          code: "DUPLICATE",
+          path: `/scope/${escapePointer(key)}`,
+          message: "duplicates a scope key",
+        }),
       ]);
     }
     scope[key] = pair.slice(separator + 1);

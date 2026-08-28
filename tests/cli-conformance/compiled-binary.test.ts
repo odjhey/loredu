@@ -1207,6 +1207,27 @@ test("compiled empty Working Lore is definitive and grammar-safe — @covers T40
     expect(failed.exitCode).toBe(2);
     expect(["CLI_USAGE", "VALIDATION_FAILED"]).toContain((json(failed).error as { code: string }).code);
   }
+  for (const [key, path] of [
+    ["a/b", "/scope/a~1b"],
+    ["a~b", "/scope/a~0b"],
+  ] as const) {
+    const duplicateScope = await invoke(home, [
+      "lore",
+      "--store",
+      selector,
+      "--activity",
+      "investigate",
+      "--scope",
+      `${key}=x`,
+      "--scope",
+      `${key}=y`,
+      "--json",
+    ]);
+    expect(duplicateScope.exitCode).toBe(2);
+    expect((json(duplicateScope).error as { issues: Array<{ path: string }> }).issues).toEqual([
+      expect.objectContaining({ code: "DUPLICATE", path }),
+    ]);
+  }
   const invalidCorpus = json(
     await invoke(home, [
       "lore",
