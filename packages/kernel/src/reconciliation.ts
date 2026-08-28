@@ -279,8 +279,7 @@ function directedCycleMembers(edges: readonly (readonly [ClaimId, ClaimId])[]): 
         pending.push(next);
       }
     }
-    if (component.length > 1 || selfLoops.has(start))
-      for (const member of component) members.add(member);
+    if (component.length > 1 || selfLoops.has(start)) for (const member of component) members.add(member);
   }
   return members;
 }
@@ -376,9 +375,7 @@ export function reconcileApplicableClaimGroup(input: {
     activeEdges.push(Object.freeze([from.record.id, to.record.id]));
   }
   const cycleMembers = directedCycleMembers(activeEdges);
-  const removed = new Set(
-    activeEdges.filter((edge) => !cycleMembers.has(edge[1])).map((edge) => edge[1]),
-  );
+  const removed = new Set(activeEdges.filter((edge) => !cycleMembers.has(edge[1])).map((edge) => edge[1]));
   const survivors = Object.freeze(claims.filter((claim) => !removed.has(claim.record.id)));
   const values = valueGroups(survivors);
   return Object.freeze({

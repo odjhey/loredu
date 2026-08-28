@@ -371,8 +371,7 @@ describe("ADR 0027 deterministic reconciliation foundation", () => {
           const descriptor = Reflect.getOwnPropertyDescriptor(target, property) as PropertyDescriptor;
           return { ...descriptor, value: lengthDescriptorReads === 1 ? 200 : 201 };
         }
-        if (typeof property === "string" && String(Number(property)) === property)
-          elementDescriptorReads++;
+        if (typeof property === "string" && String(Number(property)) === property) elementDescriptorReads++;
         return Reflect.getOwnPropertyDescriptor(target, property);
       },
       get(target, property, receiver) {
