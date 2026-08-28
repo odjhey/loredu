@@ -17,9 +17,9 @@ The executable narratives live in the
 [compiled CLI suite](../cli-conformance/compiled-binary.test.ts), where they cross
 plain-file persistence, reconciliation, projection, application envelopes, and
 rendering through the compiled conformance entry. Scenario A's mapped derived/manual
-disagreement remains inspectable evidence and never changes canonical history. A
-separate compiled T56 session covers the complete fresh-store journey from orientation
-through Working Lore continuation.
+disagreement remains inspectable evidence and never changes canonical history. The
+[CLI conformance group](../cli-conformance/README.md) owns the separate fresh-store
+journey.
 
 A scenario test earns its place by crossing milestones — store, reconciliation,
 projection, and rendering together. Anything provable inside one group belongs in

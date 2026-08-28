@@ -65,17 +65,20 @@ agent's) start from what you record now.
 5. **Judge conflicts yourself.** When lor reports a conflict candidate, run
    its exact-key `lor claims` advice and every continuation command. Inspect
    every Claim in the complete current group and verify against the source.
-   A Resolution closes health only when it repeats `--target <claim-id>` for
-   every listed Claim, including same-value corroborations. Record the evidence
-   you actually checked with one or more repeatable targets:
+   A Resolution closes health only when its targets cover every Claim in the
+   overlapping, different-value conflict set; same-value corroborations still
+   belong when they overlap a competing value. The exact-key list can also include
+   nonparticipating history, so inspect validity before selecting targets. Record
+   the evidence you actually checked with one or more repeatable targets:
    `lor add verification --actor agent:<agent-id> --target <claim-id>... --verified-against-json '{"ref":"<source>","snapshot":"<version>"}' --result confirmed`
    A Verification records the snapshotted evidence and result; it does not by
    itself settle the conflict or make health pass. Then record your judgment:
    `lor resolve --actor agent:<agent-id> --target <claim-id>... --decision prefer --replacement <preferred-target> --reason "<what you checked>"`
    If you cannot verify, use `--decision leave_disputed` — a recorded open
    question beats a guessed answer. Never try to delete the losing claim. A
-   Claim appended after your list reopens the group; follow `status` and record
-   a later Resolution covering the enlarged group.
+   Claim appended after your list reopens health only when it joins an overlapping
+   different-value pair; follow `status` and record a later Resolution covering
+   the enlarged conflict set.
 6. **Disclose and time-travel when needed.** A Working Lore item carries an
    exact-key `lor claims --same-key-as <anchor-claim>` action and one or two
    representative handles. Follow the anchored Claim list and every continuation

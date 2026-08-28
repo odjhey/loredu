@@ -115,7 +115,7 @@ M3 is implemented under [decision 0030](../../decisions/0030-working-lore-ranker
 
 Do not require embeddings or a model reranker. Ranking quality remains an M4 consumer judgment. A consumer may substitute a lexical, embedding, graph, or model Ranker without core changes, but core still owns section membership, counts, budgets, and disclosure and the Ranker version must appear in Working Lore Basis. Do not persist derived content, crawl sources, count model-specific tokens, or reinterpret M2 Resolution/projection semantics.
 
-T41–T45/T75 are implemented by the M3-L application tests. T40/T54/T56 are implemented by genuine compiled-binary journeys, leaving all 67 catalog rows executable and none deferred.
+T41–T45/T75 are implemented by the M3-L application tests. T40/T54/T56 are implemented by genuine compiled-binary journeys; executable `@covers` annotations and [`catalog-status.json`](./catalog-status.json) own exact accounting.
 
 M3 exit: the application returns useful context that remains bounded as history grows and under very large Scope cardinality; conflicts/revalidation and omitted superseded history have complete anchored disclosure; every section truncation carries full counts and a digest/occurrence-bound continuation; one append makes a cached packet stale; and ordinary/Working Lore Basis comparisons plus replay/baseline/custom Ranker order reproduce representative ids/order and all other application semantics. The compiled binary adds the definitive empty packet/five visible lines, exact-key disclosure, scenario-A revalidation at 10× history, a fresh-store 0→8 journey, and the embedded M3 skill without changing domain behavior.
 

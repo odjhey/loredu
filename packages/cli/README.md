@@ -24,17 +24,15 @@ overlap-aware status health, and `current` with scope, recorded/valid-time flags
 combined-stream pagination, projection summaries, and recursively runnable
 disclosure. Store-backed operations delegate to the surface-neutral application
 API; only argv, store composition, recursive runnable rendering, and process exit
-selection remain here. M3 now also exposes compiled `lore` grammar/rendering, section continuations,
-`claims --same-key-as`, and bounded recursive disclosure.
+selection remain here. M3 now also exposes compiled `lore` grammar/rendering,
+section continuations, `claims --same-key-as`, and bounded recursive disclosure.
 
 Compiled-binary evidence lives in
 [`../../tests/cli-conformance/`](../../tests/cli-conformance/README.md), including
 the completed M3 scenario-A revalidation narrative, the fresh-store 0→8 journey,
 and T55's four-mode late-amendment journey; executable `@covers` annotations and
 [`catalog-status.json`](../../docs/v0.x/execution/catalog-status.json) own current
-row-level implementation accounting. All 67 catalog rows now have executable
-owners and none remain deferred. The exported runner
-accepts explicit
+row-level implementation accounting. The exported runner accepts explicit
 application policy and host-capability ports for embedded composition and conformance,
 while the shipped `lor` entry keeps the default policy and production
 Clock/RandomSource.
