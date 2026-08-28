@@ -1,7 +1,10 @@
 # cli-conformance — the compiled binary
 
-Catalog rows **T50–T58**, **T60–T68**, and **T70–T75** belong here. The
-[behavioral catalog](../../docs/v0.x/execution/first-user-journey.md) owns their
+Compiled-binary assertions **T50–T58**, **T65**, and **T73–T75** belong here.
+T50–T53 also prove that the CLI adapts and renders the surface-neutral semantics
+covered by **T60–T64**, **T66–T68**, and **T70–T72** in
+[`tests/application`](../application/README.md). The
+[behavioral catalog](../../docs/v0.x/execution/first-user-journey.md) owns the
 exact assertions, and
 [`catalog-status.json`](../../docs/v0.x/execution/catalog-status.json) owns their
 staged M1.5/M2/M3 implementation milestones. The

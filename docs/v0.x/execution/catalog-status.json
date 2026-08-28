@@ -141,12 +141,12 @@
     "T73": {
       "milestone": "M1.5",
       "group": "Pagination and link-following (ADR 0009)",
-      "reason": "M1.5 affordance link-following not implemented yet"
+      "reason": "compiled end-to-end affordance chain belongs to M15-Q"
     },
     "T74": {
       "milestone": "M1.5",
       "group": "Pagination and link-following (ADR 0009)",
-      "reason": "pagination and affordance links not implemented yet"
+      "reason": "recursive CLI rendering and store-preserving links belong to M15-B/M15-Q"
     },
     "T75": {
       "milestone": "M3",

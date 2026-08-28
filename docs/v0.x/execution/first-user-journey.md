@@ -303,23 +303,23 @@ Grouped by milestone; **AC n** = acceptance criterion in [goal and scope](../sco
 
 | # | Given / When / Then | Covers |
 |---|---|---|
-| T60 | every mutation response (`--json`) contains exact bounded `ok`, `result`, `reconciliation`, rendered `advice`, and `basis`; each application affordance becomes runnable without CLI strings in the application, and committed feedback failure never looks like mutation failure | ADR 0008/0026 |
+| T60 | every application mutation response contains exact bounded `ok`, `result`, `reconciliation`, surface-neutral `advice`, and `basis`; it is deeply frozen, carries no CLI strings, and a committed feedback failure never looks like mutation failure | ADR 0008/0026 |
 | T61 | second claim, same key + same value → corroboration feedback, no attention raised | journey 3 |
 | T62 | second claim, same key + different value → conflict-candidate feedback with related count, one representative, exact-key list drill-down, and bounded `advice` naming both ids | journey 3 |
-| T63 | agent chain: paginate the exact-key list from T62, inspect all Claims, repeat `--target` for every current member, record judgment, then `lor status --check` exits 0 | journey 3b, ADR 0026 |
-| T64 | bounded `lor status` counts every absent/forward persisted reference and unresolved exclusive group; only an eligible Resolution whose record references all point backward and whose targets cover all current members closes a group, while malformed canonical files fail as store corruption rather than partial health | journey 3b, ADR 0026 |
+| T63 | application chain: paginate the exact-key list from T62, inspect all Claims, target every current member in a Resolution, record judgment, then read healthy status | journey 3b, ADR 0026 |
+| T64 | bounded application status counts every absent/forward persisted reference and unresolved exclusive group; only an eligible Resolution whose record references all point backward and whose targets cover all current members closes a group, while malformed canonical records fail as store corruption rather than partial health | journey 3b, ADR 0026 |
 | T65 | text `lor skill` equals frontmatter-stripped embedded source bytes and needs no store; a fresh store using only its M1.5 commands completes orientation, record/query/disclosure/manual-resolution, and healthy exit | journey 9, ADR 0026 |
 | T66 | for the same pinned state, corrective/navigational affordance fields and order are identical; healthy state has no corrective advice, though record handles and list continuation remain navigational | ADR 0008/0026 |
-| T67 | `lor claims` AND-composes scope subset/exact + key/present-or-absent-perspective/value/actor/since filters, orders by stream position, and returns the contract page under `--json` | key hygiene, ADR 0026 |
+| T67 | application Claim reads AND-compose scope subset/exact + key/present-or-absent-perspective/value/actor/since filters, preserve stream order, and return the contract page | key hygiene, ADR 0026 |
 | T68 | versioned core mechanics (not ClaimPolicy advice) finds canonically equal values under different exact keys in one exact scope → non-blocking advisory, never cross-key reconciliation; only eligible backward-pointing duplicate Relations connecting components suppress it | key hygiene, ADR 0026 |
 
 ### Pagination and link-following (ADR 0009)
 
 | # | Given / When / Then | Covers |
 |---|---|---|
-| T70 | any Claim/history/status collection beyond its effective limit → `page` with returned/total/cursor plus runnable continuation preserving a nondefault limit; status continuation does not duplicate/skip multiple diagnostics at one position; at completion → counts and omitted cursor | ADR 0009/0026 |
+| T70 | any application Claim/history/status collection beyond its effective limit → `page` with returned/total/cursor plus a surface-neutral continuation affordance preserving a nondefault limit; status continuation does not duplicate/skip multiple diagnostics at one position; at completion → counts and omitted cursor | ADR 0009/0026 |
 | T71 | append mid-pagination → `loredu.cursor.v1.` chain verifies pinned anchor and its operation-specific resume key, yielding no duplicates/skips from that prefix; a fresh cursorless query reflects new head | ADR 0009/0006/0026 |
-| T72 | malformed, wrong-operation/query/ruleset, or foreign-snapshot cursor → actionable `INVALID_CURSOR`/`CURSOR_MISMATCH`, exit 2, never restart | ADR 0009/0026 |
+| T72 | malformed, wrong-operation/query/ruleset, or foreign-snapshot application cursor → `INVALID_CURSOR`/`CURSOR_MISMATCH`, never restart | ADR 0009/0026 |
 | T73 | M1.5 link-following starts from status/query/add responses and reaches record/history/entry/source using only affordances | ADR 0009/0026, journey 7 |
 | T74 | no dead ends: automatic add/list items expose only their own recursively rendered handle, `show` explicitly discloses complete valid references, store selection is preserved, and invalid-reference diagnostics/SourceRefs are terminal | ADR 0009/0026 |
 | T75 | when M3 lands, a Working Lore section hitting its budget states its full count and carries a Basis-pinned continuation under the same cursor contract | working-lore contract, staged M3 |
