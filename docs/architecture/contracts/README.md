@@ -18,6 +18,6 @@ The v0.x contracts are intentionally language-neutral and provider-neutral.
 - [Kernel API](./kernel-api.md) — exact staged TypeScript entrypoints, exports, signatures, branded constructors, assembly, and M1.5/M2/M3 additions
 - [Application and CLI](./application-cli.md) — exact M1.5 protocol plus additive M2 Current Knowledge and M3 Working Lore envelope/grammar upgrades
 - [Projection](./projection.md) — exact M2 reconciliation pairs, Resolution precedence, bitemporal Current Knowledge API, bounded history/evidence, and Basis/rebuild rules
-- [Working Lore](./working-lore.md) — exact M3 activity query, Ranker, compact sections, budgets, continuation, disclosure, and staleness contract
+- [Working Lore](./working-lore.md) — exact M3 activity query, Ranker, bounded descriptors, budgets, digest-bound continuation, anchored disclosure, and staleness contract
 
 Provider SDK types, SQL schemas, model APIs, and crawler implementation details do not belong in provider-neutral contracts. A deliberately provider-specific contract such as PlainFileStore may define its public representation and host guarantees without moving them into the kernel/domain model.

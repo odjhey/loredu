@@ -106,18 +106,18 @@ Implement [decision 0030](../../decisions/0030-working-lore-ranker-contract.md) 
 
 - additive surface-neutral `lore(query)` with required Activity token, optional subset scope/current corpus SourceRef, one current valid-time Clock sample, and exact normalized query;
 - compact closed sections `current|patterns|candidates|conflicts|needs_revalidation`, with membership derived mechanically from M2 state, Claim class/confidence, Verifications, and exact corpus snapshot mismatch;
-- bounded knowledge summaries with at most two record handles, complete history/evidence metadata, and existing exact-key Claim affordances for full values and details;
+- bounded knowledge summaries with at most two record handles, complete history/evidence metadata, fixed-cardinality Scope/key/filter descriptors, and anchored `same_key_as` Claim affordances for full exact Scope, values, and history without changing shared Scope decoding;
 - a closed, versioned `Ranker` assembly port that receives frozen indexed occurrences and may return only a complete validated permutation; default `loredu.baseline/1` uses exact attention-first, position/key order;
-- global first-packet defaults `max_items=40`/`max_chars=12000`, Unicode-scalar summary accounting, longest-prefix selection, full orientation/section counts, and one Basis-pinned cursor per truncated section;
-- section-only continuation that can change budgets, preserves the original head/query/valid point/computed time/core-policy-ranker identities, reorders deterministically, consumes no Clock, and never silently restarts;
-- Working Lore-specific structural Basis extension with Ranker identity, conservative store-wide staleness, semantic replay equality, stable handles, and recursive surface-neutral disclosure;
-- additive CLI `lore` grammar/rendering under the implemented envelope/error/exit/store rules, plus the M3 embedded-skill revision only when code lands.
+- global first-packet defaults `max_items=40`/`max_chars=12000`, Unicode-scalar summary accounting, longest-prefix selection, all five orientation/section count lines, and one Basis-pinned cursor per truncated section;
+- section-only continuation that can change budgets, preserves the original head/query/valid point/computed time/core-policy-ranker identities, binds pure-SHA-256/base64url global permutation digest/count plus exact occurrence resume identity or `before-first`, consumes no Clock, and fails closed on a changed valid permutation before partial output;
+- Working Lore-specific structural Basis extension with Ranker identity, shared ordinary/Working Lore-aware `basisEquals`, conservative store-wide staleness, semantic replay equality, stable handles, and recursive surface-neutral disclosure;
+- additive CLI `lore` grammar/rendering plus `claims --same-key-as` anchored disclosure under the implemented envelope/error/exit/store rules, and the M3 embedded-skill revision only when code lands.
 
 Do not require embeddings or a model reranker. Ranking quality remains an M4 consumer judgment. A consumer may substitute a lexical, embedding, graph, or model Ranker without core changes, but core still owns section membership, counts, budgets, and disclosure and the Ranker version must appear in Working Lore Basis. Do not persist derived content, crawl sources, count model-specific tokens, or reinterpret M2 Resolution/projection semantics.
 
 T40–T45/T75 are contract-ready but remain deferred until executable coverage exists. M3-C changes no code or catalog row.
 
-Exit: the acceptance activity receives useful context that remains bounded as history grows 10×; empty scope is definitive; conflicts/revalidation and omitted superseded history have complete disclosure; every section truncation carries full counts and a pinned continuation; one append makes a cached packet stale; replay and baseline/custom Ranker order reproduce semantic content for the same Basis.
+Exit: the acceptance activity receives useful context that remains bounded as history grows 10× and under very large historical Scope cardinality; empty scope is definitive with five visible counts; conflicts/revalidation and omitted superseded history have complete anchored disclosure; every section truncation carries full counts and a digest/occurrence-bound continuation; one append makes a cached packet stale; ordinary/Working Lore Basis comparisons and replay/baseline/custom Ranker order reproduce the contract semantics.
 
 ## M4 — First real consumer
 

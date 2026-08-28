@@ -122,7 +122,7 @@ Policy assembly and `createRulesetIdentity` are runtime validation boundaries ([
 
 Generic Claim append follows [decision 0025](../../decisions/0025-m0-application-append-phase-boundaries.md): assembly captures the validated callback functions and receiver; append calls `validateClaimKey` once with the core-constructed frozen declared key; and only an empty, descriptor-safe exact `LoreduIssue[]` result permits one `semantics` call. Returned policy issues reject before references, and semantics must be exactly `exclusive|coexisting`. Callback throws, malformed issue arrays, malformed issue objects/pointers, and unsupported semantics become fresh `VALIDATION_FAILED` failures without foreign details. A rejecting validator consumes no semantics call, and neither callback can remap identity.
 
-`RulesetIdentity` is closed with literal core `loredu.reconciliation/v1` and `{claim_policy:{id,version}}`. `Basis` is closed to `stream_position`, `ruleset`, and `query: JsonObject`; `createBasis` validates descriptors and exact nested shapes, detaches, canonicalizes, and freezes it and rejects `computed_at` with `VALIDATION_FAILED`. `basisEquals` compares constructed values across stream position, both structural ruleset components, and portable-JSON query equality; it does not repair forged malformed values.
+`RulesetIdentity` is closed with literal core `loredu.reconciliation/v1` and `{claim_policy:{id,version}}`. `Basis` is closed to `stream_position`, `ruleset`, and `query: JsonObject`; `createBasis` validates descriptors and exact nested shapes, detaches, canonicalizes, and freezes it and rejects `computed_at` with `VALIDATION_FAILED`. `basisEquals` compares constructed values across stream position, structural ruleset components, and portable-JSON query equality; it does not repair forged malformed values. M3 extends this shared runtime comparison without changing its ordinary behavior or `createBasis`: neither ruleset having Ranker identity uses the existing comparison, exactly one having it returns false, and both having it additionally compares exact Ranker id/version. `createBasis` still accepts and returns only ordinary `Basis`; only `lore` emits `WorkingLoreBasis`.
 
 ## Testing entrypoint
 
@@ -287,6 +287,8 @@ and these type-only normal exports exactly:
 ```text
 WorkingLoreSectionName WorkingLoreFilters WorkingLoreQuery
 RankerIdentity WorkingLoreRulesetIdentity WorkingLoreBasis
+WorkingLoreScopePair WorkingLoreScopePreview
+WorkingLoreKeyDescriptor WorkingLoreFilterDescriptor
 WorkingLoreKnowledgeSummary WorkingLoreKnowledgeItem
 WorkingLoreItem WorkingLoreSection
 WorkingLoreOrientation WorkingLoreBudget WorkingLorePacket WorkingLoreResult
@@ -315,9 +317,14 @@ Omission selects the frozen `DEFAULT_RANKER`, whose exact identity is `{id:"lore
 The application additively gains:
 
 ```ts
+interface ClaimFilters {
+  readonly same_key_as?: ClaimId
+}
 interface LoreduApplication {
   lore(query: WorkingLoreQuery): Promise<WorkingLoreApplicationResponse>
 }
 ```
 
-A successful lore response has read feedback exactly `{state:"not-applicable",related:[]}`. The exact activity/scope/corpus query, compact section/item shapes, summary truncation, baseline/custom Ranker validation, global budgets, per-section pages/cursors, disclosure, staleness, replay, and CLI upgrade are in the [Working Lore contract](./working-lore.md). `Affordance` additively accepts `lore/lore.read` and `continue/lore.read` there. No Working Lore item, derived relation, rank result, or cursor is persisted.
+The M3 `same_key_as` Claim filter is mutually exclusive with every other cursorless Claim filter except `limit`. It resolves one visible anchor Claim to its complete exact ClaimKey and lists that group through normal ordering/pagination; it is the bounded Working Lore exact-key disclosure path and does not alter M0–M2 Scope, ClaimKey, decoder, history, or replay behavior.
+
+A successful lore response has read feedback exactly `{state:"not-applicable",related:[]}`. The exact activity/scope/corpus query, bounded Scope/key/filter descriptors, compact section/item shapes, summary truncation, baseline/custom Ranker validation, global budgets, pure-SHA-256 permutation-bound per-section cursors, anchored exact-key disclosure, staleness, replay, and CLI upgrade are in the [Working Lore contract](./working-lore.md). `Affordance` additively accepts `lore/lore.read` and `continue/lore.read` there. No Working Lore item, derived relation, rank result, or cursor is persisted.

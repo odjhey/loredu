@@ -185,7 +185,7 @@ basis:
   query: { operation: lore, activity: investigate, valid_at: <computed point>, scope: { repo: rozoro } }
 ```
 
-The application item carries compact state/count/evidence, at most two representative handles, and exact-key disclosure rather than raw values/history. A section that truncates states full `returned`/`total` and emits its own `lor lore --cursor ...` continuation. Bounded, ranked, and linked — not a record dump.
+The application item carries compact state/count/evidence, a key descriptor with anchor Claim and at most two canonical Scope preview pairs, at most two representative handles, and `lor claims --same-key-as <anchor-claim>` exact-key disclosure rather than raw values/history. `lor show <anchor-claim>` exposes the full key/Scope; the anchored list exposes every value/history under that exact key. All five count lines render even when zero. A section that truncates states full `returned`/`total` and emits its own `lor lore --cursor ...` continuation, including a `returned=0,total>0` section whose cursor resumes `before-first`. Bounded, ranked, and linked — not a record dump.
 
 ## Journey 5 — M2 projects the M1.5 Resolution
 
@@ -291,12 +291,12 @@ Grouped by milestone; **AC n** = acceptance criterion in [goal and scope](../sco
 
 | # | Given / When / Then | Covers |
 |---|---|---|
-| T40 | empty matching scope → `lore` returns a definitive packet with five zero-total sections, Working Lore Basis/default Ranker identity, `computed_at`, zero budget use, and exit 0 | journey 4, ADR 0030 |
-| T41 | as scenario A history grows 10×, global packet selection is the deterministic longest ranked prefix under exact `max_items` and Unicode-scalar `max_chars` accounting; full section/orientation totals remain unchanged by page size | AC 8, S A, ADR 0030 |
-| T42 | retracted/superseded Claims are omitted from default sections but an included representative's exact-key/history affordances reach them and their evidence | working-lore contract, ADR 0030 |
+| T40 | empty matching scope → `lore` returns a definitive packet whose text shows all five `returned=0 total=0` lines, Working Lore Basis/default Ranker identity, `computed_at`, zero budget use, and exit 0 | journey 4, ADR 0030 |
+| T41 | as scenario A history grows 10× and with 0/1/2/3/very-large Scope pair counts, global selection is the deterministic longest ranked prefix under exact `max_items` and Unicode-scalar `max_chars`; packet/Ranker structures expose only full pair count plus at most two canonical pairs, summaries stay ≤512, used chars are exact, and full counts ignore page size | AC 8, S A, ADR 0030 |
+| T42 | retracted/superseded Claims are omitted from default sections but an included representative's anchored exact-key/history affordances reach them and their evidence; groups with equal Scope previews remain distinct by anchor/full internal key | working-lore contract, ADR 0030 |
 | T43 | disputed knowledge, explicit `needs_revalidation` Verifications, and exact corpus-matching/different-snapshot evidence appear in their full-count attention sections without crawling or automatic judgment | AC 8, ADR 0030 |
-| T44 | every packet RecordHandle resolves through show then history, exact-key affordances expose omitted values, and SourceRefs remain explicit terminal disclosure | journey 7, ADR 0030 |
-| T45 | after exactly one new relevant record, the old store-wide Working Lore Basis is stale; a fresh packet advances head, while equal head with query/core/policy/Ranker mismatch is invalid | AC 14, ADR 0030 |
+| T44 | every packet RecordHandle resolves through show then history; `same_key_as` resolves the complete exact group with normal pagination and missing/wrong-family errors; full Scope/values are absent from repeated M3 descriptors but reachable through anchor show/list; SourceRefs remain terminal | journey 7, ADR 0030 |
+| T45 | after exactly one new relevant record, the old store-wide Working Lore Basis is stale; a fresh packet advances head; ordinary Basis equality and identical Working Lore equality succeed, ordinary-vs-working is false both ways, and equal-head query/core/policy/Ranker id/version mismatch is invalid | AC 14, ADR 0030 |
 
 ### CLI conformance (compiled binary)
 
@@ -335,7 +335,9 @@ Grouped by milestone; **AC n** = acceptance criterion in [goal and scope](../sco
 | T72 | malformed, wrong-operation/query/ruleset, or foreign-snapshot application cursor → `INVALID_CURSOR`/`CURSOR_MISMATCH`, never restart | ADR 0009/0026 |
 | T73 | M1.5 link-following starts from status/query/add responses and reaches record/history/entry/source using only affordances | ADR 0009/0026, journey 7 |
 | T74 | no dead ends: automatic add/list items expose only their own recursively rendered handle, `show` explicitly discloses complete valid references, store selection is preserved, and invalid-reference diagnostics/SourceRefs are terminal | ADR 0009/0026 |
-| T75 | each Working Lore section truncated by the global first-packet budget states returned/full total and carries its own Basis-pinned cursor; continuation preserves query/head/valid point/computed time/core-policy-Ranker identities, may change budgets, returns only that section, and never duplicates/skips after append | working-lore contract, ADR 0030, staged M3 |
+| T75 | each globally truncated Working Lore section, including one with no returned item, states returned/full total and carries a Basis-pinned cursor with one shared pure-SHA-256/base64url global permutation digest/count plus exact `(section,occurrence_index)`/ordinal or `before-first`; unchanged order succeeds, budget changes preserve digest, alternating same-version order mismatches before partial output, malformed Ranker output remains validation failure, duplicate cross-section occurrences stay distinct, and pinned append continuation never adds/skips | working-lore contract, ADR 0030, staged M3 |
+
+T75's digest fixtures are exact and ordered: `[]→T1PNoYwrqgwDVLtfmj7L5e0Sq02OEbqHPC8RFhICuUU`, `[0]→0LyhEfhigTetxMFvEjSW3N0dWQ0Gy12azWizn-ZW-5c`, `[1,0]→Wq8eGD8frxLDJ9wvuMIjAi8EaExh_DRTO_9i5-Vyx3Y`, `[0,2,1]→F-xKZQnI4WgcP4GTnO6egQd0keFR1WmtDMbwMZYgGBg`.
 
 ### Kernel invariants and the policy seam (issue #6)
 

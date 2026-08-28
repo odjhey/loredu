@@ -24,7 +24,7 @@ created_at: 2026-08-26T12:10:00+08:00
 | [Kernel API contract](./architecture/contracts/kernel-api.md) | Exact staged TypeScript entrypoints, exports, signatures, branded constructors, assembly, and M1.5/M2/M3 additions |
 | [Application and CLI contract](./architecture/contracts/application-cli.md) | Exact M1.5 protocol plus additive M2 Current Knowledge and M3 Working Lore envelope/grammar upgrades |
 | [Projection contract](./architecture/contracts/projection.md) | Exact M2 relation/state semantics, Resolution precedence, bitemporal current API, bounded history/evidence, and rebuild/invalidation |
-| [Working Lore contract](./architecture/contracts/working-lore.md) | Exact M3 activity query, Ranker, compact sections, budgets, continuation, disclosure, and staleness contract |
+| [Working Lore contract](./architecture/contracts/working-lore.md) | Exact M3 activity query, Ranker, bounded descriptors, budgets, digest-bound continuation, anchored disclosure, and staleness contract |
 
 ## Decisions
 
@@ -58,7 +58,7 @@ created_at: 2026-08-26T12:10:00+08:00
 | [0027: M2 reconciliation and projection contract closure](./decisions/0027-m2-reconciliation-projection-contract.md) | Exact relations/states, advice, precedence, temporal current/status, history/evidence, invalidation, and ADR 0006 semantic-equality narrowing |
 | [0028: Reject relative Loredu homes](./decisions/0028-reject-relative-loredu-homes.md) | Absolute configured/OS homes keep named and default store identity independent of cwd |
 | [0029: CLI composition seam](./decisions/0029-cli-composition-seam.md) | Explicit application policy and host ports reuse the exact parser/renderer while shipped `lor` retains production defaults |
-| [0030: Working Lore and Ranker contract closure](./decisions/0030-working-lore-ranker-contract.md) | Exact activity query, compact sections, ordering-only Ranker, summary budgets, section cursors, disclosure, and M3 Basis |
+| [0030: Working Lore and Ranker contract closure](./decisions/0030-working-lore-ranker-contract.md) | Exact activity query, bounded sections/descriptors, ordering-only Ranker, summary budgets, permutation-bound cursors, anchored disclosure, and M3 Basis |
 | [0018: Capability ports for time and identity](./decisions/0018-capability-ports.md) | `Clock` and `RandomSource` injected; the application stamps `id`/`recorded_at`, the store assigns only the position |
 | [0017: Branch protection posture](./decisions/0017-branch-protection-posture.md) | `ci-required` the only required status, zero reviews, squash-only, no bypass actors, up-to-date-before-merge on |
 

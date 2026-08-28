@@ -22,7 +22,7 @@ Prove that Loredu can maintain small, inspectable, provenance-aware operational 
 5. Current knowledge can be rebuilt from canonical records.
 6. Historical `as_of` projections work.
 7. Valid-time queries can distinguish what was later learned to have been effective at an earlier date.
-8. Working Lore produces a bounded, full-count, progressively disclosed context rather than returning the whole history ([decision 0030](../../decisions/0030-working-lore-ranker-contract.md)).
+8. Working Lore produces a store-growth-bounded, full-count, progressively disclosed context rather than returning the whole history ([decision 0030](../../decisions/0030-working-lore-ranker-contract.md)).
 9. A plain-file `RecordStore` can persist and replay the complete alpha state.
 10. The same core contracts can represent at least one technical and one non-technical activity fixture.
 11. Two actors recording the same fact with different free text but the same declared claim key are reconciled (corroboration or conflict), and the same fact under different perspectives coexists without destructive conflict ([decision 0004](../../decisions/0004-claim-identity-key.md)).
@@ -38,7 +38,7 @@ Prove that Loredu can maintain small, inspectable, provenance-aware operational 
 - deterministic reconciliation baseline;
 - explicit resolution application;
 - current and historical projections;
-- bounded Working Lore representation with exact summary-character accounting and section continuations;
+- bounded Working Lore representation with exact summary-character accounting, fixed-cardinality Scope/key descriptors, anchored exact-key disclosure, and permutation-digest/exact-occurrence section continuations;
 - deterministic baseline filtering/ranking plus a versioned ordering-only Ranker sufficient for fixtures;
 - the agent-operable `lor` CLI as an adapter (M1.5, [decisions 0007](../../decisions/0007-typescript-bun.md)–[0009](../../decisions/0009-hypermedia-pagination.md), closed exactly by [decision 0026](../../decisions/0026-m15-application-cli-contract.md));
 - conformance and end-to-end tests around the published contracts.
