@@ -5,87 +5,87 @@
   "deferred": {
     "T20": {
       "milestone": "M2",
-      "group": "M2 \u2014 reconciliation, resolution, projections",
+      "group": "M2 — reconciliation, resolution, projections",
       "reason": "reconciliation and projection engine not implemented yet"
     },
     "T21": {
       "milestone": "M2",
-      "group": "M2 \u2014 reconciliation, resolution, projections",
+      "group": "M2 — reconciliation, resolution, projections",
       "reason": "reconciliation and projection engine not implemented yet"
     },
     "T22": {
       "milestone": "M2",
-      "group": "M2 \u2014 reconciliation, resolution, projections",
+      "group": "M2 — reconciliation, resolution, projections",
       "reason": "reconciliation and projection engine not implemented yet"
     },
     "T23": {
       "milestone": "M2",
-      "group": "M2 \u2014 reconciliation, resolution, projections",
+      "group": "M2 — reconciliation, resolution, projections",
       "reason": "reconciliation and projection engine not implemented yet"
     },
     "T24": {
       "milestone": "M2",
-      "group": "M2 \u2014 reconciliation, resolution, projections",
+      "group": "M2 — reconciliation, resolution, projections",
       "reason": "reconciliation and projection engine not implemented yet"
     },
     "T25": {
       "milestone": "M2",
-      "group": "M2 \u2014 reconciliation, resolution, projections",
+      "group": "M2 — reconciliation, resolution, projections",
       "reason": "reconciliation and projection engine not implemented yet"
     },
     "T26": {
       "milestone": "M2",
-      "group": "M2 \u2014 reconciliation, resolution, projections",
+      "group": "M2 — reconciliation, resolution, projections",
       "reason": "reconciliation and projection engine not implemented yet"
     },
     "T27": {
       "milestone": "M2",
-      "group": "M2 \u2014 reconciliation, resolution, projections",
+      "group": "M2 — reconciliation, resolution, projections",
       "reason": "reconciliation and projection engine not implemented yet"
     },
     "T28": {
       "milestone": "M2",
-      "group": "M2 \u2014 reconciliation, resolution, projections",
+      "group": "M2 — reconciliation, resolution, projections",
       "reason": "reconciliation and projection engine not implemented yet"
     },
     "T29": {
       "milestone": "M2",
-      "group": "M2 \u2014 reconciliation, resolution, projections",
+      "group": "M2 — reconciliation, resolution, projections",
       "reason": "reconciliation and projection engine not implemented yet"
     },
     "T30": {
       "milestone": "M2",
-      "group": "M2 \u2014 reconciliation, resolution, projections",
+      "group": "M2 — reconciliation, resolution, projections",
       "reason": "reconciliation and projection engine not implemented yet"
     },
     "T40": {
       "milestone": "M3",
-      "group": "M3 \u2014 Working Lore",
+      "group": "M3 — Working Lore",
       "reason": "Working Lore assembly not implemented yet"
     },
     "T41": {
       "milestone": "M3",
-      "group": "M3 \u2014 Working Lore",
+      "group": "M3 — Working Lore",
       "reason": "Working Lore assembly not implemented yet"
     },
     "T42": {
       "milestone": "M3",
-      "group": "M3 \u2014 Working Lore",
+      "group": "M3 — Working Lore",
       "reason": "Working Lore assembly not implemented yet"
     },
     "T43": {
       "milestone": "M3",
-      "group": "M3 \u2014 Working Lore",
+      "group": "M3 — Working Lore",
       "reason": "Working Lore assembly not implemented yet"
     },
     "T44": {
       "milestone": "M3",
-      "group": "M3 \u2014 Working Lore",
+      "group": "M3 — Working Lore",
       "reason": "Working Lore assembly not implemented yet"
     },
     "T45": {
       "milestone": "M3",
-      "group": "M3 \u2014 Working Lore",
+      "group": "M3 — Working Lore",
       "reason": "Working Lore assembly not implemented yet"
     },
     "T53": {
@@ -121,12 +121,12 @@
     "T73": {
       "milestone": "M1.5",
       "group": "Pagination and link-following (ADR 0009)",
-      "reason": "compiled end-to-end affordance chain belongs to M15-Q"
+      "reason": "mutation, status, and show affordances are implemented; the complete query/history chain lands with M15-Q"
     },
     "T74": {
       "milestone": "M1.5",
       "group": "Pagination and link-following (ADR 0009)",
-      "reason": "recursive CLI rendering and store-preserving links belong to M15-B/M15-Q"
+      "reason": "direct add/show disclosure is implemented; list disclosure and application equivalence land at M1.5 fan-in"
     },
     "T75": {
       "milestone": "M3",
@@ -135,7 +135,7 @@
     },
     "T86": {
       "milestone": "M2",
-      "group": "M2 \u2014 reconciliation, resolution, projections",
+      "group": "M2 — reconciliation, resolution, projections",
       "reason": "value canonicalization lands with the kernel in M0; its use in conflict detection is M2"
     }
   }

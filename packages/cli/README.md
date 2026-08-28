@@ -28,7 +28,7 @@ and `lore`.
 
 Compiled-binary evidence lives in
 [`../../tests/cli-conformance/`](../../tests/cli-conformance/README.md). T50–T52
-and T58 are complete; T60 and T65 remain catalog-deferred until their application
-feedback and complete query-chain portions land. The surface-neutral application
-semantics are covered separately in
+and T58 are complete; T65 remains catalog-deferred until its complete query-chain
+portion lands. The surface-neutral application semantics, including T60, are
+covered separately in
 [`../../tests/application/`](../../tests/application/README.md).
