@@ -56,6 +56,53 @@ function rulesetToken(value: unknown): string {
   return value;
 }
 
+function validateSourceText(value: unknown, maximum: number): void {
+  if (
+    typeof value !== "string" ||
+    !isScalarText(value) ||
+    value !== value.trim() ||
+    scalarLength(value) < 1 ||
+    scalarLength(value) > maximum
+  )
+    cursorInvalid();
+}
+
+function validateLoreQuery(query: JsonObject): void {
+  const keys = Object.keys(query).sort();
+  if (
+    keys.some((key) => !["activity", "corpus", "operation", "scope", "valid_at"].includes(key)) ||
+    query.operation !== "lore"
+  )
+    cursorInvalid();
+  rulesetToken(query.activity);
+  const timestampIssues: LoreduIssue[] = [];
+  const validAt = normalizeTimestamp(query.valid_at, "/query/valid_at", timestampIssues);
+  if (!validAt || validAt !== query.valid_at || timestampIssues.length > 0) cursorInvalid();
+  if (Object.hasOwn(query, "scope")) {
+    const scope = query.scope;
+    if (!scope || typeof scope !== "object" || Array.isArray(scope) || Object.keys(scope).length === 0)
+      cursorInvalid();
+    for (const [key, value] of Object.entries(scope)) {
+      rulesetToken(key);
+      rulesetToken(value);
+    }
+  }
+  if (Object.hasOwn(query, "corpus")) {
+    const corpus = query.corpus;
+    if (!corpus || typeof corpus !== "object" || Array.isArray(corpus)) cursorInvalid();
+    const corpusObject = corpus as JsonObject;
+    const corpusKeys = Object.keys(corpusObject).sort();
+    if (
+      !Object.hasOwn(corpusObject, "ref") ||
+      corpusKeys.some((key) => !["locator", "ref", "snapshot"].includes(key))
+    )
+      cursorInvalid();
+    validateSourceText(corpusObject.ref, 1024);
+    if (Object.hasOwn(corpusObject, "locator")) validateSourceText(corpusObject.locator, 1024);
+    if (Object.hasOwn(corpusObject, "snapshot")) validateSourceText(corpusObject.snapshot, 256);
+  }
+}
+
 function parseRuleset(value: unknown): WorkingLoreRulesetIdentity {
   const object = value as Record<string, unknown>;
   if (
@@ -109,6 +156,7 @@ export function decodeWorkingLoreCursorPayload(parsed: CursorTransportPayload): 
     const basisQuery = copyJsonObject(basisObject.query, "/basis/query", basisQueryIssues);
     if (!basisQuery || basisQueryIssues.length > 0) cursorInvalid();
     if (!jsonValuesEqual(query, basisQuery)) cursorMismatch("Cursor Basis query does not match cursor query");
+    validateLoreQuery(query);
     const basis: WorkingLoreBasis = Object.freeze({
       stream_position: basisObject.stream_position as StreamPosition,
       ruleset: parseRuleset(basisObject.ruleset),

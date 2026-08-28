@@ -415,6 +415,47 @@ function parseStatusQuery(input: unknown): {
   return Object.freeze({ limit, query: frozenJsonObject({ operation: "status" }) });
 }
 
+function validateCurrentCursorQuery(query: JsonObject): void {
+  const issues: LoreduIssue[] = [];
+  const data = inspectObject(query, "/query", issues);
+  if (!data) cursorInvalid();
+  rejectUnknown(data, new Set(["operation", "scope", "as_of", "valid_at"]), issues);
+  if (ownValue(data, "operation") !== "current")
+    issues.push(makeIssue("FORMAT", "/query/operation", "must equal current"));
+  let scope: Scope | undefined;
+  if (hasOwnDescriptor(data, "scope")) {
+    scope = parseScope(ownValue(data, "scope"), "/query/scope", issues);
+    if (scope && Object.keys(scope).length === 0)
+      issues.push(makeIssue("FORMAT", "/query/scope", "empty scope must be omitted"));
+  }
+  const asOf = hasOwnDescriptor(data, "as_of")
+    ? normalizeTimestamp(ownValue(data, "as_of"), "/query/as_of", issues)
+    : undefined;
+  if (!hasOwnDescriptor(data, "valid_at"))
+    issues.push(makeIssue("REQUIRED", "/query/valid_at", "is required"));
+  const validAt = normalizeTimestamp(ownValue(data, "valid_at"), "/query/valid_at", issues);
+  if (issues.length > 0 || !validAt) cursorInvalid();
+  const normalized = frozenJsonObject({
+    operation: "current",
+    ...(scope === undefined ? {} : { scope }),
+    ...(asOf === undefined ? {} : { as_of: asOf }),
+    valid_at: validAt,
+  });
+  if (!jsonValuesEqual(normalized, query)) cursorInvalid("Cursor query is not normalized");
+}
+
+function validateOrdinaryCursorQuery(operation: CursorOperation, query: JsonObject): void {
+  try {
+    if (operation === "claims") claimFiltersFromBasisQuery(query);
+    else if (operation === "history") historyIdFromQuery(query);
+    else if (operation === "status") {
+      if (!jsonValuesEqual(query, frozenJsonObject({ operation: "status" }))) cursorInvalid();
+    } else validateCurrentCursorQuery(query);
+  } catch {
+    cursorInvalid("Cursor declared-operation query is invalid");
+  }
+}
+
 function decodeCursorPayload(object: Record<string, unknown>): CursorPayload {
   const keys = Object.keys(object).sort();
   if (
@@ -440,6 +481,7 @@ function decodeCursorPayload(object: Record<string, unknown>): CursorPayload {
     cursorInvalid();
   }
   if (!jsonValuesEqual(basis.query, query)) cursorMismatch("Cursor Basis query does not match cursor query");
+  validateOrdinaryCursorQuery(object.operation, query);
   let resume: number | OrderedResumeKey;
   if (object.operation === "status" || object.operation === "current") {
     if (
