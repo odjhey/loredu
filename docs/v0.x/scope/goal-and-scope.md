@@ -22,13 +22,13 @@ Prove that Loredu can maintain small, inspectable, provenance-aware operational 
 5. Current knowledge can be rebuilt from canonical records.
 6. Historical `as_of` projections work.
 7. Valid-time queries can distinguish what was later learned to have been effective at an earlier date.
-8. Working Lore produces a bounded context rather than returning the whole history.
+8. Working Lore produces a bounded, full-count, progressively disclosed context rather than returning the whole history ([decision 0030](../../decisions/0030-working-lore-ranker-contract.md)).
 9. A plain-file `RecordStore` can persist and replay the complete alpha state.
 10. The same core contracts can represent at least one technical and one non-technical activity fixture.
 11. Two actors recording the same fact with different free text but the same declared claim key are reconciled (corroboration or conflict), and the same fact under different perspectives coexists without destructive conflict ([decision 0004](../../decisions/0004-claim-identity-key.md)).
 12. Embedding ergonomics: a consumer reaches "appended entry + claim" and "Working Lore in hand" in a few calls with no runtime dependencies beyond the store adapter.
 13. At least one real consumer from [candidate consumers](../../reports/candidate-consumers.md) is wired in before any contract is marked `status: current`.
-14. Every projection and Working Lore packet carries a `basis`; a cached packet is detected as stale after one new relevant record and reproduces its contract-defined semantic content when basis and query are unchanged ([decisions 0006](../../decisions/0006-explicit-version-basis.md) and [0027](../../decisions/0027-m2-reconciliation-projection-contract.md)).
+14. Every projection and Working Lore packet carries a `basis`; a cached packet is detected as stale after one new relevant record and reproduces its contract-defined semantic content when basis and query are unchanged ([decisions 0006](../../decisions/0006-explicit-version-basis.md), [0027](../../decisions/0027-m2-reconciliation-projection-contract.md), and [0030](../../decisions/0030-working-lore-ranker-contract.md)).
 
 ## Included
 
@@ -38,8 +38,8 @@ Prove that Loredu can maintain small, inspectable, provenance-aware operational 
 - deterministic reconciliation baseline;
 - explicit resolution application;
 - current and historical projections;
-- bounded Working Lore representation;
-- simple filtering/ranking sufficient for fixtures;
+- bounded Working Lore representation with exact summary-character accounting and section continuations;
+- deterministic baseline filtering/ranking plus a versioned ordering-only Ranker sufficient for fixtures;
 - the agent-operable `lor` CLI as an adapter (M1.5, [decisions 0007](../../decisions/0007-typescript-bun.md)–[0009](../../decisions/0009-hypermedia-pagination.md), closed exactly by [decision 0026](../../decisions/0026-m15-application-cli-contract.md));
 - conformance and end-to-end tests around the published contracts.
 

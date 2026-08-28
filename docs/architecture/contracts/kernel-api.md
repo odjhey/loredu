@@ -1,6 +1,6 @@
 ---
 name: kernel_api_contract
-description: "Exact staged kernel surface through M2: records/application, store conformance, M1.5 response/query additions, and Current Knowledge projection types."
+description: "Exact staged kernel surface through M3: records/application, store conformance, M1.5 reads, Current Knowledge, and Working Lore/Ranker types."
 type: contract
 tags: [contracts, kernel, api, typescript]
 generated: "OpenAI coding agent and ChatGPT GPT-5.6 Sol, 2026-08-28"
@@ -273,3 +273,51 @@ interface LoreduApplication {
 ```
 
 `ApplicationCurrentResponse` keeps the application envelope fields other than mutation feedback, replaces `reconciliation` with the exact projection summary, and adds `page`; its operation-specific result is `{computed_at, items}`. `ReconciliationFeedback` additively gains Claim-add states `duplicate|support|temporal-succession` beside its existing `corroboration`. Every added state has `{state,key,related_count,related:[earliest handle],claims}`; selection is conflict-candidate > duplicate > corroboration > support > coexisting > temporal-succession, and the related fields cover only the selected pair class. `new-key` requires no earlier same-key Claim, and temporal succession is non-blocking. Every preference tier operates only on the nonempty selected valid-time-applicable same-key Claim set; future or nonapplicable replacements and Relation endpoints remain history and cannot affect precedence. Absent a complete Resolution, any active participating `supersedes` cycle forces disputed even for one equal value. Status health uses only endpoints of overlapping different-value exclusive conflict pairs; purely disjoint succession does not block. The complete relation/state/result/evidence/history, temporal normalization, Resolution precedence, ordering, cursor, staleness, and rebuild semantics are in the [projection contract](./projection.md). No inferred Relation or Resolution is exported or appended.
+
+## Additive M3 surface
+
+[Decision 0030](../../decisions/0030-working-lore-ranker-contract.md) adds no entrypoint or testing export. It adds exactly one normal-entrypoint runtime value:
+
+```text
+DEFAULT_RANKER
+```
+
+and these type-only normal exports exactly:
+
+```text
+WorkingLoreSectionName WorkingLoreFilters WorkingLoreQuery
+RankerIdentity WorkingLoreRulesetIdentity WorkingLoreBasis
+WorkingLoreKnowledgeSummary WorkingLoreKnowledgeItem
+WorkingLoreItem WorkingLoreSection
+WorkingLoreOrientation WorkingLoreBudget WorkingLorePacket WorkingLoreResult
+WorkingLoreApplicationResponse WorkingLoreRankCandidate WorkingLoreRankContext Ranker
+```
+
+At M3, the existing dependency object additively permits one optional port:
+
+```ts
+interface LoreduApplicationDependencies {
+  readonly store: RecordStore
+  readonly clock: Clock
+  readonly randomSource: RandomSource
+  readonly claimPolicy?: ClaimPolicy
+  readonly ranker?: Ranker
+}
+interface Ranker {
+  readonly id: string
+  readonly version: string
+  rank(context: WorkingLoreRankContext): readonly number[]
+}
+```
+
+Omission selects the frozen `DEFAULT_RANKER`, whose exact identity is `{id:"loredu.baseline",version:"1"}` and whose callback returns candidate indexes unchanged. Assembly validates/captures the exact closed ranker shape but does not invoke it. Existing operations ignore Ranker and keep their exact M0–M2 `RulesetIdentity`/`Basis`; only Working Lore uses `WorkingLoreRulesetIdentity`, which extends the structural identity with `ranker:{id,version}`.
+
+The application additively gains:
+
+```ts
+interface LoreduApplication {
+  lore(query: WorkingLoreQuery): Promise<WorkingLoreApplicationResponse>
+}
+```
+
+A successful lore response has read feedback exactly `{state:"not-applicable",related:[]}`. The exact activity/scope/corpus query, compact section/item shapes, summary truncation, baseline/custom Ranker validation, global budgets, per-section pages/cursors, disclosure, staleness, replay, and CLI upgrade are in the [Working Lore contract](./working-lore.md). `Affordance` additively accepts `lore/lore.read` and `continue/lore.read` there. No Working Lore item, derived relation, rank result, or cursor is persisted.
