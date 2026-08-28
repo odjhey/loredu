@@ -379,7 +379,7 @@ no CLI-owned policy semantics, and no alternate renderer.
 
 `docs/v0.x/execution/agent-skill.md` is the only skill source. The compile step embeds its UTF-8 bytes; no runtime filesystem lookup, network access, generated second copy, or separately installed skill is allowed. Text `lor skill` removes only the YAML frontmatter including its delimiters and writes the remaining Markdown bytes exactly, preserving the source's final LF. It resolves no store and emits no envelope decoration. `lor skill --json` returns the same Markdown string as `result.guide` in the CLI success envelope with `reconciliation` not applicable, empty advice, and `basis:null`; this is the sole successful non-store envelope with a null basis.
 
-The embedded M1.5 guide may name only commands available in this grammar. It orients with status and claims, teaches explicit actor/provenance, exact-key discovery, cursor following, manual Relation/Resolution judgment, and `status --check`. Its revision triggers, not its M1.5 instructions, may mention M2 `current` and M3 `lore`.
+The embedded guide may name only commands available in the shipped grammar. Its current instructions are owned by the [agent skill source](../../v0.x/execution/agent-skill.md); compiled skill bytes follow that source as milestone commands land.
 
 ## Milestone upgrades and readiness
 
