@@ -88,6 +88,11 @@
       "group": "M3 \u2014 Working Lore",
       "reason": "Working Lore assembly not implemented yet"
     },
+    "T50": {
+      "milestone": "M1.5",
+      "group": "CLI conformance (compiled binary)",
+      "reason": "first-slice commands support JSON envelopes; history and claims command coverage lands with M15-Q"
+    },
     "T53": {
       "milestone": "M1.5",
       "group": "CLI conformance (compiled binary)",

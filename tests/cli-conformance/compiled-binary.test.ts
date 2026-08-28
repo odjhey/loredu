@@ -65,7 +65,7 @@ afterAll(async () => {
   await Promise.all(homes.map((home) => rm(home, { recursive: true, force: true })));
 });
 
-test("compiled first-slice semantic commands return one JSON envelope — @covers T50", async () => {
+test("compiled first-slice semantic commands return one JSON envelope", async () => {
   const home = await freshHome();
   const initialized = json(await invoke(home, ["init", "work", "--json"]));
   expect(initialized.ok).toBe(true);
@@ -73,15 +73,15 @@ test("compiled first-slice semantic commands return one JSON envelope — @cover
 
   const entry = json(
     await invoke(home, [
+      "add",
+      "--json",
       "--store",
       "work",
-      "add",
       "entry",
       "--actor",
       "agent:compiled-test",
       "--body",
       "evidence",
-      "--json",
     ]),
   );
   const entryId = (entry.result as { id: string }).id;
@@ -196,9 +196,25 @@ test("compiled binary maps stable execution categories — @covers T51", async (
   expect(usageFailure.exitCode).toBe(2);
   expect((json(usageFailure).error as { code: string }).code).toBe("CLI_USAGE");
 
-  const missingStore = await invoke(home, ["head", "--json"]);
+  const missingStore = await invoke(home, ["head", "--store", "work", "--json"]);
   expect(missingStore.exitCode).toBe(3);
-  expect((json(missingStore).error as { code: string }).code).toBe("STORE_NOT_FOUND");
+  const missingStoreEnvelope = json(missingStore);
+  expect((missingStoreEnvelope.error as { code: string }).code).toBe("STORE_NOT_FOUND");
+  expect((missingStoreEnvelope.advice as { run: string }[])[0]?.run).toBe("lor init work");
+
+  const missingMutationStore = await invoke(home, [
+    "add",
+    "--json",
+    "entry",
+    "--actor",
+    "agent:compiled-test",
+    "--body",
+    "valid body",
+    "--store",
+    "work",
+  ]);
+  expect(missingMutationStore.exitCode).toBe(3);
+  expect((json(missingMutationStore).error as { code: string }).code).toBe("STORE_NOT_FOUND");
 
   expect((await invoke(home, ["init", "--json"])).exitCode).toBe(0);
   const existingStore = await invoke(home, ["init", "--json"]);
@@ -216,6 +232,33 @@ test("compiled binary maps stable execution categories — @covers T51", async (
   ]);
   expect(invalidDraft.exitCode).toBe(2);
   expect((json(invalidDraft).error as { code: string }).code).toBe("VALIDATION_FAILED");
+
+  const claimArgs = [
+    "add",
+    "claim",
+    "--actor",
+    "agent:compiled-test",
+    "--subject-type",
+    "code-area",
+    "--subject",
+    "status",
+    "--predicate",
+    "state",
+    "--confidence",
+    "observed",
+    "--json",
+  ];
+  expect((await invoke(home, [...claimArgs, "--value", "first"])).exitCode).toBe(0);
+  expect((await invoke(home, [...claimArgs, "--value", "second"])).exitCode).toBe(0);
+  const ordinaryStatus = await invoke(home, ["status", "--json"]);
+  expect(ordinaryStatus.exitCode).toBe(0);
+  expect((json(ordinaryStatus).result as { healthy: boolean }).healthy).toBe(false);
+  const checkedStatus = await invoke(home, ["status", "--check", "--json"]);
+  expect(checkedStatus.exitCode).toBe(5);
+  expect(
+    (json(checkedStatus).result as { health: { unresolved_exclusive_groups: number } }).health
+      .unresolved_exclusive_groups,
+  ).toBe(1);
 });
 
 test("explicit path selection initializes and opens only that store", async () => {

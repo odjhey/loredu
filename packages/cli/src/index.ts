@@ -1,6 +1,10 @@
 import { homedir } from "node:os";
 import { isAbsolute, sep } from "node:path";
 import {
+  type Claim,
+  type ClaimKey,
+  claimKeyOf,
+  claimKeysEqual,
   createBasis,
   createLoreduApplication,
   createStreamPosition,
@@ -8,8 +12,10 @@ import {
   decodeRecordDraft,
   type JsonObject,
   type JsonValue,
+  jsonValuesEqual,
   LoreduError,
   type PersistedRecord,
+  type PositionedRecord,
   RECORD_SCHEMA_ID,
   type RecordDraft,
   type RecordId,
@@ -221,20 +227,20 @@ function parseOptions(
   };
 }
 
-function takeLeadingGlobals(argv: readonly string[]): {
+function extractGlobals(argv: readonly string[]): {
   readonly rest: readonly string[];
   readonly json: boolean;
   readonly store?: string;
 } {
-  let index = 0;
+  const rest: string[] = [];
   let json = false;
   let store: string | undefined;
-  while (index < argv.length) {
+  for (let index = 0; index < argv.length; index += 1) {
     const token = argv[index];
+    if (token === undefined) continue;
     if (token === "--json") {
       if (json) usage("--json may be supplied only once");
       json = true;
-      index += 1;
       continue;
     }
     if (token === "--store") {
@@ -242,12 +248,19 @@ function takeLeadingGlobals(argv: readonly string[]): {
       const value = argv[index + 1];
       if (value === undefined) usage("--store requires a value");
       store = value;
-      index += 2;
+      index += 1;
       continue;
     }
-    break;
+    rest.push(token);
+    if (VALUE_OPTIONS.has(token)) {
+      const value = argv[index + 1];
+      if (value !== undefined) {
+        rest.push(value);
+        index += 1;
+      }
+    }
   }
-  return { rest: argv.slice(index), json, ...(store === undefined ? {} : { store }) };
+  return { rest: Object.freeze(rest), json, ...(store === undefined ? {} : { store }) };
 }
 
 function option(options: ParsedOptions, name: string): string | undefined {
@@ -393,14 +406,242 @@ function success(result: unknown, position: StreamPosition, query: JsonObject): 
   });
 }
 
-function referencedIds(record: PersistedRecord): readonly RecordId[] {
-  if (record.kind === "claim") return record.derived_from;
-  if (record.kind === "relation") return [record.from, record.to];
-  if (record.kind === "resolution") {
-    return [...record.targets, ...(record.replacement === undefined ? [] : [record.replacement])];
+function referenceFields(record: PersistedRecord): readonly { readonly path: string; readonly id: RecordId }[] {
+  if (record.kind === "claim") {
+    return record.derived_from.map((id, index) => ({ path: `/derived_from/${index}`, id }));
   }
-  if (record.kind === "verification") return record.targets;
+  if (record.kind === "relation") {
+    return [
+      { path: "/from", id: record.from },
+      { path: "/to", id: record.to },
+    ];
+  }
+  if (record.kind === "resolution") {
+    return [
+      ...record.targets.map((id, index) => ({ path: `/targets/${index}`, id })),
+      ...(record.replacement === undefined ? [] : [{ path: "/replacement", id: record.replacement }]),
+    ];
+  }
+  if (record.kind === "verification") {
+    return record.targets.map((id, index) => ({ path: `/targets/${index}`, id }));
+  }
   return [];
+}
+
+function referencedIds(record: PersistedRecord): readonly RecordId[] {
+  return referenceFields(record).map(({ id }) => id);
+}
+
+function scopesEqual(left: Scope, right: Scope): boolean {
+  const leftKeys = Object.keys(left).sort();
+  const rightKeys = Object.keys(right).sort();
+  return (
+    leftKeys.length === rightKeys.length &&
+    leftKeys.every((key, index) => key === rightKeys[index] && left[key] === right[key])
+  );
+}
+
+function claimsAffordance(key: ClaimKey): Affordance {
+  return Object.freeze({
+    rel: "list",
+    action: "claims.list",
+    params: Object.freeze({
+      query: Object.freeze({
+        scope: key.scope,
+        scope_match: "exact",
+        subject_type: key.subject.type,
+        subject: key.subject.id,
+        predicate: key.predicate,
+        perspective: key.perspective ?? null,
+      }),
+    }),
+    why: "inspect the complete exact-key group",
+  });
+}
+
+function cohortClaimsAffordance(scope: Scope, value: JsonValue): Affordance {
+  return Object.freeze({
+    rel: "list",
+    action: "claims.list",
+    params: Object.freeze({
+      query: Object.freeze({ scope, scope_match: "exact", value }),
+    }),
+    why: "inspect claims with this scope and value",
+  });
+}
+
+function distinctAdvice(items: readonly Affordance[]): readonly Affordance[] {
+  const seen = new Set<string>();
+  return Object.freeze(
+    items.filter((item) => {
+      const identity = `${item.rel}\u0000${item.action}\u0000${JSON.stringify(item.params)}`;
+      if (seen.has(identity)) return false;
+      seen.add(identity);
+      return true;
+    }),
+  );
+}
+
+function statusResult(scan: {
+  readonly records: readonly PositionedRecord[];
+}): {
+  readonly result: Readonly<Record<string, unknown>>;
+  readonly advice: readonly Affordance[];
+  readonly total: number;
+} {
+  type PositionedClaim = PositionedRecord & { readonly record: Claim };
+  const claims = scan.records.filter(
+    (item): item is PositionedClaim => item.record.kind === "claim",
+  );
+  const byId = new Map(scan.records.map((item) => [item.record.id, item]));
+  const groups: { key: ClaimKey; members: PositionedClaim[] }[] = [];
+  for (const item of claims) {
+    const key = claimKeyOf(item.record);
+    const existing = groups.find((group) => claimKeysEqual(group.key, key));
+    if (existing === undefined) groups.push({ key, members: [item] });
+    else existing.members.push(item);
+  }
+
+  const resolutions = scan.records.filter((item) => item.record.kind === "resolution");
+  const unresolved = groups.filter((group) => {
+    const firstValue = (group.members[0] as PositionedClaim).record.value;
+    if (!group.members.some((item) => !jsonValuesEqual(item.record.value, firstValue))) return false;
+    return !resolutions.some((resolution) => {
+      const record = resolution.record;
+      if (record.kind !== "resolution") return false;
+      const eligible = referenceFields(record).every(({ id }) => {
+        const target = byId.get(id);
+        return target !== undefined && target.position < resolution.position;
+      });
+      return eligible && group.members.every((item) => record.targets.includes(item.record.id));
+    });
+  });
+
+  const dangling = scan.records.flatMap((item) =>
+    referenceFields(item.record)
+      .filter(({ id }) => {
+        const target = byId.get(id);
+        return target === undefined || target.position >= item.position;
+      })
+      .map(({ path, id }) => ({ item, path, target: id })),
+  );
+
+  const attention: Record<string, unknown>[] = [];
+  const advice: Affordance[] = [];
+  for (const group of unresolved) {
+    const representative = group.members[0] as PositionedClaim;
+    const claimsLink = claimsAffordance(group.key);
+    const representativeHandle = handle(representative.record.id, representative.record.kind);
+    attention.push({
+      kind: "unresolved-exclusive-group",
+      key: group.key,
+      claim_count: group.members.length,
+      representative: representativeHandle,
+      claims: claimsLink,
+    });
+    advice.push(claimsLink, representativeHandle.affordances[0] as Affordance);
+  }
+  for (const item of dangling) {
+    const recordHandle = handle(item.item.record.id, item.item.record.kind);
+    attention.push({
+      kind: "dangling-record-reference",
+      record: recordHandle,
+      path: item.path,
+      target: item.target,
+    });
+    advice.push(recordHandle.affordances[0] as Affordance);
+  }
+
+  const cohorts: { scope: Scope; value: JsonValue; members: PositionedClaim[] }[] = [];
+  for (const item of claims) {
+    const cohort = cohorts.find(
+      (candidate) =>
+        scopesEqual(candidate.scope, item.record.scope) && jsonValuesEqual(candidate.value, item.record.value),
+    );
+    if (cohort === undefined) {
+      cohorts.push({ scope: item.record.scope, value: item.record.value, members: [item] });
+    } else cohort.members.push(item);
+  }
+  const advisories: { item: Record<string, unknown>; position: number }[] = [];
+  for (const cohort of cohorts) {
+    const nodes: { key: ClaimKey; members: PositionedClaim[] }[] = [];
+    for (const member of cohort.members) {
+      const key = claimKeyOf(member.record);
+      const node = nodes.find((candidate) => claimKeysEqual(candidate.key, key));
+      if (node === undefined) nodes.push({ key, members: [member] });
+      else node.members.push(member);
+    }
+    if (nodes.length < 2) continue;
+    const parent = nodes.map((_, index) => index);
+    const find = (index: number): number => {
+      let root = index;
+      while (parent[root] !== root) root = parent[root] as number;
+      while (parent[index] !== index) {
+        const next = parent[index] as number;
+        parent[index] = root;
+        index = next;
+      }
+      return root;
+    };
+    const nodeByClaim = new Map<RecordId, number>();
+    nodes.forEach((node, index) => node.members.forEach((member) => nodeByClaim.set(member.record.id, index)));
+    for (const relation of scan.records) {
+      if (relation.record.kind !== "relation" || relation.record.relation_type !== "duplicates") continue;
+      const from = byId.get(relation.record.from);
+      const to = byId.get(relation.record.to);
+      const left = nodeByClaim.get(relation.record.from);
+      const right = nodeByClaim.get(relation.record.to);
+      if (
+        from === undefined ||
+        to === undefined ||
+        from.position >= relation.position ||
+        to.position >= relation.position ||
+        left === undefined ||
+        right === undefined
+      ) {
+        continue;
+      }
+      parent[find(right)] = find(left);
+    }
+    const components = new Map<number, PositionedClaim>();
+    nodes.forEach((node, index) => {
+      const representative = node.members[0] as PositionedClaim;
+      const root = find(index);
+      const current = components.get(root);
+      if (current === undefined || representative.position < current.position) {
+        components.set(root, representative);
+      }
+    });
+    const representatives = [...components.values()].sort((left, right) => left.position - right.position);
+    if (representatives.length < 2) continue;
+    advisories.push({
+      position: (representatives[0] as PositionedClaim).position,
+      item: {
+        kind: "key-divergence",
+        scope: cohort.scope,
+        value: cohort.value,
+        component_count: representatives.length,
+        representatives: representatives.slice(0, 2).map((item) => handle(item.record.id, item.record.kind)),
+        claims: cohortClaimsAffordance(cohort.scope, cohort.value),
+      },
+    });
+  }
+  advisories.sort((left, right) => left.position - right.position);
+  const healthy = unresolved.length === 0 && dangling.length === 0;
+  return {
+    result: Object.freeze({
+      healthy,
+      health: Object.freeze({
+        unresolved_exclusive_groups: unresolved.length,
+        dangling_record_references: dangling.length,
+      }),
+      advisory_count: advisories.length,
+      attention: Object.freeze(attention),
+      advisories: Object.freeze(advisories.map(({ item }) => item)),
+    }),
+    advice: distinctAdvice(advice),
+    total: attention.length + advisories.length,
+  };
 }
 
 function shellWord(value: string): string {
@@ -542,6 +783,7 @@ function cliFailure(
 
 async function appendDraft(draft: RecordDraft, selector: string | undefined): Promise<BaseResponse> {
   const store = new PlainFileStore(resolveRoot(selector));
+  await store.head();
   const application = createLoreduApplication({
     store,
     clock: new SystemClock(),
@@ -576,8 +818,8 @@ async function execute(
   }
   if (argv.includes("--version") || argv.includes("-v")) usage("--version and -v must be used alone");
 
-  const leading = takeLeadingGlobals(argv);
-  const tokens = leading.rest;
+  const global = extractGlobals(argv);
+  const tokens = global.rest;
   const first = tokens[0];
   let path: string;
   let optionTokens: readonly string[];
@@ -598,12 +840,12 @@ async function execute(
   }
 
   if (optionTokens.length === 1 && optionTokens[0] === "--help") {
-    if (leading.json || leading.store !== undefined) usage("--help cannot be combined with global options");
+    if (global.json || global.store !== undefined) usage("--help cannot be combined with global options");
     return { direct: `${HELP[path]}\n`, exit: 0, json: false };
   }
 
   if (path === "skill") {
-    const parsed = parseOptions(optionTokens, {}, leading);
+    const parsed = parseOptions(optionTokens, {}, global);
     if (parsed.store !== undefined || parsed.positionals.length > 0) usage("skill accepts only --json");
     if (!parsed.json) return { direct: EMBEDDED_AGENT_SKILL, exit: 0, json: false };
     return {
@@ -620,7 +862,7 @@ async function execute(
   }
 
   if (path === "init") {
-    const parsed = parseOptions(optionTokens, {}, leading);
+    const parsed = parseOptions(optionTokens, {}, global);
     if (parsed.positionals.length > 1) usage("init accepts at most one selector");
     if (parsed.store !== undefined && parsed.positionals.length === 1) {
       usage("init positional selector and --store are mutually exclusive");
@@ -642,7 +884,7 @@ async function execute(
     const parsed = parseOptions(
       optionTokens,
       commonSpecs({ "--body": { value: true }, "--type": { value: true }, "--title": { value: true } }),
-      leading,
+      global,
     );
     if (parsed.positionals.length > 0) usage("add entry accepts no positional arguments");
     const common = commonDraft(parsed);
@@ -688,7 +930,7 @@ async function execute(
         "--valid-until": { value: true },
         "--derived-from": { value: true, repeat: true },
       }),
-      leading,
+      global,
     );
     if (parsed.positionals.length > 0) usage("add claim accepts no positional arguments");
     const scalarValue = option(parsed, "--value");
@@ -726,7 +968,7 @@ async function execute(
     const parsed = parseOptions(
       optionTokens,
       commonSpecs({ "--from": { value: true }, "--to": { value: true }, "--type": { value: true } }),
-      leading,
+      global,
     );
     if (parsed.positionals.length > 0) usage("relate accepts no positional arguments");
     const draft = decodeRecordDraft({
@@ -754,7 +996,7 @@ async function execute(
         "--reason": { value: true },
         "--effective-at": { value: true },
       }),
-      leading,
+      global,
     );
     if (parsed.positionals.length > 0) usage("resolve accepts no positional arguments");
     const draft = decodeRecordDraft({
@@ -786,7 +1028,7 @@ async function execute(
         "--verified-against-json": { value: true, repeat: true },
         "--result": { value: true },
       }),
-      leading,
+      global,
     );
     if (parsed.positionals.length > 0) usage("add verification accepts no positional arguments");
     const draft = decodeRecordDraft({
@@ -807,7 +1049,7 @@ async function execute(
   }
 
   if (path === "show") {
-    const parsed = parseOptions(optionTokens, {}, leading);
+    const parsed = parseOptions(optionTokens, {}, global);
     if (parsed.positionals.length !== 1) usage("show requires exactly one record id");
     const id = recordId(parsed.positionals[0] as string);
     const scan = await new PlainFileStore(resolveRoot(parsed.store)).scan();
@@ -839,7 +1081,7 @@ async function execute(
   }
 
   if (path === "head") {
-    const parsed = parseOptions(optionTokens, {}, leading);
+    const parsed = parseOptions(optionTokens, {}, global);
     if (parsed.positionals.length > 0) usage("head accepts no positional arguments");
     const position = await new PlainFileStore(resolveRoot(parsed.store)).head();
     return {
@@ -850,26 +1092,18 @@ async function execute(
     };
   }
 
-  const parsed = parseOptions(optionTokens, { "--check": { value: false } }, leading);
+  const parsed = parseOptions(optionTokens, { "--check": { value: false } }, global);
   if (parsed.positionals.length > 0) usage("status accepts no positional arguments");
   const scan = await new PlainFileStore(resolveRoot(parsed.store)).scan();
+  const status = statusResult(scan);
   const response = Object.freeze({
-    ...success(
-      Object.freeze({
-        healthy: true,
-        health: Object.freeze({ unresolved_exclusive_groups: 0, dangling_record_references: 0 }),
-        advisory_count: 0,
-        attention: Object.freeze([]),
-        advisories: Object.freeze([]),
-      }),
-      scan.head,
-      { operation: "status" },
-    ),
-    page: Object.freeze({ returned: 0, total: 0 }),
+    ...success(status.result, scan.head, { operation: "status" }),
+    advice: status.advice,
+    page: Object.freeze({ returned: status.total, total: status.total }),
   });
   return {
     response,
-    exit: 0,
+    exit: parsed.flags.has("--check") && status.result.healthy === false ? 5 : 0,
     json: parsed.json,
     ...(parsed.store === undefined ? {} : { selector: parsed.store }),
   };
@@ -895,10 +1129,8 @@ export async function run(argv: readonly string[], io: CliIo): Promise<number> {
     return execution.exit;
   } catch (error) {
     try {
-      selector = takeLeadingGlobals(argv).store;
-    } catch {
-      // The original usage error remains authoritative.
-    }
+      selector = extractGlobals(argv).store;
+    } catch {}
     const failure = cliFailure(error, selector);
     if (wantsJson) emitJson(io, rendered(failure.envelope, selector));
     else {
