@@ -248,7 +248,7 @@ describe("ADR 0027 deterministic reconciliation foundation", () => {
     expect(noCycle.claims.map(({ record }) => String(record.id))).toEqual([ids.c2]);
   });
 
-  test("complete latest Resolution outranks Relations while incomplete judgment has no partial effect", () => {
+  test("full-visible Resolution eligibility stays separate from group-local coverage and rejects nonvisible targets", () => {
     const irrelevant = positionedClaim(1, persistedClaim(ids.c3, { predicate: "owner", value: "elsewhere" }));
     const first = positionedClaim(2, persistedClaim(ids.c1, { value: "old" }));
     const second = positionedClaim(3, persistedClaim(ids.c2, { value: "new" }));
@@ -270,6 +270,28 @@ describe("ADR 0027 deterministic reconciliation foundation", () => {
     });
     expect(resolved).toMatchObject({ state: "preferred", resolution: complete, cycle: false });
     expect(resolved.claims.map(({ record }) => String(record.id))).toEqual([ids.c2]);
+
+    const incompleteOnly = reconcileApplicableClaimGroup({
+      claims: [first, second],
+      visibleClaims: [irrelevant, first, second],
+      resolutions: [incompleteLater],
+      semantics: "exclusive",
+    });
+    expect(incompleteOnly).toMatchObject({ state: "disputed", cycle: false });
+    expect(incompleteOnly.resolution).toBeUndefined();
+
+    const nonvisibleExtra = positionedResolution(
+      4,
+      resolution(ids.s2, [ids.c1, ids.c2, ids.c4], { decision: "prefer", replacement: ids.c2 }),
+    );
+    const nonvisibleRejected = reconcileApplicableClaimGroup({
+      claims: [first, second],
+      visibleClaims: [irrelevant, first, second],
+      resolutions: [nonvisibleExtra],
+      semantics: "exclusive",
+    });
+    expect(nonvisibleRejected).toMatchObject({ state: "disputed", cycle: false });
+    expect(nonvisibleRejected.resolution).toBeUndefined();
 
     const equalFirst = positionedClaim(1, persistedClaim(ids.c1, { value: "same" }));
     const equalSecond = positionedClaim(2, persistedClaim(ids.c2, { value: "same" }));

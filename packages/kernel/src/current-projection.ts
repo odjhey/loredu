@@ -279,11 +279,10 @@ function visibleRecords(snapshot: Snapshot, asOf: string | undefined): readonly 
   return Object.freeze(snapshot.records.filter((item) => item.record.recorded_at <= asOf));
 }
 
-function positionedClaims(records: readonly PositionedRecord[], scope?: Scope): readonly PositionedClaim[] {
+function positionedClaims(records: readonly PositionedRecord[]): readonly PositionedClaim[] {
   return Object.freeze(
     records
       .filter((item): item is PositionedRecord & { readonly record: Claim } => item.record.kind === "claim")
-      .filter((item) => scope === undefined || scopeContains(item.record.scope, scope))
       .map((item) => Object.freeze({ position: item.position, record: item.record })),
   );
 }
@@ -530,7 +529,13 @@ function computeProjection(
 } {
   const visible = visibleRecords(snapshot, filters.as_of);
   const byId = new Map<RecordId, PositionedRecord>(visible.map((item) => [item.record.id, item]));
-  const claims = positionedClaims(visible, filters.scope);
+  // Resolution reference eligibility is store-visible, while output identity remains query-selected.
+  const visibleClaims = positionedClaims(visible);
+  const requestedScope = filters.scope;
+  const claims =
+    requestedScope === undefined
+      ? visibleClaims
+      : Object.freeze(visibleClaims.filter((claim) => scopeContains(claim.record.scope, requestedScope)));
   const groups = buildGroups(claims, policy);
   const relations = backwardRelations(visible, byId);
   const resolutions = effectiveResolutions(visible, byId, validAt);
@@ -560,7 +565,7 @@ function computeProjection(
     if (applicable.length === 0) continue;
     const reconciled = reconcileApplicableClaimGroup({
       claims: applicable,
-      visibleClaims: claims,
+      visibleClaims,
       relations,
       resolutions,
       semantics: group.semantics,

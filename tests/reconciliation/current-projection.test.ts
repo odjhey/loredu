@@ -21,6 +21,7 @@ const ids = {
   old: "clm_0000000000000001" as ClaimId,
   amendment: "clm_0000000000000002" as ClaimId,
   later: "clm_0000000000000003" as ClaimId,
+  outside: "clm_0000000000000004" as ClaimId,
   relation: "rel_0000000000000001" as RecordId,
   resolution: "res_0000000000000001" as RecordId,
   verification: "ver_0000000000000001" as RecordId,
@@ -63,12 +64,16 @@ function claim(
     readonly derivedFrom?: readonly string[];
     readonly sources?: readonly JsonObject[];
     readonly perspective?: string;
+    readonly scope?: Readonly<Record<string, string>>;
+    readonly subjectId?: string;
+    readonly predicate?: string;
   } = {},
 ): PersistedRecord {
   return decodePersistedRecord({
     ...base("claim", id, recordedAt),
-    subject: { type: "agreement", id: "notice" },
-    predicate: "notice-period",
+    ...(options.scope === undefined ? {} : { scope: options.scope }),
+    subject: { type: "agreement", id: options.subjectId ?? "notice" },
+    predicate: options.predicate ?? "notice-period",
     ...(options.perspective === undefined ? {} : { perspective: options.perspective }),
     value,
     confidence: "confirmed",
@@ -209,6 +214,96 @@ describe("public M2 Current Knowledge projection", () => {
     const reopened = await app.current({ valid_at: "2026-03-10T00:00:00Z" });
     expect(knowledge(reopened)[0]).toMatchObject({ state: "disputed", value_count: 2 });
     expect(knowledge(reopened)[0]?.values.map((value) => value.value)).toEqual(["60 days", "90 days"]);
+  });
+
+  test("scoped Resolution eligibility uses full visible references while output, coverage, and advice stay local", async () => {
+    const selectedScope = { repo: "selected" };
+    const outsideScope = { repo: "outside" };
+    const selectedOld = claim(ids.old, "30 days", "2026-01-01T00:00:00.000Z", {
+      scope: selectedScope,
+    });
+    const selectedNew = claim(ids.amendment, "60 days", "2026-01-02T00:00:00.000Z", {
+      scope: selectedScope,
+    });
+    const outside = claim(ids.outside, "outside", "2026-01-03T00:00:00.000Z", {
+      scope: outsideScope,
+      subjectId: "outside-policy",
+      predicate: "state",
+    });
+
+    const completeStore = new InMemoryStore();
+    await append(
+      completeStore,
+      selectedOld,
+      selectedNew,
+      outside,
+      resolution([ids.old, ids.amendment, ids.outside], ids.amendment),
+    );
+    let adviceCalls = 0;
+    let adviceClaimIds: readonly ClaimId[] = [];
+    let adviceResolutionIds: readonly RecordId[] = [];
+    const complete = await application(completeStore, undefined, {
+      id: "test.scoped-visibility",
+      version: "1",
+      validateClaimKey: () => [],
+      semantics: () => "exclusive",
+      advise(context) {
+        adviceCalls++;
+        adviceClaimIds = context.claims.map(({ record }) => record.id);
+        adviceResolutionIds = context.resolutions.map(({ record }) => record.id);
+        return [];
+      },
+    }).current({ scope: selectedScope, valid_at: "2026-03-10T00:00:00Z" });
+    expect(adviceCalls).toBe(1);
+    expect(adviceClaimIds).toEqual([ids.old, ids.amendment]);
+    expect(adviceResolutionIds).toEqual([]);
+    expect(knowledge(complete)).toHaveLength(1);
+    expect(knowledge(complete)[0]).toMatchObject({
+      key: { scope: selectedScope },
+      state: "preferred",
+      values: [{ value: "60 days", representative: { id: ids.amendment } }],
+      history: { claim_count: 2, resolution_count: 1, latest_resolution: { id: ids.resolution } },
+    });
+    expect(JSON.stringify(complete.result.items)).not.toContain(ids.outside);
+
+    const incompleteStore = new InMemoryStore();
+    await append(
+      incompleteStore,
+      selectedOld,
+      selectedNew,
+      outside,
+      resolution([ids.old, ids.outside], ids.old),
+    );
+    const incomplete = await application(incompleteStore).current({
+      scope: selectedScope,
+      valid_at: "2026-03-10T00:00:00Z",
+    });
+    expect(knowledge(incomplete)).toHaveLength(1);
+    expect(knowledge(incomplete)[0]).toMatchObject({
+      state: "disputed",
+      value_count: 2,
+      history: { claim_count: 2, resolution_count: 1 },
+    });
+
+    const forwardStore = new InMemoryStore();
+    await append(
+      forwardStore,
+      selectedOld,
+      selectedNew,
+      resolution([ids.old, ids.amendment, ids.outside], ids.amendment),
+      outside,
+    );
+    const forward = await application(forwardStore).current({
+      scope: selectedScope,
+      valid_at: "2026-03-10T00:00:00Z",
+    });
+    expect(knowledge(forward)).toHaveLength(1);
+    expect(knowledge(forward)[0]).toMatchObject({
+      state: "disputed",
+      value_count: 2,
+      history: { claim_count: 2, resolution_count: 0 },
+    });
+    expect(JSON.stringify(forward.result.items)).not.toContain(ids.outside);
   });
 
   test("incomplete Resolutions and future replacements cannot select Current Knowledge", async () => {
