@@ -3,7 +3,7 @@ name: product_architecture
 description: "Loredu product thesis, ownership boundaries, application ports, core flow, progressive-disclosure posture, and non-goals."
 type: architecture
 tags: [architecture, core, ports, progressive-disclosure]
-generated: "ChatGPT GPT-5.6 Sol, 2026-08-28"
+generated: "ChatGPT GPT-5.6 Sol and OpenAI coding agent, 2026-08-28"
 created_at: 2026-08-26T12:10:00+08:00
 ---
 
@@ -63,10 +63,11 @@ Loredu owns:
 
 - immutable knowledge records and their exact caller-declared identities; a ClaimPolicy may validate but never remap a ClaimKey;
 - generic key-divergence detection as versioned core mechanics; default policy advice is empty;
+- consumer ClaimPolicy mediation for `exclusive|coexisting` and bounded deterministic policy advisories, without identity remapping or preference;
 - provenance links from claims back to entries and sources;
-- deterministic reconciliation semantics;
-- explicit resolution records;
-- current and historical projections;
+- deterministic same-key reconciliation with closed pair/state vocabularies;
+- explicit Resolution records and their precedence over explicit `supersedes` and temporal mechanics;
+- bitemporal Current Knowledge with bounded history/evidence summaries and record-level disclosure;
 - bounded Working Lore and progressive-disclosure contracts;
 - storage/application ports required to preserve those semantics, including the capability ports the kernel is assembled with (`Clock`, `RandomSource` — [clock and identity](./contracts/clock-and-identity.md)).
 
@@ -109,7 +110,7 @@ Loredu does not own:
 
 `Ranker` follows the same pattern as `Extractor` and `Resolver`: the core ships a deterministic baseline for Working Lore selection; a consumer may plug in lexical search, embeddings, or model reranking without the core knowing.
 
-The domain and application layers must not depend on a CLI, agent harness, model SDK, crawler, or persistence vendor. Provider-native types stop at adapters. M0's RecordStore boundary is intentionally only typed `append(PersistedRecord) → StreamPosition` and `get(RecordId) → PersistedRecord|undefined`; application append owns validation, references, stamping, and the `{record, position}` result. M1 additively closes atomic snapshot `scan` with a kind-only provider filter, snapshot-bounded incremental `stream`, `head`, and reusable conformance in the [store contract](./contracts/store.md). M1.5 composes claim filters, exact-key feedback, health, Basis-pinned cursors, and semantic affordances above that port; the CLI only parses/renders them and supplies host Clock/secure RandomSource implementations at its composition root ([application and CLI contract](./contracts/application-cli.md)). Markdown bytes, roots, locks, and fsync stay in the [plain-file provider contract](./contracts/plain-file-store.md), outside the kernel/domain boundary.
+The domain and application layers must not depend on a CLI, agent harness, model SDK, crawler, or persistence vendor. Provider-native types stop at adapters. M0's RecordStore boundary is intentionally only typed `append(PersistedRecord) → StreamPosition` and `get(RecordId) → PersistedRecord|undefined`; application append owns validation, references, stamping, and the `{record, position}` result. M1 additively closes atomic snapshot `scan` with a kind-only provider filter, snapshot-bounded incremental `stream`, `head`, and reusable conformance in the [store contract](./contracts/store.md). M1.5 composes claim filters, exact-key feedback, health, Basis-pinned cursors, and semantic affordances above that port; the CLI only parses/renders them and supplies host Clock/secure RandomSource implementations at its composition root ([application and CLI contract](./contracts/application-cli.md)). M2 additively derives Current Knowledge from one atomic snapshot under the active structural core/policy ruleset: policy may advise but cannot merge keys or choose truth, while `computed_at` stays outside semantic Basis ([projection contract](./contracts/projection.md)). Markdown bytes, roots, locks, and fsync stay in the [plain-file provider contract](./contracts/plain-file-store.md), outside the kernel/domain boundary.
 
 ## Progressive disclosure
 

@@ -23,7 +23,7 @@ created_at: 2026-08-26T12:10:00+08:00
 | [Clock and identity ports](./architecture/contracts/clock-and-identity.md) | Capability ports for `recorded_at` and record id entropy, and the single stamping point in the append path |
 | [Kernel API contract](./architecture/contracts/kernel-api.md) | Exact staged TypeScript entrypoints, exports, signatures, branded constructors, assembly, and M1.5 additions |
 | [Application and CLI contract](./architecture/contracts/application-cli.md) | Exact M1.5 application reads/responses/filters/cursors/health and CLI grammar/errors/exits/composition/skill behavior |
-| [Projection contract](./architecture/contracts/projection.md) | Current and historical temporal views |
+| [Projection contract](./architecture/contracts/projection.md) | Exact M2 relation/state semantics, Resolution precedence, bitemporal current API, bounded history/evidence, and rebuild/invalidation |
 | [Working Lore contract](./architecture/contracts/working-lore.md) | Bounded progressive-disclosure context for an activity |
 
 ## Decisions
@@ -36,7 +36,7 @@ created_at: 2026-08-26T12:10:00+08:00
 | [0003: Plain files first](./decisions/0003-plain-files-first.md) | Markdown/frontmatter adapter for alpha; indexes remain replaceable |
 | [0004: Claim identity is a declared key](./decisions/0004-claim-identity-key.md) | Caller-declared claim keys scope deterministic reconciliation |
 | [0005: Embedded kernel, not a standalone product](./decisions/0005-embedded-kernel-compatibility.md) | Consumer-driven stabilization and the record compatibility policy |
-| [0006: Versioning is explicit at every layer](./decisions/0006-explicit-version-basis.md) | Stream positions, ruleset versions, and basis stamps on derived views |
+| [0006: Versioning is explicit at every layer](./decisions/0006-explicit-version-basis.md) | Stream/ruleset/Basis identity; same-Basis byte-identity wording narrowed to semantic content by ADR 0027 |
 | [0007: TypeScript on Bun](./decisions/0007-typescript-bun.md) | Strict TypeScript core, bun:test suites, CLI compiled to a single binary |
 | [0008: CLI before full reconciliation; agent-reactive responses](./decisions/0008-cli-first-agent-reactive.md) | Ship `lor` after M1 with deterministic next-step advice; agents chain until healthy |
 | [0009: Hypermedia responses and basis-pinned pagination](./decisions/0009-hypermedia-pagination.md) | Responses embed runnable affordances; lists paginate by basis-pinned cursor with explicit counts |
@@ -55,6 +55,7 @@ created_at: 2026-08-26T12:10:00+08:00
 | [0024: M0 policy and Basis runtime boundaries](./decisions/0024-m0-policy-and-basis-runtime-boundaries.md) | Closed policy assembly, callback-free ruleset snapshots, canonical Basis construction, and structural equality |
 | [0025: M0 application append phase boundaries](./decisions/0025-m0-application-append-phase-boundaries.md) | Custom-policy result validation, ordered reference failures, all-family stamping, and detached in-memory snapshots |
 | [0026: M1.5 application and CLI contract closure](./decisions/0026-m15-application-cli-contract.md) | Exact application/CLI protocol, mechanics, pagination, disclosure, host capabilities, embedded skill, and staged M2/M3 boundary |
+| [0027: M2 reconciliation and projection contract closure](./decisions/0027-m2-reconciliation-projection-contract.md) | Exact relations/states, advice, precedence, temporal current/status, history/evidence, invalidation, and ADR 0006 semantic-equality narrowing |
 | [0028: Reject relative Loredu homes](./decisions/0028-reject-relative-loredu-homes.md) | Absolute configured/OS homes keep named and default store identity independent of cwd |
 | [0018: Capability ports for time and identity](./decisions/0018-capability-ports.md) | `Clock` and `RandomSource` injected; the application stamps `id`/`recorded_at`, the store assigns only the position |
 | [0017: Branch protection posture](./decisions/0017-branch-protection-posture.md) | `ci-required` the only required status, zero reviews, squash-only, no bypass actors, up-to-date-before-merge on |
@@ -86,7 +87,7 @@ created_at: 2026-08-26T12:10:00+08:00
 | [Scope](./v0.x/scope/README.md) | v0.x scope index |
 | [Goal and scope](./v0.x/scope/goal-and-scope.md) | What v0.x proves and explicitly does not build |
 | [Execution](./v0.x/execution/README.md) | v0.x execution index |
-| [Implementation plan](./v0.x/execution/implementation-plan.md) | M0–M4 delivery sequence (including the M1.5 CLI milestone) and acceptance scenarios |
+| [Implementation plan](./v0.x/execution/implementation-plan.md) | M0–M4 delivery sequence, including exact M1.5 and M2 contract exits, and acceptance scenarios |
 | [First user journey](./v0.x/execution/first-user-journey.md) | Expected CLI usage journeys and the automated behavioral test catalog |
 | [Agent skill draft](./v0.x/execution/agent-skill.md) | The guide embedded in the binary and printed by `lor skill` |
 | [Catalog status](./v0.x/execution/catalog-status.json) | Which behavioral-catalog T-numbers are deferred, and to which milestone |

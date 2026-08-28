@@ -106,7 +106,9 @@ from: clm_0123456789abcdef
 to: clm_fedcba9876543210
 ```
 
-`from` and `to` are ordered, distinct, complete ids of existing records. All initial types may connect any persisted family except `derived_from`, which requires Claim `from` and Claim `to`. Direction remains canonical even if a projection later interprets a type symmetrically. v1 has no self-edge, multi-endpoint relation, or endpoint list.
+`from` and `to` are ordered, distinct, complete ids of existing records. All initial types may connect any persisted family except `derived_from`, which requires Claim `from` and Claim `to`. Direction remains canonical even if a projection later interprets a type symmetrically. For same-key Claim precedence, persisted `supersedes` points successor `from` → predecessor `to`. v1 has no self-edge, multi-endpoint relation, or endpoint list.
+
+Persisted Relation vocabulary is judgment/history and remains distinct from M2's disposable derived pair vocabulary. Core may derive `duplicate|corroboration|support|conflict|coexistence|temporal-succession` without appending a Relation. A cross-key persisted Relation remains inspectable but never merges Claim identities or creates cross-key reconciliation.
 
 ### Resolution
 
@@ -121,6 +123,8 @@ reason: verified against the cited snapshot
 ```
 
 The reason is an auditable rationale, not hidden chain-of-thought.
+
+The record schema deliberately permits heterogeneous Claim/Relation targets and an optional replacement so historical judgments remain replayable. M2 projection applies a stricter, deterministic eligibility rule rather than changing canonical bytes: a group-level `prefer` or `supersede` requires a replacement Claim among the targets, in the same exact ClaimKey, and direct Claim targets covering every currently applicable group member; `retract` and `leave_disputed` require no replacement and the same complete direct coverage. An incomplete or decision-incompatible Resolution remains canonical and inspectable but has no group-level preference effect. Relation targets are controlled separately and never substitute for Claim coverage. The highest-position complete applicable Resolution wins for a group; details are fixed by the [projection contract](./projection.md).
 
 ### Verification
 
@@ -154,7 +158,7 @@ Structural validation collects all safely discoverable issues and sorts by point
 ## Invariants
 
 1. Canonical records are detached, deeply immutable append-only history.
-2. Contradictions are legal; projections and Resolution records interpret rather than mutate history.
+2. Contradictions are legal; projections and Resolution records interpret rather than mutate history. A derived reconciliation relation is disposable data, never an implicit persisted Relation.
 3. Every persisted schema remains replayable through the public decoder.
 4. The kernel application alone assigns schema, id, and `recorded_at`; the store assigns only position.
 5. Every record reference is complete, kind-correct, and points backward; SourceRefs are not record references.

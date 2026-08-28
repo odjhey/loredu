@@ -3,13 +3,13 @@ name: first_user_journey
 description: "The first real usage journey (human driver + agents via CLI) and the automated behavioral test catalog derived from it."
 type: plan
 tags: [v0.x, execution, journey, testing, cli]
-generated: "Claude Fable 5 (Claude Code) and ChatGPT GPT-5.6 Sol, 2026-08-28"
+generated: "Claude Fable 5 (Claude Code), ChatGPT GPT-5.6 Sol, and OpenAI coding agent, 2026-08-28"
 created_at: 2026-08-26T00:00:00+08:00
 ---
 
 # First user journey and behavioral test cases
 
-The first user is the project owner plus their agents, driving Loredu through the CLI ([decision 0007](../../decisions/0007-typescript-bun.md)). The binary is `lor` — short enough for agents to type constantly. This document describes usage step by step and derives the behavioral tests that must be automated. [Decision 0026](../../decisions/0026-m15-application-cli-contract.md) now fixes the M1.5 spellings and protocol; M2/M3 additions remain staged.
+The first user is the project owner plus their agents, driving Loredu through the CLI ([decision 0007](../../decisions/0007-typescript-bun.md)). The binary is `lor` — short enough for agents to type constantly. This document describes usage step by step and derives the behavioral tests that must be automated. [Decision 0026](../../decisions/0026-m15-application-cli-contract.md) fixes the M1.5 protocol; [decision 0027](../../decisions/0027-m2-reconciliation-projection-contract.md) fixes the additive M2 `current`/temporal projection protocol; implementation and M3 remain staged.
 
 The CLI arrives right after M1, before full reconciliation, and its semantic responses are **agent-reactive** ([decision 0008](../../decisions/0008-cli-first-agent-reactive.md)): they expose mechanical feedback, health, and deterministic affordances when applicable so an agent can chain calls until health passes. M1.5 orientation is status plus filtered record queries. Current Knowledge does not exist until M2; Working Lore does not exist until M3.
 
@@ -188,17 +188,25 @@ Journey 3b already recorded the complete-group judgment and proved M1.5 health. 
 
 ```text
 $ lor current --scope repo=rozoro
-(code-area command-registration) location = src/cli/commands  [clm_3333333333333333, resolved]
+(code-area command-registration) location = src/cli/commands  [preferred, clm_3333333333333333]
+reconciliation: preferred=1 disputed=0
 ```
+
+The winning `prefer` Resolution is recorded-visible, effective, directly covers all applicable Claims, and names its same-key replacement. Current Knowledge exposes at most two representatives, full history/evidence counts, an exact-key Claim affordance, Basis, separate `computed_at`, and a page. “Preferred” reports deterministic precedence, not a truth judgment.
 
 ## Journey 6 — M2 time travel
 
 ```text
 $ lor current --scope repo=rozoro --as-of 2026-08-26T12:00:00Z
-(code-area command-registration) location = src/commands
+(code-area command-registration) location = src/commands  [preferred]
+$ lor current --scope repo=rozoro --valid-at 2026-07-15T00:00:00Z
+(code-area command-registration) location = src/cli/commands  [preferred]
+$ lor current --scope repo=rozoro \
+    --as-of 2026-07-15T00:00:00Z --valid-at 2026-07-15T00:00:00Z
+(code-area command-registration) location = src/commands  [preferred]
 ```
 
-`as_of`, `valid_at`, and the combination behave per the [projection contract](../../architecture/contracts/projection.md).
+`as_of` is an inclusive recorded-time cutoff. Alone it also supplies the valid-time point. Explicit `valid_at` is the inclusive external-world point; the combination keeps both dimensions independent. Bare current captures one Clock instant as its resolved `valid_at`, records that semantic input in Basis query, and keeps the same sample separately as informational `computed_at`.
 
 ## Journey 7 — drill down
 
@@ -217,7 +225,7 @@ $ lor head
 stream_position=5
 ```
 
-M1.5 can compare any response Basis to this store-wide head and can continue an older list through its pinned cursor. Once projections exist, a cached Current Knowledge or Working Lore response with `basis.stream_position=4` is conservatively stale when head is 5. Deleting derived artifacts and replaying plain files must reproduce later derived content for the same basis and query ([decision 0006](../../decisions/0006-explicit-version-basis.md)).
+M1.5 can compare any response Basis to this store-wide head and can continue an older list through its pinned cursor. Once projections exist, a cached Current Knowledge or Working Lore response with `basis.stream_position=4` is conservatively stale when head is 5. Equal head alone is insufficient: active structural ruleset and normalized query must also equal the cached Basis. Deleting derived artifacts and replaying plain files must reproduce semantic items, reconciliation counts, ordering, and affordance actions/params for the same Basis; separate `computed_at`, rendered prose/commands, and private cursor bytes do not participate ([decisions 0006](../../decisions/0006-explicit-version-basis.md) and [0027](../../decisions/0027-m2-reconciliation-projection-contract.md)).
 
 ## Journey 9 — teach the agents
 
@@ -261,18 +269,18 @@ Grouped by milestone; **AC n** = acceptance criterion in [goal and scope](../sco
 
 | # | Given / When / Then | Covers |
 |---|---|---|
-| T20 | two claims, same key, same value, different actors/phrasing → corroboration relation | AC 3, 11, S C |
-| T21 | two claims, same key, different value, overlapping validity → candidate conflict + attention item | AC 3, S C |
-| T22 | same subject/predicate under different `perspective` → no conflict; surfaced as perspective gap | S C guardrail |
-| T23 | claims under different keys never auto-reconcile | ADR 0004 |
-| T24 | resolution `prefer` flips projection preference; both claims still addressable; no record mutated | AC 4, invariant 6 |
-| T25 | `as_of` before a record's `recorded_at` excludes it (S A: earlier belief reproduced) | AC 6, S A |
-| T26 | `valid_at` after an amendment's effective date returns amended value even if recorded late | AC 7, S B |
-| T27 | combined `as_of` + `valid_at` distinguishes historical knowledge from later correction | AC 7, S B |
-| T28 | delete derived state, replay → identical derived content for same Basis + query | AC 5, ADR 0006 |
-| T29 | every projection carries exact Basis (`stream_position`, structural `ruleset`, canonical query) and separate `computed_at` | AC 14 |
-| T30 | core or policy ruleset version bump → cached view marked invalid without touching canonical records | ADR 0006 |
-| T86 | using the M0 canonical equality primitive, object key order does not affect value equality while `1` and `"1"` under one key become a conflict candidate, not duplicate | ADR 0019, ADR 0010 |
+| T20 | overlapping same-key/equal-value Claims from different actors are one `corroboration` derived relation (later → earlier), `preferred` one-value knowledge, and never an appended Relation | AC 3, 11, S C, ADR 0027 |
+| T21 | overlapping same-key/different-value Claims under `exclusive` produce one `conflict` relation and disputed Current Knowledge; absent a complete Resolution, an active participating `supersedes` cycle is disputed even for one equal value and removes no cycle member | AC 3, S C, ADR 0027 |
+| T22 | different-perspective keys never conflict or merge; custom advice context admits exactly applicable Claims, Relations with both endpoints in that set, and Resolutions whose every target/replacement stays inside it; dense non-blocking output may name both keys, accepts 200, and rejects 201 before elements/sort/count/page with no partial result | S C guardrail, ADR 0027 |
+| T23 | Claims under different exact keys never auto-reconcile or share a derived relation, even when a policy advisory or explicit cross-key Relation names both | ADR 0004, ADR 0027 |
+| T24 | a latest effective backward-valid `prefer` Resolution directly covering every selected applicable same-key Claim selects only a targeted applicable replacement; an incomplete/later-uncovered Resolution or future replacement does not; every Claim/Resolution remains addressable and immutable | AC 4, invariant 6, ADR 0027 |
+| T25 | `as_of=A` includes exactly records with `recorded_at <= A`, uses A as implicit valid point when `valid_at` is absent, and reproduces scenario A's earlier belief | AC 6, S A, ADR 0027 |
+| T26 | current `valid_at=V` uses all recorded-visible knowledge and inclusive Claim intervals/Resolution effectiveness; at a January point an old Claim remains selected when a targeted replacement starts in February, and an inapplicable `new → old` supersedes edge cannot remove it, while a late-recorded amendment can project once applicable | AC 7, S B, ADR 0027 |
+| T27 | `as_of=A, valid_at=V` independently limits recorded knowledge and external applicability, distinguishing the historical belief from a later-discovered correction | AC 7, S B, ADR 0027 |
+| T28 | under ADR 0027's narrow replacement of ADR 0006 byte identity, delete derived state and replay the same prefix → equal semantic items, relation/state counts, ordering, and affordance actions/params for the same Basis; computed time, why/run/rendering, and private cursor bytes are excluded | AC 5, ADR 0006/0027 |
+| T29 | current projection carries full-scan-head Basis with structural ruleset and explicit resolved `valid_at`, plus sibling `computed_at`; advice is called once per admitted first/continuation page (including empty), omitted/pre-admission-invalid means zero, and continuation stores no output, preserves inputs, consumes no Clock, recomputes the combined stream, and mismatches impossible resume | AC 14, ADR 0027 |
+| T30 | lower store head means stale; equal head with query/core/policy mismatch means invalid; a ruleset version bump invalidates cache without touching canonical records | ADR 0006/0027 |
+| T86 | M0 canonical equality makes reordered objects equal and classifies the exact duplicate/corroboration/support boundary deterministically, while `1` and `"1"` under one overlapping exclusive key produce `conflict`, never duplicate | ADR 0019, ADR 0010/0027 |
 
 ### M3 — Working Lore
 
@@ -292,7 +300,7 @@ Grouped by milestone; **AC n** = acceptance criterion in [goal and scope](../sco
 | T50 | every semantic command supports `--json`; success/failure is one LF-terminated object, and application-backed semantic fields match the application result after CLI advice rendering | agent ergonomics, ADR 0026 |
 | T51 | exits are exact: 0 executed, 2 usage/validation/reference/cursor, 3 not-found, 4 store/provider, 5 unhealthy `--check`, 6 capability/internal | agent ergonomics, ADR 0026 |
 | T52 | `add entry --body -` reads stdin; body round-trips byte-exact through store and `show` | journey 2 |
-| T53 | `add claim` prints new/corroboration/conflict/coexisting feedback; a post-commit read failure prints committed-but-feedback-unavailable with status advice and still exits 0 | journey 2–3, ADR 0026 |
+| T53 | `add claim` prints M1.5 new/corroboration/conflict/coexisting feedback and, once M2 lands, exact duplicate/corroboration/support/temporal-succession feedback with related fields limited to the selected class; a post-commit read failure prints committed-but-feedback-unavailable with status advice and still exits 0 | journey 2–3, ADR 0026/0027 |
 | T54 | after M2/M3 commands exist, end-to-end scenario A (three runs, revalidation surfaced) through the binary | S A, staged M2/M3 |
 | T55 | after M2 temporal projection exists, end-to-end scenario B (30→60-day amendment, all four temporal queries) through the binary | S B, staged M2 |
 | T56 | staged end-to-end journey 0→8 as one scripted fresh-store session: M1.5 record/query/health first, then M2 current/time and M3 lore when those commands land | AC 12 (ergonomics), ADR 0026 |
@@ -304,10 +312,10 @@ Grouped by milestone; **AC n** = acceptance criterion in [goal and scope](../sco
 | # | Given / When / Then | Covers |
 |---|---|---|
 | T60 | every application mutation response contains exact bounded `ok`, `result`, `reconciliation`, surface-neutral `advice`, and `basis`; it is deeply frozen, carries no CLI strings, and a committed feedback failure never looks like mutation failure | ADR 0008/0026 |
-| T61 | second claim, same key + same value → corroboration feedback, no attention raised | journey 3 |
+| T61 | in the M1.5 slice, a second same-key/same-value Claim corroborates; in M2, conflict > duplicate > corroboration > support > coexisting > temporal-succession selects one feedback class, `new-key` requires no earlier same-key Claim, and disjoint succession is non-blocking with one earliest representative and no corrective advice | journey 3, ADR 0027 |
 | T62 | second claim, same key + different value → conflict-candidate feedback with related count, one representative, exact-key list drill-down, and bounded `advice` naming both ids | journey 3 |
 | T63 | application chain: paginate the exact-key list from T62, inspect all Claims, target every current member in a Resolution, record judgment, then read healthy status | journey 3b, ADR 0026 |
-| T64 | bounded application status counts every absent/forward persisted reference and unresolved exclusive group; only an eligible Resolution whose record references all point backward and whose targets cover all current members closes a group, while malformed canonical records fail as store corruption rather than partial health | journey 3b, ADR 0026 |
+| T64 | at M1.5, bounded application status counts every absent/forward persisted reference and unresolved exclusive group and requires complete eligible Resolution coverage; at M2, only inclusive-validity-overlapping different-value conflict-pair endpoints participate in the unresolved set/count/coverage, purely disjoint succession consumes no Clock and never blocks or reopens health, and malformed canonical records fail as store corruption rather than partial health | journey 3b, ADR 0026/0027 |
 | T65 | text `lor skill` equals frontmatter-stripped embedded source bytes and needs no store; a fresh store using only its M1.5 commands completes orientation, record/query/disclosure/manual-resolution, and healthy exit | journey 9, ADR 0026 |
 | T66 | for the same pinned state, corrective/navigational affordance fields and order are identical; healthy state has no corrective advice, though record handles and list continuation remain navigational | ADR 0008/0026 |
 | T67 | application Claim reads AND-compose scope subset/exact + key/present-or-absent-perspective/value/actor/since filters, preserve stream order, and return the contract page | key hygiene, ADR 0026 |
