@@ -2401,11 +2401,11 @@ test("one compiled fresh-store journey runs orientation through Working Lore —
     "The compiled command path changed.",
   ]);
   const entryId = (entry.result as { id: string }).id;
-  const claimArgs = (value: string, confidence: string) => [
+  const claimArgs = (actor: string, value: string, confidence: string, derivedFrom?: string) => [
     "add",
     "claim",
     "--actor",
-    "agent:journey",
+    actor,
     "--scope",
     "repo=loredu",
     "--subject-type",
@@ -2416,26 +2416,39 @@ test("one compiled fresh-store journey runs orientation through Working Lore —
     "location",
     "--value",
     value,
-    "--derived-from",
-    entryId,
+    ...(derivedFrom === undefined ? [] : ["--derived-from", derivedFrom]),
     "--confidence",
     confidence,
   ];
   const firstClaim = await run("2026-07-01T02:00:00.000Z", [
-    ...claimArgs("packages/old-cli", "candidate"),
+    ...claimArgs("agent:journey", "packages/old-cli", "candidate", entryId),
     "--class",
     "pattern",
   ]);
-  const secondClaim = await run("2026-07-01T03:00:00.000Z", claimArgs("packages/cli", "confirmed"));
+  const corroboratingClaim = await run(
+    "2026-07-01T02:30:00.000Z",
+    claimArgs("agent:corroborator", "packages/old-cli", "observed"),
+  );
+  const secondClaim = await run(
+    "2026-07-01T03:00:00.000Z",
+    claimArgs("agent:journey", "packages/cli", "confirmed", entryId),
+  );
   const firstClaimId = (firstClaim.result as { id: string }).id;
+  const corroboratingClaimId = (corroboratingClaim.result as { id: string }).id;
   const secondClaimId = (secondClaim.result as { id: string }).id;
-  expect(secondClaim.reconciliation).toMatchObject({ state: "conflict-candidate" });
+  expect(corroboratingClaim.reconciliation).toMatchObject({
+    state: "corroboration",
+    related_count: 1,
+    related: [{ id: firstClaimId }],
+  });
+  expect(secondClaim.reconciliation).toMatchObject({ state: "conflict-candidate", related_count: 2 });
   const conflictRuns = secondClaim.advice as Array<{ action: string; run: string }>;
   expect(conflictRuns.every(({ run: command }) => command.includes("--store journey-m3"))).toBe(true);
   const emittedConflictList = conflictRuns.find(({ action }) => action === "claims.list")?.run;
   const conflictList = json(await invokeShell(home, `${emittedConflictList as string} --json`));
   expect((conflictList.result as Array<{ id: string }>).map(({ id }) => id)).toEqual([
     firstClaimId,
+    corroboratingClaimId,
     secondClaimId,
   ]);
   for (const command of conflictRuns
@@ -2470,6 +2483,8 @@ test("one compiled fresh-store journey runs orientation through Working Lore —
     "--target",
     firstClaimId,
     "--target",
+    corroboratingClaimId,
+    "--target",
     secondClaimId,
     "--decision",
     "prefer",
@@ -2492,13 +2507,13 @@ test("one compiled fresh-store journey runs orientation through Working Lore —
     "needs_revalidation",
   ]);
   expect((verification.result as { id: string }).id).toMatch(/^ver_/);
-  expect(Number(await new PlainFileStore(root).head())).toBe(6);
+  expect(Number(await new PlainFileStore(root).head())).toBe(7);
   const persistedAfterWrites = await snapshotStoreArtifacts(root);
 
   const current = await run("2026-07-02T00:00:00.000Z", ["current", "--scope", "repo=loredu"]);
   expect(current).toMatchObject({
     page: { returned: 1, total: 1 },
-    basis: { stream_position: 6, query: { operation: "current", scope: { repo: "loredu" } } },
+    basis: { stream_position: 7, query: { operation: "current", scope: { repo: "loredu" } } },
   });
   const historical = await run("2026-07-02T00:00:00.000Z", [
     "current",
@@ -2509,6 +2524,31 @@ test("one compiled fresh-store journey runs orientation through Working Lore —
   ]);
   expect(historical.basis).toMatchObject({
     query: { as_of: "2026-07-01T03:00:00.000Z", valid_at: "2026-07-01T03:00:00.000Z" },
+  });
+  const validTime = await run("2026-07-02T00:10:00.000Z", [
+    "current",
+    "--scope",
+    "repo=loredu",
+    "--valid-at",
+    "2026-07-15T00:00:00.000Z",
+  ]);
+  expect(validTime.basis).toMatchObject({
+    query: { valid_at: "2026-07-15T00:00:00.000Z" },
+  });
+  const bitemporal = await run("2026-07-02T00:20:00.000Z", [
+    "current",
+    "--scope",
+    "repo=loredu",
+    "--as-of",
+    "2026-07-01T03:00:00.000Z",
+    "--valid-at",
+    "2026-07-15T00:00:00.000Z",
+  ]);
+  expect(bitemporal.basis).toMatchObject({
+    query: {
+      as_of: "2026-07-01T03:00:00.000Z",
+      valid_at: "2026-07-15T00:00:00.000Z",
+    },
   });
 
   const lore = await run("2026-07-02T01:00:00.000Z", [
@@ -2526,7 +2566,7 @@ test("one compiled fresh-store journey runs orientation through Working Lore —
   ]);
   expect(lore).toMatchObject({
     basis: {
-      stream_position: 6,
+      stream_position: 7,
       ruleset: { ranker: { id: "loredu.baseline", version: "1" } },
     },
     result: {
@@ -2537,6 +2577,29 @@ test("one compiled fresh-store journey runs orientation through Working Lore —
     },
   });
   expectRenderedAffordances(lore, selector);
+  expect(await snapshotStoreArtifacts(root)).toEqual(persistedAfterWrites);
+  const cachedPosition = (lore.basis as { stream_position: number }).stream_position;
+  const matchingHead = await run("2026-07-02T01:10:00.000Z", ["head"]);
+  expect((matchingHead.result as { stream_position: number }).stream_position).toBe(cachedPosition);
+  const laterEntry = await run("2026-07-02T01:20:00.000Z", [
+    "add",
+    "entry",
+    "--actor",
+    "agent:journey",
+    "--type",
+    "finding",
+    "--title",
+    "later observation",
+    "--source-json",
+    '{"ref":"repo=loredu","locator":"packages/cli","snapshot":"journey-v2"}',
+    "--body",
+    "A later observation makes the cached packet conservatively stale.",
+  ]);
+  expect(laterEntry.result).toMatchObject({ kind: "entry", position: cachedPosition + 1 });
+  const advancedHead = await run("2026-07-02T01:30:00.000Z", ["head"]);
+  expect((advancedHead.result as { stream_position: number }).stream_position).toBe(cachedPosition + 1);
+  expect(cachedPosition).toBeLessThan((advancedHead.result as { stream_position: number }).stream_position);
+  const persistedAfterStaleAppend = await snapshotStoreArtifacts(root);
   const lorePacket = (
     lore.result as {
       packet: {
@@ -2569,6 +2632,7 @@ test("one compiled fresh-store journey runs orientation through Working Lore —
   expect(continuation?.run).toContain(" --cursor ");
   expect(continuation?.run).toContain(" --max-items 1 --max-chars 512");
   const continued = json(await invokeShell(home, `${continuation?.run as string} --json`));
+  expect(continued.basis).toMatchObject({ stream_position: cachedPosition });
   expect(
     (continued.result as { packet: { sections: Array<{ name: string }> } }).packet.sections.map(
       ({ name }) => name,
@@ -2577,17 +2641,20 @@ test("one compiled fresh-store journey runs orientation through Working Lore —
   expectRenderedAffordances(continued, selector);
 
   const attentionItem = lorePacket.sections.find(({ name }) => name === "needs_revalidation")?.items[0];
-  const anchored = json(
+  let anchored = json(
     await invokeShell(home, `${attentionItem?.knowledge.claims.run as string} --limit 1 --json`),
   );
-  const anchoredIds = (anchored.result as Array<{ id: string }>).map(({ id }) => id);
-  const anchoredContinuation = (anchored.advice as Array<{ action: string; run: string }>).find(
-    ({ action }) => action === "claims.list",
-  );
-  expect(anchoredContinuation?.run).toContain(" --store journey-m3 claims --cursor ");
-  const anchoredLast = json(await invokeShell(home, `${anchoredContinuation?.run as string} --json`));
-  anchoredIds.push(...(anchoredLast.result as Array<{ id: string }>).map(({ id }) => id));
-  expect(anchoredIds).toEqual([firstClaimId, secondClaimId]);
+  const anchoredIds: string[] = [];
+  while (true) {
+    anchoredIds.push(...(anchored.result as Array<{ id: string }>).map(({ id }) => id));
+    const anchoredContinuation = (anchored.advice as Array<{ action: string; run: string }>).find(
+      ({ action }) => action === "claims.list",
+    );
+    if (anchoredContinuation === undefined) break;
+    expect(anchoredContinuation.run).toContain(" --store journey-m3 claims --cursor ");
+    anchored = json(await invokeShell(home, `${anchoredContinuation.run} --json`));
+  }
+  expect(anchoredIds).toEqual([firstClaimId, corroboratingClaimId, secondClaimId]);
 
   const representative = attentionItem?.knowledge.representatives[0];
   expect(representative?.id).toBe(secondClaimId);
@@ -2661,11 +2728,13 @@ test("one compiled fresh-store journey runs orientation through Working Lore —
     "entry",
     "claim",
     "claim",
+    "claim",
     "relation",
     "resolution",
     "verification",
+    "entry",
   ]);
-  expect(await snapshotStoreArtifacts(root)).toEqual(persistedAfterWrites);
+  expect(await snapshotStoreArtifacts(root)).toEqual(persistedAfterStaleAppend);
 });
 
 test("compiled M2 scenario B preserves all four temporal modes and canonical history — @covers T55", async () => {
