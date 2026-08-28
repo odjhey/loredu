@@ -18,12 +18,13 @@ The complete M1.5 binary is implemented: exact store selection and `init`, all
 five record mutation forms, `show`, `history`, filtered/paginated `claims`,
 paginated `status --check`, `head`, stdin Entry bodies, JSON/text rendering, bare
 orientation, direct version/help, stable failure categories, production host
-capabilities, and the build-time embedded `lor skill`. M2-R additively exposes
-exact duplicate/corroboration/support/temporal-succession Claim feedback and
-overlap-aware status health through those existing commands. Store-backed
-operations delegate to the surface-neutral application API; only argv, store
-composition, recursive runnable rendering, and process exit selection remain
-here. Later M2/M3 work still owns `current` and `lore`.
+capabilities, and the build-time embedded `lor skill`. M2 additively exposes
+exact duplicate/corroboration/support/temporal-succession Claim feedback,
+overlap-aware status health, and `current` with scope, recorded/valid-time flags,
+combined-stream pagination, projection summaries, and recursively runnable
+disclosure. Store-backed operations delegate to the surface-neutral application
+API; only argv, store composition, recursive runnable rendering, and process exit
+selection remain here. M3 still owns `lore`.
 
 Compiled-binary evidence lives in
 [`../../tests/cli-conformance/`](../../tests/cli-conformance/README.md); executable

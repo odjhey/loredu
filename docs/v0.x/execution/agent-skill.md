@@ -1,6 +1,6 @@
 ---
 name: agent_skill
-description: "Agent guide shipped inside the lor binary (printed by `lor skill`), v1 for the manual-reconciliation era."
+description: "Agent guide shipped inside the lor binary (printed by `lor skill`), with M2 Current Knowledge and temporal projection guidance."
 type: plan
 tags: [v0.x, execution, agents, skill]
 status: current
@@ -8,13 +8,14 @@ generated: "Claude Fable 5 (Claude Code) and OpenAI coding agent gpt-5.6-sol, 20
 created_at: 2026-08-26T00:00:00+08:00
 ---
 
-# Agent skill (M1.5 v1)
+# Agent skill (M2 v2)
 
 This is the source guide embedded in the `lor` binary and printed by `lor skill`.
-Version 1 targets the M1.5 manual-reconciliation era; it is revised when M2
-(computed reconciliation) and M3 (`lor lore`) land. A repo-level `.agents/skills`
-wrapper should defer to `lor skill` rather than duplicating this text. Every M1.5
-command and rendered continuation or disclosure action named below is executable.
+Version 2 adds M2 computed Current Knowledge while retaining explicit human/agent
+judgment; it is revised again when M3 (`lor lore`) lands. A repo-level
+`.agents/skills` wrapper should defer to `lor skill` rather than duplicating this
+text. Every command and rendered continuation or disclosure action named below is
+executable.
 
 ---
 
@@ -32,10 +33,13 @@ agent's) start from what you record now.
 
 ### The loop
 
-1. **Orient.** `lor status --json` — see health and advisories before starting.
-   If it reports `STORE_NOT_FOUND`, run `lor init` for the default store and
-   retry. List what is already known in your scope:
-   `lor claims --scope <key=value>`.
+1. **Orient.** `lor current --scope <key=value> --json` — read bounded Current
+   Knowledge, its Basis, and mechanical reconciliation before starting. Follow
+   its continuation command when the first page is insufficient. Then run
+   `lor status --json` to see unresolved health and advisories. If either reports
+   `STORE_NOT_FOUND`, run `lor init` for the default store and retry. Use
+   `lor claims --scope <key=value>` when you need canonical Claim history rather
+   than the projection.
 2. **Record entries as you go.** Every finding worth keeping:
    `echo "<free text>" | lor add entry --actor agent:<agent-id> --type finding --title "..." --source-json '{"ref":"<source>","snapshot":"<version>"}' --body -`
    Entries are cheap. When in doubt, record.
@@ -67,11 +71,17 @@ agent's) start from what you record now.
    question beats a guessed answer. Never try to delete the losing claim. A
    Claim appended after your list reopens the group; follow `status` and record
    a later Resolution covering the enlarged group.
-6. **Relate what you notice.** If two claims support or contradict each other
+6. **Time-travel when needed.** `lor current --as-of <rfc3339>` asks what was
+   recorded by that inclusive instant and also uses it as the default valid-time
+   point. `lor current --valid-at <rfc3339>` uses all recorded knowledge about
+   that external-world point. Combine both flags to keep recorded and valid time
+   independent. Current Knowledge is derived and bounded; follow its Claim,
+   show, history, and continuation actions for complete canonical disclosure.
+7. **Relate what you notice.** If two claims support or contradict each other
    and lor has not linked them, record it:
    `lor relate --actor agent:<agent-id> --from <a> --to <b> --type supports`
    (`contradicts`, `duplicates`, and `supersedes` are the other common types.)
-7. **Finish healthy.** Before ending the activity: `lor status --check`.
+8. **Finish healthy.** Before ending the activity: `lor status --check`.
    Exit 5 means blocking health remains; work the corrective `advice:` list
    until it passes. Provider/validation failures use other exits. Do not leave
    attention items you created unhandled — resolve them or mark them disputed
@@ -101,7 +111,5 @@ agent's) start from what you record now.
 
 ## Revision triggers
 
-- **M2:** feedback lines change from candidates to computed relations; add
-  `lor current` / `--as-of` to the orientation step.
 - **M3:** orientation step becomes `lor lore --activity <kind> --scope <scope>`;
   drill-down guidance for handles.

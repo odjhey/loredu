@@ -451,6 +451,33 @@ test("every M1.5 semantic command returns one equivalent JSON envelope — @cove
   expect(bare).toEqual(status);
   const head = json(await invoke(home, ["--json", "--store", "work", "head"]));
   expect(withoutRuns(head)).toEqual(JSON.parse(JSON.stringify(await app.readHead())));
+  const currentCapabilities = {
+    instant: 1_700_000_000_005,
+    entropy: "50515253545556575859",
+  } as const;
+  const current = json(
+    await invokeConformance(
+      home,
+      [
+        "current",
+        "--store",
+        "work",
+        "--scope",
+        "repo=loredu",
+        "--valid-at",
+        "2026-03-10T00:00:00Z",
+        "--json",
+      ],
+      currentCapabilities,
+    ),
+  );
+  const directCurrent = await createLoreduApplication({
+    store: new PlainFileStore(root),
+    clock: { now: () => createInstant(currentCapabilities.instant) },
+    randomSource: { nextBytes: () => new Uint8Array(10) },
+  }).current({ scope: { repo: "loredu" }, valid_at: "2026-03-10T00:00:00Z" });
+  expect(withoutRuns(current)).toEqual(JSON.parse(JSON.stringify(directCurrent)));
+  expectRenderedAffordances(current, "work");
   expect(json(await invoke(home, ["skill", "--json"]))).toMatchObject({ ok: true, basis: null });
 });
 
