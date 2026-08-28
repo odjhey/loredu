@@ -2,13 +2,19 @@ import type { WorkingLoreSectionName } from "./application-types";
 import { type CursorTransportPayload, encodeCursorTransport } from "./cursor-transport";
 import { CORE_RULESET_ID, type WorkingLoreBasis, type WorkingLoreRulesetIdentity } from "./domain/basis";
 import type { JsonObject } from "./domain/entry";
-import { copyJsonObject, jsonValuesEqual } from "./domain/portable-json";
+import {
+  copyJsonObject,
+  isScalarText,
+  jsonValuesEqual,
+  scalarLength,
+} from "./domain/portable-json";
 import { normalizeTimestamp } from "./domain/records";
 import { LoreduError, type LoreduIssue } from "./errors";
 import type { StreamPosition } from "./ports/capabilities";
 
 const RECORD_ID = /^(ent|clm|rel|res|ver)_[0-9abcdefghjkmnpqrstvwxyz]{16}$/;
 const DIGEST = /^[A-Za-z0-9_-]{43}$/;
+const TOKEN = /^[a-z0-9](?:[a-z0-9._:/-]*[a-z0-9])?$/;
 const SECTION_NAMES: readonly WorkingLoreSectionName[] = Object.freeze([
   "current",
   "patterns",
@@ -49,6 +55,17 @@ function integer(value: unknown): value is number {
   return typeof value === "number" && Number.isSafeInteger(value) && value >= 0;
 }
 
+function rulesetToken(value: unknown): string {
+  if (
+    typeof value !== "string" ||
+    !isScalarText(value) ||
+    scalarLength(value) > 128 ||
+    !TOKEN.test(value)
+  )
+    cursorInvalid();
+  return value;
+}
+
 function parseRuleset(value: unknown): WorkingLoreRulesetIdentity {
   const object = value as Record<string, unknown>;
   if (
@@ -68,17 +85,14 @@ function parseRuleset(value: unknown): WorkingLoreRulesetIdentity {
     Object.keys(ranker).sort().join(",") !== "id,version"
   )
     cursorInvalid();
-  if (
-    typeof policy.id !== "string" ||
-    typeof policy.version !== "string" ||
-    typeof ranker.id !== "string" ||
-    typeof ranker.version !== "string"
-  )
-    cursorInvalid();
+  const policyId = rulesetToken(policy.id);
+  const policyVersion = rulesetToken(policy.version);
+  const rankerId = rulesetToken(ranker.id);
+  const rankerVersion = rulesetToken(ranker.version);
   return Object.freeze({
     core: CORE_RULESET_ID,
-    claim_policy: Object.freeze({ id: policy.id, version: policy.version }),
-    ranker: Object.freeze({ id: ranker.id, version: ranker.version }),
+    claim_policy: Object.freeze({ id: policyId, version: policyVersion }),
+    ranker: Object.freeze({ id: rankerId, version: rankerVersion }),
   });
 }
 

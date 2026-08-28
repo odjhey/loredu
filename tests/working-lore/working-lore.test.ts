@@ -488,6 +488,15 @@ describe("M3 Working Lore public application", () => {
     await expect(application.claims({ cursor: encodeCursor(malformedLoreCursor) })).rejects.toMatchObject({
       code: "INVALID_CURSOR",
     });
+    const malformedRulesetCursor = cursorPayload(currentCursor);
+    (
+      malformedRulesetCursor.basis as {
+        ruleset: { ranker: { id: string } };
+      }
+    ).ruleset.ranker.id = "bad id";
+    await expect(application.lore({ cursor: encodeCursor(malformedRulesetCursor) })).rejects.toMatchObject({
+      code: "INVALID_CURSOR",
+    });
     const continued = await application.lore({ cursor: currentCursor, max_items: 200, max_chars: 1_000_000 });
     expect(continued.result.packet.sections).toHaveLength(1);
     const continuedSection = must(continued.result.packet.sections[0]);
