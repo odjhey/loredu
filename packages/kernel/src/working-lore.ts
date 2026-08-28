@@ -826,6 +826,7 @@ function sectionCursor(
   section: WorkingLoreSectionName,
   all: readonly Occurrence[],
   selected: readonly Occurrence[],
+  previousResume: Resume | undefined,
   basis: WorkingLoreBasis,
   snapshot: Snapshot,
   computedAt: string,
@@ -834,22 +835,24 @@ function sectionCursor(
 ): string | undefined {
   const stream = all.filter((item) => item.section === section);
   const returned = selected.filter((item) => item.section === section);
-  if (returned.length >= stream.length) return undefined;
   const last = returned[returned.length - 1];
   const resume: Resume =
     last === undefined
-      ? Object.freeze({ kind: "before-first" })
+      ? (previousResume ?? Object.freeze({ kind: "before-first" }))
       : Object.freeze({
           kind: "after",
           section_ordinal: stream.findIndex((item) => item.index === last.index),
           occurrence_index: last.index,
         });
+  const nextOrdinal = resume.kind === "before-first" ? 0 : resume.section_ordinal + 1;
+  if (nextOrdinal >= stream.length) return undefined;
   return cursorFor(basis, snapshot, computedAt, section, resume, count, digest);
 }
 function buildSections(
   names: readonly WorkingLoreSectionName[],
   all: readonly Occurrence[],
   selected: readonly Occurrence[],
+  previousResume: Resume | undefined,
   basis: WorkingLoreBasis,
   snapshot: Snapshot,
   computedAt: string,
@@ -860,7 +863,17 @@ function buildSections(
     names.map((name) => {
       const items = Object.freeze(selected.filter((item) => item.section === name).map((item) => item.item));
       const total = all.filter((item) => item.section === name).length;
-      const cursor = sectionCursor(name, all, selected, basis, snapshot, computedAt, count, digest);
+      const cursor = sectionCursor(
+        name,
+        all,
+        selected,
+        previousResume,
+        basis,
+        snapshot,
+        computedAt,
+        count,
+        digest,
+      );
       return Object.freeze({ name, items, page: page(items.length, total, cursor) });
     }),
   );
@@ -954,6 +967,7 @@ export function createWorkingLoreService(
       names,
       ranked,
       selected,
+      parsed.cursor?.rank.resume,
       basis,
       snapshot,
       computedAt,

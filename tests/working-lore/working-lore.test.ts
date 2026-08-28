@@ -508,6 +508,9 @@ describe("M3 Working Lore public application", () => {
       cursorPayload(beforeFirst).rank.candidate_count,
     );
     expect(cursorPayload(afterOne).rank.resume).toMatchObject({ kind: "after", section_ordinal: 0 });
+    const stableLast = await stable.lore({ cursor: afterOne, max_items: 1, max_chars: 1000 });
+    expect(must(stableLast.result.packet.sections[0]).page).toEqual({ returned: 1, total: 2 });
+    expect(stableLast.advice.filter(({ rel }) => rel === "continue")).toEqual([]);
   });
 
   test("Ranker assembly/callback validation is fail-closed and callback timing is exact", async () => {
