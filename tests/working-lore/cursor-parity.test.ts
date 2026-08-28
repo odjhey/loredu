@@ -136,6 +136,23 @@ describe("shared cursor transport and declared-schema parity", () => {
     expect(rankCalls()).toBe(rankBefore);
   });
 
+  test("lore admits cursors before validating continuation budgets", async () => {
+    const { application, clock, rankCalls, cursors } = await fixture();
+    const clockBefore = clock.calls;
+    const rankBefore = rankCalls();
+    await expect(application.lore({ cursor: "invalid", max_items: 0 })).rejects.toMatchObject({
+      code: "INVALID_CURSOR",
+    });
+    await expect(application.lore({ cursor: cursors.claims, max_chars: 1 })).rejects.toMatchObject({
+      code: "CURSOR_MISMATCH",
+    });
+    await expect(application.lore({ cursor: cursors.lore, max_items: 0 })).rejects.toMatchObject({
+      code: "VALIDATION_FAILED",
+    });
+    expect(clock.calls).toBe(clockBefore);
+    expect(rankCalls()).toBe(rankBefore);
+  });
+
   test("both duplicated query copies are independently schema-valid before equality", async () => {
     const { application, clock, rankCalls, cursors } = await fixture();
     const mutateQuery = (operation: Operation, copyName: "query" | "basis.query"): string => {

@@ -212,6 +212,37 @@ function parseInitial(input: unknown): ParsedLore {
   const data = inspectObject(input, "", issues);
   if (!data) validationFailed(issues);
   rejectUnknown(data, new Set(["activity", "scope", "corpus", "max_items", "max_chars", "cursor"]), issues);
+  if (hasOwnDescriptor(data, "cursor")) {
+    for (const key of Object.keys(data))
+      if (key !== "cursor" && key !== "max_items" && key !== "max_chars")
+        issues.push(makeIssue("UNKNOWN_FIELD", `/${escapePointer(key)}`, "cannot accompany cursor"));
+    const raw = own(data, "cursor");
+    if (typeof raw !== "string") issues.push(makeIssue("TYPE", "/cursor", "must be a string"));
+    if (issues.length > 0) validationFailed(issues);
+    const cursor = decodeCursor(raw as string);
+    if (cursor.operation !== "lore") cursorMismatch("Cursor belongs to another operation");
+    const parsed = filtersFromNormalizedQuery(cursor.query);
+    const maxItems = parseBudget(
+      own(data, "max_items"),
+      hasOwnDescriptor(data, "max_items"),
+      "/max_items",
+      1,
+      200,
+      DEFAULT_MAX_ITEMS,
+      issues,
+    );
+    const maxChars = parseBudget(
+      own(data, "max_chars"),
+      hasOwnDescriptor(data, "max_chars"),
+      "/max_chars",
+      512,
+      1_000_000,
+      DEFAULT_MAX_CHARS,
+      issues,
+    );
+    if (issues.length > 0) validationFailed(issues);
+    return Object.freeze({ maxItems, maxChars, ...parsed, cursor });
+  }
   const maxItems = parseBudget(
     own(data, "max_items"),
     hasOwnDescriptor(data, "max_items"),
@@ -230,18 +261,6 @@ function parseInitial(input: unknown): ParsedLore {
     DEFAULT_MAX_CHARS,
     issues,
   );
-  if (hasOwnDescriptor(data, "cursor")) {
-    for (const key of Object.keys(data))
-      if (key !== "cursor" && key !== "max_items" && key !== "max_chars")
-        issues.push(makeIssue("UNKNOWN_FIELD", `/${escapePointer(key)}`, "cannot accompany cursor"));
-    const raw = own(data, "cursor");
-    if (typeof raw !== "string") issues.push(makeIssue("TYPE", "/cursor", "must be a string"));
-    if (issues.length > 0) validationFailed(issues);
-    const cursor = decodeCursor(raw as string);
-    if (cursor.operation !== "lore") cursorMismatch("Cursor belongs to another operation");
-    const parsed = filtersFromNormalizedQuery(cursor.query);
-    return Object.freeze({ maxItems, maxChars, ...parsed, cursor });
-  }
   if (!hasOwnDescriptor(data, "activity")) issues.push(makeIssue("REQUIRED", "/activity", "is required"));
   const activity = parseToken(own(data, "activity"), "/activity", issues);
   const scope = hasOwnDescriptor(data, "scope")
