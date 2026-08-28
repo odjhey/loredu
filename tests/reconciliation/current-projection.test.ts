@@ -517,11 +517,7 @@ describe("public M2 Current Knowledge projection", () => {
     ]);
 
     const second = await application(store).current({ cursor: first.page.cursor as string });
-    expect(second.advice.map(({ action }) => action)).toEqual([
-      "claims.list",
-      "record.show",
-      "record.show",
-    ]);
+    expect(second.advice.map(({ action }) => action)).toEqual(["claims.list", "record.show", "record.show"]);
     expect(second.advice.slice(1).map(({ params }) => params)).toEqual([
       { id: secondOld },
       { id: secondNew },
