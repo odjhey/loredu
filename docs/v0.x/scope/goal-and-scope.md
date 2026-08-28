@@ -3,7 +3,7 @@ name: v0x_goal_and_scope
 description: "v0.x outcomes, acceptance boundaries, included application capabilities, and explicit non-goals."
 type: plan
 tags: [v0.x, scope]
-generated: "ChatGPT GPT-5.6 Sol, 2026-08-26"
+generated: "ChatGPT GPT-5.6 Sol and OpenAI coding agent, 2026-08-28"
 created_at: 2026-08-26T12:10:00+08:00
 ---
 
@@ -28,7 +28,7 @@ Prove that Loredu can maintain small, inspectable, provenance-aware operational 
 11. Two actors recording the same fact with different free text but the same declared claim key are reconciled (corroboration or conflict), and the same fact under different perspectives coexists without destructive conflict ([decision 0004](../../decisions/0004-claim-identity-key.md)).
 12. Embedding ergonomics: a consumer reaches "appended entry + claim" and "Working Lore in hand" in a few calls with no runtime dependencies beyond the store adapter.
 13. At least one real consumer from [candidate consumers](../../reports/candidate-consumers.md) is wired in before any contract is marked `status: current`.
-14. Every projection and Working Lore packet carries a `basis`; a cached packet is detected as stale after one new relevant record and reproduces identically when basis and query are unchanged ([decision 0006](../../decisions/0006-explicit-version-basis.md)).
+14. Every projection and Working Lore packet carries a `basis`; a cached packet is detected as stale after one new relevant record, and replay with the same Basis reproduces semantic content rather than presentation bytes ([decisions 0006](../../decisions/0006-explicit-version-basis.md) and [0027](../../decisions/0027-m2-reconciliation-projection-contract.md)).
 
 ## Included
 

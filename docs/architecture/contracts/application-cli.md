@@ -1,8 +1,8 @@
 ---
 name: application_cli_contract
-description: "Exact M1.5 application read, response, pagination, health, affordance, CLI grammar, rendering, error, exit, host-capability, and embedded-skill contract."
+description: "Exact M1.5 application/CLI protocol plus the additive M2 Current Knowledge envelope, affordance, temporal grammar, and feedback upgrade."
 type: contract
-tags: [contracts, application, cli, m1.5, pagination, agents]
+tags: [contracts, application, cli, m1.5, m2, projection, pagination, agents]
 generated: "OpenAI coding agent, 2026-08-28"
 created_at: 2026-08-28T06:00:00+08:00
 ---
@@ -253,7 +253,11 @@ interface StatusResult {
 
 Health blocks `status --check`; advisories never do. Status forms one bounded ordered item stream: all unresolved groups, then all dangling references, then all key-divergence advisories, using each class's order below. Its unique resume key is `(class rank, primary position, ordinal)`: class ranks are that fixed three-class order; primary position is the group's earliest member, the dangling reference's referring record, or the advisory's earliest representative; ordinal is the zero-based position among same-class items with that primary position in their defined deterministic order. The cursor resumes strictly after the complete key, so multiple diagnostics from one record cannot be duplicated or skipped. `health` and `advisory_count` are full pinned-snapshot counts; `attention` and `advisories` contain only their members on this page. Its top-level `page.returned` is their combined page length and `page.total` is both full health counts plus `advisory_count`. Status uses the same default 50 and maximum 200 as other bounded collections, and continuation is `status.read`.
 
-An **unresolved exclusive group** is an exact ClaimKey group for which the assembled policy selects `exclusive` and at least two canonically different values exist at the basis. It is closed only by an eligible Resolution in the same prefix whose unique `targets` include every Claim currently in that group. A Resolution is eligible for closure only when every target and its optional replacement resolve to matching records at positions lower than the Resolution's position. A Resolution with an absent or forward-pointing reference still contributes the corresponding dangling diagnostics but has no closure effect. Any decision, including `leave_disputed`, records sufficient human judgment to close health. Adding a later Claim to the group reopens it until a later eligible Resolution covers the enlarged group. Relations describe links but do not close an exclusive group. Group Claims and groups themselves order by earliest member position. The item carries only the earliest representative plus full `claim_count`; its `claims.list` affordance uses exact scope, subject, predicate, and present/absent perspective filters so the complete group remains bounded and paginates normally.
+At M1.5, an **unresolved exclusive group** is an exact ClaimKey group under assembled `exclusive` semantics with at least two canonically different values. Its members are every Claim currently in that group; an eligible Resolution closes it only when its direct Claim targets cover every member, and any later Claim reopens it until a later Resolution covers the enlarged group.
+
+At M2, the shared pair classifier narrows an unresolved exclusive group to a conflict set: only canonically different values whose inclusive validity intervals overlap form a conflict pair, and the set is the union of those pair endpoints. Computing overlap samples no Clock. No group exists when that set is empty, so equal values and purely interval-disjoint temporal succession are non-blocking history and do not make `status --check` unhealthy.
+
+At either milestone, the unresolved member set is closed only by an eligible Resolution in the same prefix whose unique direct Claim `targets` include every member. Completeness and the item's `claim_count` use that milestone's member set. A Resolution is eligible for closure only when every target and optional replacement resolves to a matching record at a lower position. An absent or forward-pointing reference still contributes dangling diagnostics but has no closure effect. Any decision, including `leave_disputed`, records sufficient human judgment to close health. At M2, a later Claim reopens health only when it joins an overlapping different-value conflict pair and therefore enters the set; a purely disjoint successor does not. Relations describe links but do not close a group at either milestone. Group Claims and groups order by earliest member position. The item carries only the earliest group representative plus full `claim_count`; its `claims.list` affordance uses the complete exact key so bounded history remains inspectable.
 
 A **dangling record reference** is any persisted Claim `derived_from`, Relation endpoint, Resolution target/replacement, or Verification target for which no matching record exists at a lower stream position. An absent target and a target appearing only later are both dangling because references must point backward. One item is emitted per field/index in ascending referring-record position and schema traversal order. Its `record` is the executable handle for inspecting the referring record; `target` reports the invalid reference id as an explicit terminal diagnostic and never itself carries an affordance. Wrong-family ids make the persisted record invalid and therefore provider-corrupt rather than health data. Normal application appends prevent dangling references, but valid hand-authored records can expose them. `attention` lists unresolved groups first, then dangling references, each in its ordering above.
 
@@ -370,4 +374,47 @@ The embedded M1.5 guide may name only commands available in this grammar. It ori
 
 ## Milestone upgrades and readiness
 
-M1.5 implements record commands, exact-key feedback, query/status, pagination, and disclosure. M2 may add richer reconciliation and `current` while preserving response/error/exit shapes. M3 may add `lore`, Working Lore budgets, and section continuation under the same cursor and affordance rules. T50–T75 therefore have fixed protocol semantics now but retain their staged implementation owners; this contract is no implementation or catalog claim.
+M1.5 implements record commands, exact-key feedback, query/status, pagination, and disclosure. [Decision 0027](../../decisions/0027-m2-reconciliation-projection-contract.md) now fixes the additive M2 `current` upgrade below while preserving response/error/exit shapes. M3 may add `lore`, Working Lore budgets, and section continuation under the same cursor and affordance rules. T50–T75 therefore have fixed protocol semantics but retain their staged implementation owners; this contract is no implementation or catalog claim.
+
+## Additive M2 Current Knowledge upgrade
+
+M2 does not replace any M1.5 operation or envelope. It adds the surface-neutral application method and exact derived shapes in the [projection contract](./projection.md):
+
+```ts
+type ApplicationCurrentResponse =
+  Omit<ApplicationResponse<CurrentProjectionResult>, "reconciliation"> & {
+    readonly reconciliation: ProjectionReconciliationSummary
+    readonly page: Page
+  }
+interface LoreduApplication {
+  current(query?: CurrentQuery): Promise<ApplicationCurrentResponse>
+}
+```
+
+`ApplicationCurrentResponse` has the existing `ok`, operation-specific `result`, `advice`, and `basis`, replaces the mutation `reconciliation` member with the full-query `ProjectionReconciliationSummary`, and adds `page`. Its result is `{computed_at, items}` rather than a bare array because computed time is projection metadata outside Basis. The item stream combines bounded Current Knowledge items followed by policy advisories; `page` counts that combined stream. Every value representative and policy advisory Claim is a recursively rendered RecordHandle. Exact-key Claim drill-down remains `claims.list`; record history and evidence remain `show`/`history` disclosure rather than new CLI stores.
+
+A policy may return at most 200 advisory drafts from each `advise` call. The application descriptor-validates the returned Array and its own length, rejects a length above 200 with a fresh `VALIDATION_FAILED` before density or element validation, sorting, counting, or pagination, and returns no partial envelope. At an accepted length it requires a dense array before validating elements. This literal bound adds no public constant.
+
+The M2 Claim-add feedback union additively distinguishes `duplicate`, `support`, and `temporal-succession` from the existing states. Each has the exact bounded shape `{state,key,related_count,related:[one handle],claims}`. `new-key` applies only with no earlier same-key Claim. Otherwise feedback selects only one pair class in the order conflict-candidate, duplicate, corroboration, support, coexisting, temporal-succession; its count and representative cover only that class. Temporal succession is non-blocking and emits no corrective top-level advice. The [projection contract](./projection.md) fixes each pair boundary. The optional projection-wide policy advice callback is not called by `add`.
+
+`Affordance` additively permits rel `current`, action `current.read`, and these valid pairs:
+
+```text
+current/current.read   params exactly {query}
+continue/current.read  params exactly {cursor, limit?}
+```
+
+A cursorless `query` contains only supplied typed `scope`, `as_of`, and `valid_at`; the application resolves the semantic valid point into Basis. Continuation includes `limit` exactly under the existing nondefault-limit rule. Current disputed-item advice is the exact-key Claim list, then exposed representative show actions, in item order; continuation remains last. Coexisting items and policy advisories are non-blocking and do not invent corrective commands.
+
+The CLI grammar additively gains exactly:
+
+```text
+lor current [--scope <key=value>]... [--as-of <rfc3339>]
+    [--valid-at <rfc3339>] [--limit <n>] [--cursor <token>] [--json]
+```
+
+`--store` remains a global option and is preserved in every rendered action. Cursorless scope pairs follow the same split/duplicate/token rules as Claims and use subset matching; there is no M2 `--exact-scope` on `current`. `--as-of` and `--valid-at` are singular and use the caller timestamp grammar. A cursor forbids scope and both temporal flags but may combine with one limit. Current rendering orders canonical scope pairs, then `--as-of`, `--valid-at`, `--cursor`, and `--limit` as applicable. `current --help` follows the existing direct-help rule.
+
+Text mode prints each knowledge key/state and at most its two value representatives, then policy advisories, reconciliation counts, advice, Basis, computed time, and page counts. JSON mode is exactly the recursively rendered application response plus LF. An empty matching projection is `ok:true`, `items:[]`, zero counts, Basis, `computed_at`, `page:{returned:0,total:0}`, and exit 0. Disputed or retracted knowledge does not make the command fail; this command is projection, not health. Existing exits are unchanged: query/cursor validation is 2, missing store is 3, provider failure is 4, Clock failure is 6. Exit 5 remains exclusive to unhealthy `status --check`.
+
+A cursorless `current` consumes one Clock call before its atomic scan; continuation consumes none. When the policy defines `advise`, every admitted first page and continuation invokes it exactly once after pinned reconciliation/context construction and before full combined-stream count/order/page; omitted advice means zero calls, and an invalid cursor fails before any call. Continuation stores no advisory output and recomputes it deterministically against the preserved Basis/ruleset/head/valid point/computed time before applying its combined-stream resume key. The CLI's existing internal production Clock supplies time. Bare `lor` remains status, not Current Knowledge. M2 adds no `reconcile` command and no `lore`; M3 still owns `lore` and Working Lore continuation. This section establishes T20–T30/T86 and staged T54–T56 protocol readiness only; it makes no implementation or catalog claim.

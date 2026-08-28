@@ -1,6 +1,6 @@
 ---
 name: kernel_api_contract
-description: "Exact staged kernel surface through M1.5: records/application, M1 RecordStore conformance, and response/query additions."
+description: "Exact staged kernel surface through M2: records/application, store conformance, M1.5 response/query additions, and Current Knowledge projection types."
 type: contract
 tags: [contracts, kernel, api, typescript]
 generated: "OpenAI coding agent and ChatGPT GPT-5.6 Sol, 2026-08-28"
@@ -116,7 +116,7 @@ function basisEquals(left: Basis, right: Basis): boolean
 
 The runtime port boundary enforces the declared `Uint8Array` return: entropy is an actual Uint8 element typed array of exactly the requested length, without array or typed-array coercion. Capability and store failures are normalized to their phase-owned operational codes; only an exact store `DUPLICATE_RECORD_ID` passes through.
 
-Assembly captures exactly one store, clock, random source, and policy. Omitted policy selects `DEFAULT_CLAIM_POLICY`; there is no singleton lookup or per-append override. M0 application exposes only generic `append`, preserving family-specific result narrowing. M0 ClaimPolicy has no `advise`; later policy advice is additive, while generic key-divergence remains core M1.5 mechanics.
+Assembly captures exactly one store, clock, random source, and policy. Omitted policy selects `DEFAULT_CLAIM_POLICY`; there is no singleton lookup or per-append override. M0 application exposes only generic `append`, preserving family-specific result narrowing. The M0 ClaimPolicy shape has no `advise`; M2 additively permits the exact optional callback below, while generic key-divergence remains separate core M1.5 mechanics.
 
 Policy assembly and `createRulesetIdentity` are runtime validation boundaries ([decision 0024](../../decisions/0024-m0-policy-and-basis-runtime-boundaries.md)). Policy `id` and `version` are identifier-safe tokens, both callbacks are callable, and public own fields are closed to the four interface fields. An `identity` field rejects without invocation rather than restoring the superseded remapping seam; `advise`/`advisories` fields likewise reject in M0. Ruleset construction snapshots id/version and invokes no callback. The default policy is frozen, validates the closed declared ClaimKey shape into frozen ordered issues, always selects `exclusive`, and has no identity or advice member.
 
@@ -231,3 +231,45 @@ interface LoreduApplication {
 ```
 
 `createLoreduApplication` and its dependency object do not change. The complete response, filter, overlap, health, cursor, and affordance semantics are in the [application and CLI contract](./application-cli.md). `INVALID_CURSOR`, `CURSOR_MISMATCH`, and `RECORD_NOT_FOUND` are additive `LoreduErrorCode` members. CLI envelope/error/exit types are adapter contract rather than kernel exports. Production host Clock and RandomSource implementations remain internal to the CLI composition root; they are not kernel exports.
+
+## Additive M2 surface
+
+[Decision 0027](../../decisions/0027-m2-reconciliation-projection-contract.md) adds no entrypoint, testing export, or normal runtime value. It adds these type-only normal exports exactly:
+
+```text
+DerivedRelationType DerivedRelation CurrentKnowledgeState CurrentValue
+ProjectionHistorySummary ProjectionEvidenceSummary CurrentKnowledgeItem
+PositionedClaim PositionedRelation PositionedResolution
+ClaimPolicyAdviceContext PolicyAdvisoryDraft PolicyAdvisory
+ProjectionFilters CurrentQuery CurrentProjectionItem CurrentProjectionResult
+ProjectionReconciliationSummary ApplicationCurrentResponse
+```
+
+At M2, `ClaimPolicy` is replaced by this additive shape; existing policies remain valid:
+
+```ts
+interface ClaimPolicy {
+  readonly id: string
+  readonly version: string
+  validateClaimKey(key: ClaimKey): readonly LoreduIssue[]
+  semantics(key: ClaimKey): ClaimSemantics
+  advise?(context: ClaimPolicyAdviceContext): readonly PolicyAdvisoryDraft[]
+}
+```
+
+M2 assembly permits only that optional additional own field, validates and captures the callback, and still rejects legacy `identity` and unknown `advisories`. `createRulesetIdentity` validates the callback but snapshots only id/version and never invokes it. Claim append still invokes only key validation and semantics. `current` constructs the exact frozen advice context from applicable Claims plus only Relations whose two endpoints are in that Claim set and Resolutions whose every target/replacement stays inside that admitted context. It invokes advice exactly once on every admitted first page and continuation, including empty context; omitted advice and pre-admission cursor failure invoke zero times. Continuation recomputes rather than storing output and consumes no Clock. One callback result may contain at most 200 drafts: core descriptor-validates the Array and its own length, rejects a larger length with fresh `VALIDATION_FAILED` before density or element validation, sorting, counting, or pagination, then requires accepted output to be dense. It returns no partial result, and this literal bound adds no public constant or export.
+
+The existing application additively gains:
+
+```ts
+type ApplicationCurrentResponse =
+  Omit<ApplicationResponse<CurrentProjectionResult>, "reconciliation"> & {
+    readonly reconciliation: ProjectionReconciliationSummary
+    readonly page: Page
+  }
+interface LoreduApplication {
+  current(query?: CurrentQuery): Promise<ApplicationCurrentResponse>
+}
+```
+
+`ApplicationCurrentResponse` keeps the application envelope fields other than mutation feedback, replaces `reconciliation` with the exact projection summary, and adds `page`; its operation-specific result is `{computed_at, items}`. `ReconciliationFeedback` additively gains Claim-add states `duplicate|support|temporal-succession` beside its existing `corroboration`. Every added state has `{state,key,related_count,related:[earliest handle],claims}`; selection is conflict-candidate > duplicate > corroboration > support > coexisting > temporal-succession, and the related fields cover only the selected pair class. `new-key` requires no earlier same-key Claim, and temporal succession is non-blocking. Every preference tier operates only on the nonempty selected valid-time-applicable same-key Claim set; future or nonapplicable replacements and Relation endpoints remain history and cannot affect precedence. Absent a complete Resolution, any active participating `supersedes` cycle forces disputed even for one equal value. Status health uses only endpoints of overlapping different-value exclusive conflict pairs; purely disjoint succession does not block. The complete relation/state/result/evidence/history, temporal normalization, Resolution precedence, ordering, cursor, staleness, and rebuild semantics are in the [projection contract](./projection.md). No inferred Relation or Resolution is exported or appended.

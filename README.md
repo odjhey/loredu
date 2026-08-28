@@ -2,7 +2,7 @@
 
 Loredu is an embedded operational knowledge kernel — a utility for our own products to build on, not a standalone product. Activities append what they learn as immutable, provenance-carrying records; claims declare identity keys so knowledge about the same fact meets instead of piling up.
 
-The kernel is strictly mechanical: it detects — duplicates, conflicts, divergence, staleness — deterministically, and never judges. Humans and agents make the judgments, and every judgment is itself a record. It is reactive: mechanical feedback and explicit health let writers correct the store in the same session ([product architecture](docs/architecture/product-architecture.md)). Derived views are bounded and stamped with the basis they were computed from, so consumers can cache them, detect staleness, and reproduce them exactly.
+The kernel is strictly mechanical: it detects — duplicates, conflicts, divergence, staleness — deterministically, and never judges. Humans and agents make the judgments, and every judgment is itself a record. It is reactive: mechanical feedback and explicit health let writers correct the store in the same session ([product architecture](docs/architecture/product-architecture.md)). Derived views are bounded and stamped with the basis they were computed from, so consumers can cache them, detect staleness, and reproduce their semantic content exactly.
 
 Vocabulary, namespacing, writers, and surfaces belong to consumers; Loredu owns the consistent record, detection, resolution, and disclosure semantics underneath — machine-readable at every boundary.
 
