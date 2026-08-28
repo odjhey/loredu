@@ -31,6 +31,22 @@ function capture(readStdin: CliIo["readStdin"]): {
   };
 }
 
+test("unsupported short and bundled options are usage failures", async () => {
+  for (const option of ["-x", "-xyz"]) {
+    const invocation = capture(async () => {
+      throw new Error("usage failures must not read stdin");
+    });
+    const exit = await run(["show", option, "--json"], invocation.io);
+
+    expect(exit).toBe(2);
+    expect(invocation.stderr()).toBe("");
+    expect(JSON.parse(invocation.stdout())).toMatchObject({
+      ok: false,
+      error: { code: "CLI_USAGE", message: `unknown option: ${option}` },
+    });
+  }
+});
+
 test("stdin read failures retain the internal failure exit category after store preflight", async () => {
   const root = await mkdtemp(join(tmpdir(), "loredu-cli-unit-"));
   roots.push(root);

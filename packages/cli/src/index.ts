@@ -192,7 +192,7 @@ function parseOptions(
     const token = tokens[index];
     if (token === undefined) continue;
     if (token === "--") usage("the -- delimiter is not supported");
-    if (!token.startsWith("--")) {
+    if (!token.startsWith("-")) {
       positionals.push(token);
       continue;
     }
