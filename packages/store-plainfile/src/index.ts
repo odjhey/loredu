@@ -5,13 +5,11 @@ export {
   PLAIN_FILE_FORMAT,
   PlainFileStore,
   recordFileName,
-  type StoreRootInput,
 } from "./plain-file-store";
 export { decodePlainFileRecord, encodePlainFileRecord } from "./record-codec";
 export {
   DEFAULT_STORE_NAME,
   defaultLoreduHome,
-  type ResolvedStoreRoot,
   resolveStoreRoot,
   STORES_DIRNAME,
   type StoreRootContext,

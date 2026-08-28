@@ -5,6 +5,7 @@ import {
   mkdtemp,
   readdir,
   readFile,
+  realpath,
   rename,
   rm,
   symlink,
@@ -94,7 +95,7 @@ async function waitForLockOwner(path: string, pid: number, timeoutMilliseconds =
 }
 
 // @covers T17
-test("root resolution, explicit initialization, relocation, and cross-root isolation are strict", async () => {
+test("string root APIs, physical explicit paths, relocation, and cross-root isolation are strict", async () => {
   const base = await sandbox();
   try {
     const home = join(base, "home");
@@ -104,21 +105,21 @@ test("root resolution, explicit initialization, relocation, and cross-root isola
 
     expect(defaultLoreduHome({ LOREDU_HOME: home }, osHome)).toBe(home);
     expect(defaultLoreduHome({ LOREDU_HOME: "" }, osHome)).toBe(join(osHome, ".loredu"));
-    expect(resolveStoreRoot({ kind: "name", name: "alpha" }, { loreduHome: home, osHome, cwd })).toEqual({
-      kind: "name",
-      name: "alpha",
-      home,
-      path: join(home, "stores", "alpha"),
-    });
-    expect(resolveStoreRoot({ kind: "default" }, { loreduHome: home, osHome, cwd })).toEqual({
-      kind: "default",
-      name: "default",
-      home,
-      path: join(home, "stores", "default"),
-    });
-    expect(
-      resolveStoreRoot({ kind: "path", path: "../explicit" }, { loreduHome: home, osHome, cwd }),
-    ).toEqual({ kind: "path", path: join(base, "explicit") });
+    const named = resolveStoreRoot({ kind: "name", name: "alpha" }, { loreduHome: home, osHome, cwd });
+    const defaultRoot = resolveStoreRoot({ kind: "default" }, { loreduHome: home, osHome, cwd });
+    const explicitMissing = resolveStoreRoot(
+      { kind: "path", path: "../explicit/missing" },
+      { loreduHome: home, osHome, cwd },
+    );
+    expect(typeof named).toBe("string");
+    expect(typeof defaultRoot).toBe("string");
+    expect(typeof explicitMissing).toBe("string");
+    expect(named).toBe(join(home, "stores", "alpha"));
+    expect(defaultRoot).toBe(join(home, "stores", "default"));
+    expect(explicitMissing).toBe(join(await realpath(base), "explicit", "missing"));
+    expect(join(storeRootForName("composable", home), "records")).toBe(
+      join(home, "stores", "composable", "records"),
+    );
 
     for (const name of ["", ".", "..", "UPPER", "a/b", "-leading", "trailing-"]) {
       expect(() => storeRootForName(name, home)).toThrow(TypeError);
@@ -127,13 +128,13 @@ test("root resolution, explicit initialization, relocation, and cross-root isola
 
     const missing = storeRootForName("missing", home);
     await expect(new PlainFileStore(missing).head()).rejects.toMatchObject({ code: "STORE_NOT_FOUND" });
-    expect(await exists(missing.path)).toBe(false);
+    expect(await exists(missing)).toBe(false);
 
     const alpha = storeRootForName("alpha", home);
     const beta = storeRootForName("beta", home);
     await initializePlainFileStore(alpha);
     await initializePlainFileStore(beta);
-    expect(await readFile(join(alpha.path, ".loredu", "format.json"), "utf8")).toBe(
+    expect(await readFile(join(alpha, ".loredu", "format.json"), "utf8")).toBe(
       '{"format":"loredu.plainfile/v1"}\n',
     );
     await expect(initializePlainFileStore(alpha)).rejects.toMatchObject({ code: "STORE_ALREADY_EXISTS" });
@@ -147,12 +148,12 @@ test("root resolution, explicit initialization, relocation, and cross-root isola
     expect(await alphaStore.get(betaRecord.id)).toBeUndefined();
     expect(await betaStore.get(alphaRecord.id)).toBeUndefined();
 
-    await mkdir(join(alpha.path, ".loredu", "write.lock"));
-    await writeFile(join(alpha.path, ".loredu", "write.lock", "owner.json"), "not owner metadata\n");
+    await mkdir(join(alpha, ".loredu", "write.lock"));
+    await writeFile(join(alpha, ".loredu", "write.lock", "owner.json"), "not owner metadata\n");
     expect(Number(await betaStore.append(entry("ent_0000000000000019", "beta second")))).toBe(2);
 
     const moved = join(base, "relocated-store");
-    await rename(beta.path, moved);
+    await rename(beta, moved);
     const relocated = new PlainFileStore(moved);
     expect(Number(await relocated.head())).toBe(2);
     expect((await relocated.get(betaRecord.id))?.id).toBe(betaRecord.id);
@@ -161,31 +162,42 @@ test("root resolution, explicit initialization, relocation, and cross-root isola
     const outside = join(base, "outside");
     await mkdir(outside);
     await writeFile(join(outside, "sentinel"), "unchanged");
+    await mkdir(join(home, "stores"), { recursive: true });
 
-    const linkedRoot = join(home, "stores", "linked");
-    await symlink(outside, linkedRoot, "dir");
-    await expect(new PlainFileStore(linkedRoot).head()).rejects.toMatchObject({ code: "STORE_CORRUPT" });
-    await expect(initializePlainFileStore(linkedRoot)).rejects.toMatchObject({
-      code: "STORE_ALREADY_EXISTS",
-    });
+    const linkedNamedRoot = join(home, "stores", "linked");
+    await symlink(outside, linkedNamedRoot, "dir");
+    expect(() => storeRootForName("linked", home)).toThrow(TypeError);
+    expect(() =>
+      resolveStoreRoot({ kind: "name", name: "linked" }, { loreduHome: home, osHome, cwd }),
+    ).toThrow(TypeError);
 
     const unsafeHome = join(base, "unsafe-home");
     await mkdir(unsafeHome);
     await symlink(outside, join(unsafeHome, "stores"), "dir");
-    const escapedNamedRoot = storeRootForName("escaped", unsafeHome);
-    await expect(new PlainFileStore(escapedNamedRoot).head()).rejects.toMatchObject({
-      code: "STORE_CORRUPT",
-    });
-    await expect(initializePlainFileStore(escapedNamedRoot)).rejects.toMatchObject({
-      code: "STORE_ALREADY_EXISTS",
-    });
+    expect(() => storeRootForName("escaped", unsafeHome)).toThrow(TypeError);
+    expect(() => resolveStoreRoot({ kind: "default" }, { loreduHome: unsafeHome, osHome, cwd })).toThrow(
+      TypeError,
+    );
     expect(await exists(join(outside, "escaped"))).toBe(false);
+    expect(await readFile(join(outside, "sentinel"), "utf8")).toBe("unchanged");
 
-    const escaped = join(base, "escaped-descendant");
-    await initializePlainFileStore(escaped);
-    await rm(join(escaped, "records"), { recursive: true });
-    await symlink(outside, join(escaped, "records"), "dir");
-    await expect(new PlainFileStore(escaped).scan()).rejects.toMatchObject({ code: "STORE_CORRUPT" });
+    const physical = join(base, "physical-explicit-store");
+    await initializePlainFileStore(physical);
+    const explicitRecord = entry("ent_0000000000000022", "through explicit symlink");
+    await new PlainFileStore(physical).append(explicitRecord);
+    const explicitLink = join(base, "explicit-link");
+    await symlink(physical, explicitLink, "dir");
+    const selectedExplicit = resolveStoreRoot(
+      { kind: "path", path: explicitLink },
+      { loreduHome: home, osHome, cwd },
+    );
+    expect(selectedExplicit).toBe(await realpath(physical));
+    expect(Number(await new PlainFileStore(explicitLink).head())).toBe(1);
+    expect((await new PlainFileStore(selectedExplicit).get(explicitRecord.id))?.id).toBe(explicitRecord.id);
+
+    await rm(join(physical, "records"), { recursive: true });
+    await symlink(outside, join(physical, "records"), "dir");
+    await expect(new PlainFileStore(explicitLink).scan()).rejects.toMatchObject({ code: "STORE_CORRUPT" });
     expect(await readFile(join(outside, "sentinel"), "utf8")).toBe("unchanged");
   } finally {
     await dispose(base);
@@ -237,17 +249,21 @@ test("an owned append lock fails immediately, cannot age stale, and only a prove
     );
     expect(replay.some(({ record }) => record.id === attempted.id)).toBe(true);
     expect(Number(position)).toBe(replay.length);
-    expect(
-      (await readdir(join(root, ".loredu", "tmp"))).some((name) => name.startsWith("dead-write-lock--")),
-    ).toBe(true);
+    const temporaryEntries = await readdir(join(root, ".loredu", "tmp"));
+    const deadLock = temporaryEntries.find((name) => name.startsWith("dead-write-lock--"));
+    expect(deadLock).toBeDefined();
     expect(await exists(lock)).toBe(false);
 
+    if (deadLock === undefined) throw new Error("dead owner lock was not quarantined");
+    const recoveredOwner = JSON.parse(
+      await readFile(join(root, ".loredu", "tmp", deadLock, "owner.json"), "utf8"),
+    ) as Record<string, unknown>;
     await mkdir(lock);
     await writeFile(
       owner,
-      `${JSON.stringify({ format: "loredu.write-lock/v1", hostname: hostname(), pid: 2_147_483_647 })}\n`,
+      `${JSON.stringify({ ...recoveredOwner, hostname: `other-${hostname()}`, pid: 2_147_483_647 })}\n`,
     );
-    await expect(contender.append(entry("ent_0000000000000021", "same hostname"))).rejects.toMatchObject({
+    await expect(contender.append(entry("ent_0000000000000021", "different host"))).rejects.toMatchObject({
       code: "STORE_LOCKED",
     });
     expect(await exists(owner)).toBe(true);

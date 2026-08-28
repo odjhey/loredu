@@ -1,18 +1,7 @@
 import { execFile } from "node:child_process";
 import { randomUUID } from "node:crypto";
 import { constants, type Dirent, type Stats } from "node:fs";
-import {
-  lstat,
-  mkdir,
-  open,
-  readdir,
-  readFile,
-  readlink,
-  realpath,
-  rename,
-  rm,
-  unlink,
-} from "node:fs/promises";
+import { lstat, mkdir, open, readdir, readFile, readlink, rename, rm, unlink } from "node:fs/promises";
 import { hostname } from "node:os";
 import { dirname, join, relative, resolve, sep } from "node:path";
 import { promisify } from "node:util";
@@ -29,7 +18,7 @@ import {
   type StreamPosition,
 } from "@loredu/kernel";
 import { decodePlainFileRecord, encodePlainFileRecord } from "./record-codec";
-import { type ResolvedStoreRoot, STORES_DIRNAME, validateStoreName } from "./store-root";
+import { physicalizeStorePath } from "./store-root";
 
 export const PLAIN_FILE_FORMAT = "loredu.plainfile/v1";
 const FORMAT_BYTES = new TextEncoder().encode(`{"format":"${PLAIN_FILE_FORMAT}"}\n`);
@@ -54,15 +43,6 @@ interface LockOwner extends LockExecutionContext {
   readonly pid: number;
   readonly processIncarnation: string;
 }
-
-export type StoreRootInput = string | ResolvedStoreRoot;
-
-interface NormalizedStoreRoot {
-  readonly path: string;
-  readonly named?: Exclude<ResolvedStoreRoot, { readonly kind: "path" }>;
-}
-
-class NamedRootBoundaryError extends Error {}
 
 type StoreErrorCode =
   | "STORE_ALREADY_EXISTS"
@@ -116,48 +96,6 @@ async function inspect(path: string): Promise<Stats | undefined> {
   } catch (error) {
     if (isHostError(error, "ENOENT")) return undefined;
     throw error;
-  }
-}
-
-function normalizeStoreRoot(input: StoreRootInput): NormalizedStoreRoot {
-  if (typeof input === "string") {
-    if (input.length === 0) throw new TypeError("store root must be nonempty");
-    return { path: resolve(input) };
-  }
-  if (typeof input !== "object" || input === null || typeof input.path !== "string") {
-    throw new TypeError("store root must be a path or resolved selection");
-  }
-  if (input.kind === "path") return { path: resolve(input.path) };
-  if (
-    (input.kind !== "name" && input.kind !== "default") ||
-    typeof input.home !== "string" ||
-    typeof input.name !== "string"
-  ) {
-    throw new TypeError("resolved store root is invalid");
-  }
-  validateStoreName(input.name);
-  const home = resolve(input.home);
-  const path = resolve(input.path);
-  if (path !== join(home, STORES_DIRNAME, input.name)) {
-    throw new TypeError("resolved named store root does not match its home and name");
-  }
-  return { path, named: Object.freeze({ ...input, home, path }) };
-}
-
-async function assertNamedRootContained(root: NormalizedStoreRoot): Promise<void> {
-  if (root.named === undefined) return;
-  const home = root.named.home;
-  const stores = join(home, STORES_DIRNAME);
-  for (const path of [stores, root.path]) {
-    const stat = await inspect(path);
-    if (stat?.isSymbolicLink()) throw new NamedRootBoundaryError(`named store path is a symlink: ${path}`);
-  }
-  const rootStat = await inspect(root.path);
-  if (rootStat === undefined) return;
-  const [physicalHome, physicalRoot] = await Promise.all([realpath(home), realpath(root.path)]);
-  const fromHome = relative(physicalHome, physicalRoot);
-  if (fromHome === "" || fromHome === ".." || fromHome.startsWith(`..${sep}`)) {
-    throw new NamedRootBoundaryError(`named store root escapes Loredu home: ${root.path}`);
   }
 }
 
@@ -229,9 +167,8 @@ export function recordFileName(position: StreamPosition, id: RecordId): string {
  * Establish a fresh plain-file store and durably publish its format/layout.
  * Opening a store never calls this function implicitly.
  */
-export async function initializePlainFileStore(rootInput: StoreRootInput): Promise<void> {
-  const selection = normalizeStoreRoot(rootInput);
-  const root = selection.path;
+export async function initializePlainFileStore(rootInput: string): Promise<void> {
+  const root = physicalizeStorePath(rootInput);
   const control = join(root, ".loredu");
   const temporary = join(control, "tmp");
   const records = join(root, "records");
@@ -239,7 +176,6 @@ export async function initializePlainFileStore(rootInput: StoreRootInput): Promi
   const syncPaths = new Set<string>();
 
   try {
-    await assertNamedRootContained(selection);
     const existing = await inspect(root);
     if (existing !== undefined) {
       if (!existing.isDirectory() || existing.isSymbolicLink() || (await readdir(root)).length !== 0) {
@@ -268,7 +204,6 @@ export async function initializePlainFileStore(rootInput: StoreRootInput): Promi
       }
     }
 
-    await assertNamedRootContained(selection);
     await mkdir(control);
     await mkdir(temporary);
     await mkdir(records);
@@ -285,9 +220,6 @@ export async function initializePlainFileStore(rootInput: StoreRootInput): Promi
     for (const path of syncPaths) await fsyncDirectory(path);
   } catch (error) {
     if (error instanceof LoreduError) throw error;
-    if (error instanceof NamedRootBoundaryError) {
-      throw storeError("STORE_ALREADY_EXISTS", `cannot initialize unsafe named store root: ${root}`);
-    }
     if (isHostError(error, "EEXIST")) {
       throw storeError("STORE_ALREADY_EXISTS", `plain-file store already exists at ${root}`);
     }
@@ -297,7 +229,6 @@ export async function initializePlainFileStore(rootInput: StoreRootInput): Promi
 
 /** Durable, append-serialized Markdown/frontmatter RecordStore adapter. */
 export class PlainFileStore implements RecordStore {
-  readonly #selection: NormalizedStoreRoot;
   readonly #root: string;
   readonly #recordsDirectory: string;
   readonly #controlDirectory: string;
@@ -305,9 +236,8 @@ export class PlainFileStore implements RecordStore {
   readonly #lockDirectory: string;
   readonly #lockOwnerPath: string;
 
-  constructor(root: StoreRootInput) {
-    this.#selection = normalizeStoreRoot(root);
-    this.#root = this.#selection.path;
+  constructor(root: string) {
+    this.#root = physicalizeStorePath(root);
     this.#recordsDirectory = join(this.#root, "records");
     this.#controlDirectory = join(this.#root, ".loredu");
     this.#temporaryDirectory = join(this.#controlDirectory, "tmp");
@@ -463,6 +393,7 @@ export class PlainFileStore implements RecordStore {
 
     const local = await localLockExecutionContext();
     if (
+      owner.hostname !== hostname() ||
       owner.bootId !== local.bootId ||
       owner.pidNamespace !== local.pidNamespace ||
       !this.#isProcessProvenDead(owner.pid)
@@ -503,7 +434,6 @@ export class PlainFileStore implements RecordStore {
   async #validateLayout(): Promise<void> {
     let root: Stats;
     try {
-      await assertNamedRootContained(this.#selection);
       root = await lstat(this.#root);
     } catch (error) {
       if (isHostError(error, "ENOENT")) {
@@ -511,9 +441,6 @@ export class PlainFileStore implements RecordStore {
           "STORE_NOT_FOUND",
           `plain-file store not found at ${this.#root}; initialize it with lor init`,
         );
-      }
-      if (error instanceof NamedRootBoundaryError) {
-        throw storeError("STORE_CORRUPT", `named store root is not physically contained: ${this.#root}`);
       }
       throw storeError("STORE_IO_FAILED", `could not inspect plain-file store ${this.#root}`);
     }
