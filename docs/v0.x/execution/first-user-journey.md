@@ -193,8 +193,12 @@ Journey 3b already recorded the complete-group judgment and proved M1.5 health. 
 
 ```text
 $ lor current --scope repo=rozoro
-(code-area command-registration) location = src/cli/commands  [preferred, clm_3333333333333333]
-reconciliation: preferred=1 disputed=0
+knowledge: {"scope":{"repo":"rozoro"},"subject":{"type":"code-area","id":"command-registration"},"predicate":"location"} state=preferred
+  value: "src/cli/commands" representative=clm_3333333333333333
+computed_at: <canonical timestamp>
+reconciliation: {"state":"projection","relations":{"duplicate":0,"corroboration":1,"support":0,"conflict":2,"coexistence":0,"temporal_succession":0},"knowledge":{"preferred":1,"coexisting":0,"disputed":0,"retracted":0},"policy_advisories":0,"related":[]}
+basis: {"stream_position":5,"ruleset":{"core":"loredu.reconciliation/v1","claim_policy":{"id":"loredu.default","version":"1"}},"query":{"operation":"current","scope":{"repo":"rozoro"},"valid_at":"<same canonical timestamp>"}}
+page: returned=1 total=1
 ```
 
 The winning `prefer` Resolution is recorded-visible, effective, directly covers all applicable Claims, and names its same-key replacement. Current Knowledge exposes at most two representatives, full history/evidence counts, an exact-key Claim affordance, Basis, separate `computed_at`, and a page. “Preferred” reports deterministic precedence, not a truth judgment.
@@ -203,12 +207,9 @@ The winning `prefer` Resolution is recorded-visible, effective, directly covers 
 
 ```text
 $ lor current --scope repo=rozoro --as-of 2026-08-26T12:00:00Z
-(code-area command-registration) location = src/commands  [preferred]
 $ lor current --scope repo=rozoro --valid-at 2026-07-15T00:00:00Z
-(code-area command-registration) location = src/cli/commands  [preferred]
 $ lor current --scope repo=rozoro \
     --as-of 2026-07-15T00:00:00Z --valid-at 2026-07-15T00:00:00Z
-(code-area command-registration) location = src/commands  [preferred]
 ```
 
 `as_of` is an inclusive recorded-time cutoff. Alone it also supplies the valid-time point. Explicit `valid_at` is the inclusive external-world point; the combination keeps both dimensions independent. Bare current captures one Clock instant as its resolved `valid_at`, records that semantic input in Basis query, and keeps the same sample separately as informational `computed_at`.
