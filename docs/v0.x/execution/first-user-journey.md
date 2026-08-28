@@ -307,9 +307,9 @@ Grouped by milestone; **AC n** = acceptance criterion in [goal and scope](../sco
 | T51 | exits are exact: 0 executed, 2 usage/validation/reference/cursor, 3 not-found, 4 store/provider, 5 unhealthy `--check`, 6 capability/internal | agent ergonomics, ADR 0026 |
 | T52 | `add entry --body -` reads stdin; body round-trips byte-exact through store and `show` | journey 2 |
 | T53 | `add claim` prints new/conflict/coexisting feedback plus M2-R's exact duplicate/corroboration/support/temporal-succession classes with related fields limited to the selected class; a post-commit read failure prints committed-but-feedback-unavailable with status advice and still exits 0 | journey 2–3, ADR 0026/0027 |
-| T54 | after M2/M3 commands exist, end-to-end scenario A (three runs, revalidation surfaced) through the binary | S A, staged M2/M3 |
+| T54 | after M3 Working Lore exists, end-to-end scenario A combines the implemented three-run M2 narrative with revalidation surfaced through the binary | S A, staged M3 |
 | T55 | after M2 temporal projection exists, end-to-end scenario B (30→60-day amendment, all four temporal queries) through the binary | S B, M2 |
-| T56 | staged end-to-end journey 0→8 as one scripted fresh-store session: M1.5 record/query/health first, then M2 current/time and M3 lore when those commands land | AC 12 (ergonomics), ADR 0026 |
+| T56 | staged end-to-end journey 0→8 as one scripted fresh-store session: implemented M1.5 record/query/health and M2 current/time, then M3 lore when it lands | AC 12 (ergonomics), ADR 0026, staged M3 |
 | T57 | AC 12 measured at M1.5: journey 2 (entry + claim) is ≤ 2 commands; empty orientation is one bare `lor` status command (a scoped claims query is optional follow-up) | AC 12, ADR 0026 |
 | T58 | content first: bare `lor` prints the orientation/status view (live data, exit 0), not help; `lor <command> --help` prints a concise per-command reference; an unknown flag fails with an actionable error, never ignored | agent ergonomics, journey 3b |
 

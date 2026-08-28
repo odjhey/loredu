@@ -36,12 +36,12 @@
     "T54": {
       "milestone": "M3",
       "group": "CLI conformance (compiled binary)",
-      "reason": "full scenario requires M2 projections and M3 Working Lore"
+      "reason": "the M2 narrative is covered, but the full row awaits M3 Working Lore revalidation"
     },
     "T56": {
       "milestone": "M3",
       "group": "CLI conformance (compiled binary)",
-      "reason": "complete staged journey requires M2 current and M3 lore commands"
+      "reason": "the M1.5 and M2 portions are implemented; the complete journey awaits M3 lore"
     },
     "T75": {
       "milestone": "M3",

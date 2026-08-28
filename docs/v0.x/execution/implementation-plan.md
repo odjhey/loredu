@@ -98,7 +98,7 @@ The complete M2 scope is:
 
 Deterministic derived-to-manual relation comparison uses the contract mapping and flags disagreements for review; it never silently appends, deletes, or prefers either side. M2-R provides executable T20–T23/T86 evidence for the internal foundation without publishing a reconciliation runtime function. M2-P provides public-API T24–T30 evidence. M2-E provides compiled scenarios A/B/C and moves only T55; T54 remains deferred because its Working Lore/revalidation assertion belongs to M3. [`catalog-status.json`](./catalog-status.json) and executable `@covers` annotations own exact accounting.
 
-Exit is implemented: from public exports, T20–T30/T86 pass against both default semantics and a deterministic custom-policy fixture; all four temporal modes, January queries with future Resolution replacements or inapplicable `new → old` supersedes edges, one-value precedence cycles, overlapping-versus-disjoint status health, Resolution precedence/completeness, exact advice-context admission/calls, the 200/201 advisory boundary and validation order, bounded combined-stream cursor behavior, mutation temporal-succession feedback, history/evidence counts, stale/ruleset/query invalidation, and replay are exact. Compiled scenarios exercise technical/manual reconciliation review, late-recorded policy amendment time travel, cross-actor legal keys, process perspectives, custom-policy Basis identity, persistence/reopen, and immutable canonical counts; compiled `current` preserves the M1.5 protocol. Deleting derived state and replaying canonical records reproduces semantic content for the same Basis.
+Exit is implemented: from public exports, T20–T30/T86 pass against both default semantics and a deterministic custom-policy fixture; all four temporal modes, January queries with future Resolution replacements or inapplicable `new → old` supersedes edges, one-value precedence cycles, overlapping-versus-disjoint status health, Resolution precedence/completeness, exact advice-context admission/calls, the 200/201 advisory boundary and validation order, bounded combined-stream cursor behavior, mutation temporal-succession feedback, history/evidence counts, stale/ruleset/query invalidation, and replay are exact. Compiled scenarios exercise technical/manual reconciliation review, late-recorded policy amendment time travel, cross-actor legal keys, process perspectives, custom-policy Basis identity, persistence/reopen, immutable canonical counts, and unchanged store artifact trees across projection reads; compiled `current` preserves the M1.5 protocol. Deleting derived state and replaying canonical records reproduces semantic content for the same Basis.
 
 ## M3 — Working Lore
 
@@ -136,6 +136,7 @@ Verify:
 - current projection does not claim `src/commands` is exhaustive;
 - earlier `as_of` projection reproduces the earlier belief;
 - supporting entries/source refs are inspectable;
+- mapped derived relations can be compared with manual Relation records for agreement or review-worthy disagreement without mutating canonical history;
 - Working Lore returns a compact current pattern plus any revalidation attention rather than all three raw entries.
 
 ## Acceptance scenario B — policy change
@@ -162,6 +163,7 @@ Verify:
 
 - A and B reconcile as corroboration; a differing value under the same exact key with default `exclusive` semantics surfaces as a candidate conflict;
 - the perspective variants coexist without destructive reconciliation; a consumer ClaimPolicy may later add a deterministic cross-perspective advisory without changing core;
+- a versioned custom ClaimPolicy can change same-key semantics through the composition seam, with its identity carried in Basis;
 - a claim with a malformed or missing required key is rejected at validation, not silently stored.
 
 ## Guardrail scenario — business-process perspectives
