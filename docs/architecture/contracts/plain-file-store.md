@@ -54,7 +54,7 @@ function defaultLoreduHome(
 function storeRootForName(name: string, home: string): string
 ```
 
-`StoreRootSelection` rejects empty path/name strings; its exact discriminants prevent simultaneous selectors and provider guessing. The calling surface applies path > name > default precedence and the classification rule under [Store roots](#store-roots) before calling it. The existing adapter diagnostics `STORE_ADAPTER_NAME = "plainfile"` and `SUPPORTED_RECORD_SCHEMA = RECORD_SCHEMA_ID` remain exported constants, not alternate format authorities.
+`StoreRootSelection` rejects empty path/name strings; its exact discriminants prevent simultaneous selectors and provider guessing. `resolveStoreRoot`, `storeRootForName`, `initializePlainFileStore`, and the `PlainFileStore` constructor use primitive strings exactly; no resolved-root wrapper is exported. The calling surface applies path > name > default precedence and the classification rule under [Store roots](#store-roots) before calling it. The existing adapter diagnostics `STORE_ADAPTER_NAME = "plainfile"` and `SUPPORTED_RECORD_SCHEMA = RECORD_SCHEMA_ID` remain exported constants, not alternate format authorities.
 
 Construction performs no creation. Each operation validates the existing root/format before reading or writing. Initialization is explicit.
 
@@ -153,13 +153,13 @@ Resolution precedence is exact:
 2. otherwise `name` when supplied;
 3. otherwise the name `default`.
 
-An explicit path is not put under Loredu home and triggers no upward search. An explicit relative path resolves against the supplied `cwd`; this is the only intentional cwd-relative behavior. Named/default roots never use cwd. A store name is 1–128 Unicode scalars but ASCII lowercase only, begins and ends `[a-z0-9]`, contains only `[a-z0-9._-]`, and is neither `.` nor `..`. It resolves to `<home>/stores/<name>`.
+An explicit path is not put under Loredu home and triggers no upward search. An explicit relative path resolves against the supplied `cwd`; this is the only intentional cwd-relative behavior. An explicit path selection establishes a physical root: an existing root symlink resolves to its target, and a missing root resolves its nearest existing ancestor physically before appending the missing suffix. Named/default roots never use cwd. A store name is 1–128 Unicode scalars but ASCII lowercase only, begins and ends `[a-z0-9]`, contains only `[a-z0-9._-]`, and is neither `.` nor `..`. It resolves to `<home>/stores/<name>`.
 
 Home is a nonempty `LOREDU_HOME`, otherwise `<osHome>/.loredu`; empty `LOREDU_HOME` counts as absent. A CLI with one `--store` token classifies it as a path when absolute, when it starts with `.` plus a platform separator, or when it contains a platform separator; all other tokens are names. Invalid names reject rather than becoming accidental paths.
 
 Missing resolved roots fail `STORE_NOT_FOUND` with an actionable `lor init` hint. A bad marker/layout is `STORE_CORRUPT`. No read or ordinary command silently creates a directory and there is no cwd-parent discovery.
 
-All canonical/control paths are joined beneath the selected root. Descendant symlinks and name traversal reject. For named/default selections, neither `<home>/stores` nor the named root may be a symlink, and an existing root's physical path must remain beneath the physical home; opening an explicit path instead establishes its physical root before containment checks. Named stores have disjoint roots, locks, position sequences, and reads. A store directory may be relocated and reopened by selecting its new explicit path; the layout stores no absolute-root identity. No operation follows a record/control symlink or accesses another named root.
+All canonical/control paths are joined beneath the selected root. Descendant symlinks and name traversal reject. While the name/default discriminant still exists, `resolveStoreRoot` (and the name-aware `storeRootForName`) rejects an existing `<home>/stores` or named root symlink and requires existing named paths to remain physically beneath the physical home. The helper then returns only the primitive root string; initialization and opening resolve that string to its physical root, including through an explicit root symlink, while preserving no-follow checks for descendants. Named stores have disjoint roots, locks, position sequences, and reads. A store directory may be relocated and reopened by selecting its new explicit path; the layout stores no absolute-root identity. No operation follows a record/control symlink or accesses another named root.
 
 ## Stable adapter errors
 
