@@ -67,13 +67,27 @@ describe("authoritative workspace boundary guard", () => {
   test("the real workspace is clean", () => expect(scanWorkspace(REPO_ROOT)).toEqual([]));
 
   test("the CLI embedded-skill import is restricted to its regular canonical source", () => {
-    const root = fixture();
-    rmSync(join(root, "docs/v0.x/execution/agent-skill.md"));
-    expect(scanWorkspace(root)).toContainEqual(
+    const missing = fixture();
+    rmSync(join(missing, "docs/v0.x/execution/agent-skill.md"));
+    expect(scanWorkspace(missing)).toContainEqual(
       violation(
         "packages/cli/src/embedded-skill.ts",
         "boundary-unresolved",
         "1:20 embedded skill source is not a regular file",
+      ),
+    );
+
+    const linked = fixture();
+    const external = mkdtempSync(join(tmpParent(), "loredu-boundary-skill-"));
+    temporaryRoots.push(external);
+    cpSync(join(linked, "docs/v0.x/execution/agent-skill.md"), join(external, "agent-skill.md"));
+    rmSync(join(linked, "docs/v0.x/execution"), { recursive: true });
+    symlinkSync(external, join(linked, "docs/v0.x/execution"), "dir");
+    expect(scanWorkspace(linked)).toContainEqual(
+      violation(
+        "packages/cli/src/embedded-skill.ts",
+        "boundary-unresolved",
+        "1:20 embedded skill source is outside its canonical workspace path",
       ),
     );
   });

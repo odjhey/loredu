@@ -361,6 +361,21 @@ function checkReference(
     const asset = inspect(embeddedSkill);
     if (!asset?.isFile() || asset.isSymbolicLink()) {
       push(result, root, file, "boundary-unresolved", `${at} embedded skill source is not a regular file`);
+    } else {
+      let canonical = false;
+      try {
+        canonical =
+          realpathSync(embeddedSkill) ===
+          join(realpathSync(root), "docs", "v0.x", "execution", "agent-skill.md");
+      } catch {}
+      if (!canonical)
+        push(
+          result,
+          root,
+          file,
+          "boundary-unresolved",
+          `${at} embedded skill source is outside its canonical workspace path`,
+        );
     }
     return;
   }
