@@ -222,25 +222,65 @@ function completeResolution(resolution: PositionedResolution, claims: readonly P
 
 function directedCycleMembers(edges: readonly (readonly [ClaimId, ClaimId])[]): ReadonlySet<ClaimId> {
   const outgoing = new Map<ClaimId, ClaimId[]>();
+  const incoming = new Map<ClaimId, ClaimId[]>();
+  const selfLoops = new Set<ClaimId>();
+  const adjacency = (graph: Map<ClaimId, ClaimId[]>, id: ClaimId): ClaimId[] => {
+    const existing = graph.get(id);
+    if (existing) return existing;
+    const created: ClaimId[] = [];
+    graph.set(id, created);
+    return created;
+  };
   for (const [from, to] of edges) {
-    const values = outgoing.get(from) ?? [];
-    values.push(to);
-    outgoing.set(from, values);
+    adjacency(outgoing, from).push(to);
+    adjacency(outgoing, to);
+    adjacency(incoming, to).push(from);
+    adjacency(incoming, from);
+    if (from === to) selfLoops.add(from);
   }
-  const members = new Set<ClaimId>();
+
+  const visited = new Set<ClaimId>();
+  const finished: ClaimId[] = [];
   for (const start of outgoing.keys()) {
-    const pending = [...(outgoing.get(start) ?? [])];
-    const visited = new Set<ClaimId>();
+    if (visited.has(start)) continue;
+    visited.add(start);
+    const stack: { id: ClaimId; next: number }[] = [{ id: start, next: 0 }];
+    while (stack.length > 0) {
+      const frame = stack[stack.length - 1] as { id: ClaimId; next: number };
+      const neighbors = outgoing.get(frame.id) as ClaimId[];
+      const next = neighbors[frame.next];
+      if (next !== undefined) {
+        frame.next++;
+        if (!visited.has(next)) {
+          visited.add(next);
+          stack.push({ id: next, next: 0 });
+        }
+      } else {
+        finished.push(frame.id);
+        stack.pop();
+      }
+    }
+  }
+
+  const assigned = new Set<ClaimId>();
+  const members = new Set<ClaimId>();
+  for (let index = finished.length - 1; index >= 0; index--) {
+    const start = finished[index] as ClaimId;
+    if (assigned.has(start)) continue;
+    assigned.add(start);
+    const component: ClaimId[] = [];
+    const pending = [start];
     while (pending.length > 0) {
       const current = pending.pop() as ClaimId;
-      if (current === start) {
-        members.add(start);
-        break;
+      component.push(current);
+      for (const next of incoming.get(current) as ClaimId[]) {
+        if (assigned.has(next)) continue;
+        assigned.add(next);
+        pending.push(next);
       }
-      if (visited.has(current)) continue;
-      visited.add(current);
-      pending.push(...(outgoing.get(current) ?? []));
     }
+    if (component.length > 1 || selfLoops.has(start))
+      for (const member of component) members.add(member);
   }
   return members;
 }
