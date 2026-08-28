@@ -6,7 +6,8 @@ directories ([ADR 0011](../docs/decisions/0011-repo-package-architecture.md)).
 Tests here normally exercise **published package exports** or the compiled `lor`
 binary. Package-local tests own implementation details; the
 [reconciliation group](./reconciliation/README.md) documents M2-R's bounded temporary
-internal seam while M2-P exercises public Current Knowledge through package exports.
+internal seam, M2-P exercises public Current Knowledge through package exports, and
+M2-E crosses the compiled CLI, plain-file persistence, and scenario narratives.
 
 ```sh
 bun test                       # whole tree
@@ -23,7 +24,7 @@ bun test tests/store           # one group
 | [`reconciliation/`](./reconciliation/README.md) | M0 identity primitives (T81–T82); M2 reconciliation and public projections (T20–T30, T86) |
 | [`working-lore/`](./working-lore/README.md) | M3 — Working Lore (T40–T45) |
 | [`cli-conformance/`](./cli-conformance/README.md) | Compiled CLI conformance (T50–T58, T65, T73–T75) plus adapter/rendering checks over application semantics |
-| [`scenarios/`](./scenarios/README.md) | acceptance scenarios A/B/C, end to end |
+| [`scenarios/`](./scenarios/README.md) | M2 acceptance narratives A/B/C; scenario A completes under M3 |
 
 ## Claiming a catalog T-number
 

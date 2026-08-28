@@ -1,7 +1,7 @@
 # `@loredu/kernel`
 
-The application kernel: record semantics, ports, and (as M0/M2 land) the append
-path, reconciliation, projections, and Working Lore.
+The application kernel: record semantics, ports, append path, reconciliation, and
+projections. M3 will add Working Lore.
 
 ## Invariants this package is built to keep
 
