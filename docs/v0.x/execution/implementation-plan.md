@@ -80,7 +80,9 @@ Exit: an agent given only the binary and `lor skill` completes the M1.5 portions
 
 ## M2 — Reconciliation and projection
 
-Implement [decision 0027](../../decisions/0027-m2-reconciliation-projection-contract.md) and the exact [projection contract](../../architecture/contracts/projection.md):
+Implement [decision 0027](../../decisions/0027-m2-reconciliation-projection-contract.md) and the exact [projection contract](../../architecture/contracts/projection.md). Delivery is staged: M2-R has landed the bounded internal reconciliation foundation plus additive Claim feedback and overlap-aware status health; M2-P/E still owns public Current Knowledge, temporal projection, summaries/evidence, cursor, and rebuild/cache wiring.
+
+The complete M2 scope is:
 
 - one bounded surface-neutral `current(query?)` operation over an atomic RecordStore scan, plus CLI `current` with scope, `--as-of`, `--valid-at`, pagination, and unchanged envelope/error/exit conventions;
 - an always-explicit resolved valid-time point in Basis query: bare current uses its one Clock sample, `as_of=A` alone uses A, explicit `valid_at=V` wins, and combined queries independently apply recorded and valid time;
@@ -94,7 +96,7 @@ Implement [decision 0027](../../decisions/0027-m2-reconciliation-projection-cont
 - M2 status conflict sets as unions of overlapping-validity/different-value exclusive pair endpoints, with counts/Resolution coverage over that set, no Clock, and purely disjoint succession unable to block or reopen health;
 - structural Basis exactly `{stream_position,ruleset,query}`, separate `computed_at`, store-wide staleness, query/ruleset invalidation, and ADR 0027's narrow semantic-content replacement for ADR 0006 byte identity, excluding computed time/rendering/private cursor bytes.
 
-Deterministic derived-to-manual relation comparison uses the contract mapping and flags disagreements for review; it never silently appends, deletes, or prefers either side. T20–T30/T86 are contract-ready but remain deferred until executable coverage exists. M2-C changes no code or catalog row.
+Deterministic derived-to-manual relation comparison uses the contract mapping and flags disagreements for review; it never silently appends, deletes, or prefers either side. M2-R provides executable T20–T23/T86 evidence for the internal foundation without publishing a reconciliation runtime function. T24–T30 remain deferred to M2-P/E; [`catalog-status.json`](./catalog-status.json) and executable `@covers` annotations own exact accounting.
 
 Exit: from public exports, T20–T30/T86 pass against both default semantics and a deterministic custom-policy fixture; all four temporal modes, January queries with future Resolution replacements or inapplicable `new → old` supersedes edges, one-value precedence cycles, overlapping-versus-disjoint status health, Resolution precedence/completeness, exact advice-context admission/calls, the 200/201 advisory boundary and validation order, bounded combined-stream cursor behavior, mutation temporal-succession feedback, history/evidence counts, stale/ruleset/query invalidation, and replay are exact; the compiled `current` command preserves the M1.5 protocol; deleting derived state and replaying canonical records reproduces semantic content for the same Basis.
 

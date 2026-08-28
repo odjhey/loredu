@@ -93,3 +93,14 @@ export type {
 export { createInstant, createStreamPosition } from "./ports/capabilities";
 export type { ClaimPolicy, ClaimSemantics } from "./ports/claim-policy";
 export { DEFAULT_CLAIM_POLICY } from "./ports/claim-policy";
+export type {
+  ClaimPolicyAdviceContext,
+  CurrentKnowledgeState,
+  DerivedRelation,
+  DerivedRelationType,
+  PolicyAdvisory,
+  PolicyAdvisoryDraft,
+  PositionedClaim,
+  PositionedRelation,
+  PositionedResolution,
+} from "./reconciliation";

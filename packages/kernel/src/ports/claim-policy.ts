@@ -12,10 +12,11 @@ import {
   scalarLength,
 } from "../domain/portable-json";
 import { LoreduError, type LoreduIssue, type LoreduIssueCode } from "../errors";
+import type { ClaimPolicyAdviceContext, PolicyAdvisoryDraft } from "../reconciliation";
 
 const TOKEN = /^[a-z0-9](?:[a-z0-9._:/-]*[a-z0-9])?$/;
-const POLICY_FIELDS = new Set(["id", "version", "validateClaimKey", "semantics"]);
-const FORBIDDEN_POLICY_FIELDS = ["identity", "advise", "advisories"] as const;
+const POLICY_FIELDS = new Set(["id", "version", "validateClaimKey", "semantics", "advise"]);
+const FORBIDDEN_POLICY_FIELDS = ["identity", "advisories"] as const;
 const ISSUE_CODES: ReadonlySet<LoreduIssueCode> = new Set([
   "REQUIRED",
   "TYPE",
@@ -30,6 +31,7 @@ const ISSUE_CODES: ReadonlySet<LoreduIssueCode> = new Set([
 ]);
 const JSON_POINTER = /^(?:|(?:\/(?:[^~]|~[01])*)+)$/u;
 const intrinsicReflectApply = Reflect.apply;
+const POLICY_PROTOTYPE_LIMIT = 32;
 
 export type ClaimSemantics = "exclusive" | "coexisting";
 
@@ -38,6 +40,7 @@ export interface ClaimPolicy {
   readonly version: string;
   validateClaimKey(key: ClaimKey): readonly LoreduIssue[];
   semantics(key: ClaimKey): ClaimSemantics;
+  advise?(context: ClaimPolicyAdviceContext): readonly PolicyAdvisoryDraft[];
 }
 
 function orderedIssues(issues: readonly LoreduIssue[]): readonly LoreduIssue[] {
@@ -83,24 +86,38 @@ function rejectUnknown(
   }
 }
 
-function readDataProperty(value: object, key: string, path: string, issues: LoreduIssue[]): unknown {
+interface ReadPolicyField {
+  readonly present: boolean;
+  readonly readable: boolean;
+  readonly value?: unknown;
+}
+
+function readDataProperty(value: object, key: string, path: string, issues: LoreduIssue[]): ReadPolicyField {
   try {
     let current: object | null = value;
+    const visited = new Set<object>();
+    let inspected = 0;
     while (current !== null) {
+      if (visited.has(current) || inspected >= POLICY_PROTOTYPE_LIMIT) {
+        issues.push(makeIssue("TYPE", path, "could not inspect ClaimPolicy field"));
+        return Object.freeze({ present: false, readable: false });
+      }
+      visited.add(current);
+      inspected++;
       const descriptor = Reflect.getOwnPropertyDescriptor(current, key);
       if (descriptor) {
         if (!("value" in descriptor)) {
           issues.push(makeIssue("TYPE", path, "must be a data property"));
-          return undefined;
+          return Object.freeze({ present: true, readable: false });
         }
-        return descriptor.value;
+        return Object.freeze({ present: true, readable: true, value: descriptor.value });
       }
       current = Reflect.getPrototypeOf(current);
     }
-    return undefined;
+    return Object.freeze({ present: false, readable: true });
   } catch {
     issues.push(makeIssue("TYPE", path, "could not inspect ClaimPolicy field"));
-    return undefined;
+    return Object.freeze({ present: false, readable: false });
   }
 }
 
@@ -151,6 +168,7 @@ export interface ValidatedClaimPolicy {
   readonly version: string;
   validateClaimKey(key: ClaimKey): unknown;
   semantics(key: ClaimKey): unknown;
+  advise?(context: ClaimPolicyAdviceContext): unknown;
 }
 
 function invalidCallbackResult(message: string): readonly LoreduIssue[] {
@@ -265,15 +283,19 @@ export function validateClaimPolicy(policy: unknown): ValidatedClaimPolicy {
     }
   }
 
-  const id = readDataProperty(policy, "id", "/id", issues);
-  const version = readDataProperty(policy, "version", "/version", issues);
-  const validator = readDataProperty(policy, "validateClaimKey", "/validateClaimKey", issues);
-  const semantics = readDataProperty(policy, "semantics", "/semantics", issues);
+  const id = readDataProperty(policy, "id", "/id", issues).value;
+  const version = readDataProperty(policy, "version", "/version", issues).value;
+  const validator = readDataProperty(policy, "validateClaimKey", "/validateClaimKey", issues).value;
+  const semantics = readDataProperty(policy, "semantics", "/semantics", issues).value;
+  const adviseField = readDataProperty(policy, "advise", "/advise", issues);
+  const advise = adviseField.value;
   const parsedId = validateToken(id, "/id", issues);
   const parsedVersion = validateToken(version, "/version", issues);
   if (typeof validator !== "function")
     issues.push(makeIssue("TYPE", "/validateClaimKey", "must be a function"));
   if (typeof semantics !== "function") issues.push(makeIssue("TYPE", "/semantics", "must be a function"));
+  if (adviseField.present && adviseField.readable && typeof advise !== "function")
+    issues.push(makeIssue("TYPE", "/advise", "must be a function when present"));
 
   const ordered = orderedIssues(issues);
   if (
@@ -281,12 +303,14 @@ export function validateClaimPolicy(policy: unknown): ValidatedClaimPolicy {
     !parsedId ||
     !parsedVersion ||
     typeof validator !== "function" ||
-    typeof semantics !== "function"
+    typeof semantics !== "function" ||
+    (adviseField.present && typeof advise !== "function")
   )
     throw new LoreduError("VALIDATION_FAILED", "ClaimPolicy validation failed", ordered);
   const capturedPolicy = policy as ClaimPolicy;
   const capturedValidator = validator;
   const capturedSemantics = semantics;
+  const capturedAdvise = advise;
   return Object.freeze({
     policy: capturedPolicy,
     id: parsedId,
@@ -297,5 +321,12 @@ export function validateClaimPolicy(policy: unknown): ValidatedClaimPolicy {
     semantics(key: ClaimKey): unknown {
       return intrinsicReflectApply(capturedSemantics, capturedPolicy, [key]);
     },
+    ...(!adviseField.present || typeof capturedAdvise !== "function"
+      ? {}
+      : {
+          advise(context: ClaimPolicyAdviceContext): unknown {
+            return intrinsicReflectApply(capturedAdvise, capturedPolicy, [context]);
+          },
+        }),
   });
 }

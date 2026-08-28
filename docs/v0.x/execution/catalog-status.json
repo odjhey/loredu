@@ -3,60 +3,40 @@
   "catalog": "docs/v0.x/execution/first-user-journey.md",
   "note": "Every catalog T-number is either claimed by an executable test under tests/ (via an @covers annotation) or listed here with the milestone that will implement it. Never both, never neither. See ADR 0015.",
   "deferred": {
-    "T20": {
-      "milestone": "M2",
-      "group": "M2 — reconciliation, resolution, projections",
-      "reason": "reconciliation and projection engine not implemented yet"
-    },
-    "T21": {
-      "milestone": "M2",
-      "group": "M2 — reconciliation, resolution, projections",
-      "reason": "reconciliation and projection engine not implemented yet"
-    },
-    "T22": {
-      "milestone": "M2",
-      "group": "M2 — reconciliation, resolution, projections",
-      "reason": "reconciliation and projection engine not implemented yet"
-    },
-    "T23": {
-      "milestone": "M2",
-      "group": "M2 — reconciliation, resolution, projections",
-      "reason": "reconciliation and projection engine not implemented yet"
-    },
     "T24": {
       "milestone": "M2",
       "group": "M2 — reconciliation, resolution, projections",
-      "reason": "reconciliation and projection engine not implemented yet"
+      "reason": "complete Resolution behavior is not wired through public Current Knowledge yet"
     },
     "T25": {
       "milestone": "M2",
       "group": "M2 — reconciliation, resolution, projections",
-      "reason": "reconciliation and projection engine not implemented yet"
+      "reason": "recorded-time Current Knowledge queries are not implemented yet"
     },
     "T26": {
       "milestone": "M2",
       "group": "M2 — reconciliation, resolution, projections",
-      "reason": "reconciliation and projection engine not implemented yet"
+      "reason": "valid-time Current Knowledge queries are not implemented yet"
     },
     "T27": {
       "milestone": "M2",
       "group": "M2 — reconciliation, resolution, projections",
-      "reason": "reconciliation and projection engine not implemented yet"
+      "reason": "combined recorded-time and valid-time projection is not implemented yet"
     },
     "T28": {
       "milestone": "M2",
       "group": "M2 — reconciliation, resolution, projections",
-      "reason": "reconciliation and projection engine not implemented yet"
+      "reason": "public projection replay and semantic-content comparison are not implemented yet"
     },
     "T29": {
       "milestone": "M2",
       "group": "M2 — reconciliation, resolution, projections",
-      "reason": "reconciliation and projection engine not implemented yet"
+      "reason": "Current Knowledge Basis, advice invocation, and cursor continuation are not implemented yet"
     },
     "T30": {
       "milestone": "M2",
       "group": "M2 — reconciliation, resolution, projections",
-      "reason": "reconciliation and projection engine not implemented yet"
+      "reason": "projection staleness and cache invalidation are not implemented yet"
     },
     "T40": {
       "milestone": "M3",
@@ -107,11 +87,6 @@
       "milestone": "M3",
       "group": "Pagination and link-following (ADR 0009)",
       "reason": "Working Lore section continuation lands in M3"
-    },
-    "T86": {
-      "milestone": "M2",
-      "group": "M2 — reconciliation, resolution, projections",
-      "reason": "value canonicalization lands with the kernel in M0; its use in conflict detection is M2"
     }
   }
 }

@@ -9,9 +9,9 @@ created_at: 2026-08-26T00:00:00+08:00
 
 # First user journey and behavioral test cases
 
-The first user is the project owner plus their agents, driving Loredu through the CLI ([decision 0007](../../decisions/0007-typescript-bun.md)). The binary is `lor` — short enough for agents to type constantly. This document describes usage step by step and derives the behavioral tests that must be automated. [Decision 0026](../../decisions/0026-m15-application-cli-contract.md) fixes the implemented M1.5 protocol; [decision 0027](../../decisions/0027-m2-reconciliation-projection-contract.md) fixes the additive M2 `current`/temporal projection protocol; M2 implementation and M3 remain staged.
+The first user is the project owner plus their agents, driving Loredu through the CLI ([decision 0007](../../decisions/0007-typescript-bun.md)). The binary is `lor` — short enough for agents to type constantly. This document describes usage step by step and derives the behavioral tests that must be automated. [Decision 0026](../../decisions/0026-m15-application-cli-contract.md) fixes the implemented M1.5 protocol; [decision 0027](../../decisions/0027-m2-reconciliation-projection-contract.md) fixes the additive M2 `current`/temporal projection protocol. M2-R reconciliation mechanics are implemented, while public Current Knowledge and M3 remain staged.
 
-The CLI arrives right after M1, before full reconciliation, and its semantic responses are **agent-reactive** ([decision 0008](../../decisions/0008-cli-first-agent-reactive.md)): they expose mechanical feedback, health, and deterministic affordances when applicable so an agent can chain calls until health passes. M1.5 orientation is status plus filtered record queries. Current Knowledge does not exist until M2; Working Lore does not exist until M3.
+The CLI arrives right after M1, before full projection wiring, and its semantic responses are **agent-reactive** ([decision 0008](../../decisions/0008-cli-first-agent-reactive.md)): they expose mechanical feedback, health, and deterministic affordances when applicable so an agent can chain calls until health passes. M1.5 orientation is status plus filtered record queries, now with M2-R Claim feedback and overlap-aware health. Public Current Knowledge does not exist yet; Working Lore does not exist until M3.
 
 ## Response envelope
 
@@ -300,7 +300,7 @@ Grouped by milestone; **AC n** = acceptance criterion in [goal and scope](../sco
 | T50 | every semantic command supports `--json`; success/failure is one LF-terminated object, and application-backed semantic fields match the application result after CLI advice rendering | agent ergonomics, ADR 0026 |
 | T51 | exits are exact: 0 executed, 2 usage/validation/reference/cursor, 3 not-found, 4 store/provider, 5 unhealthy `--check`, 6 capability/internal | agent ergonomics, ADR 0026 |
 | T52 | `add entry --body -` reads stdin; body round-trips byte-exact through store and `show` | journey 2 |
-| T53 | `add claim` prints M1.5 new/corroboration/conflict/coexisting feedback and, once M2 lands, exact duplicate/corroboration/support/temporal-succession feedback with related fields limited to the selected class; a post-commit read failure prints committed-but-feedback-unavailable with status advice and still exits 0 | journey 2–3, ADR 0026/0027 |
+| T53 | `add claim` prints new/conflict/coexisting feedback plus M2-R's exact duplicate/corroboration/support/temporal-succession classes with related fields limited to the selected class; a post-commit read failure prints committed-but-feedback-unavailable with status advice and still exits 0 | journey 2–3, ADR 0026/0027 |
 | T54 | after M2/M3 commands exist, end-to-end scenario A (three runs, revalidation surfaced) through the binary | S A, staged M2/M3 |
 | T55 | after M2 temporal projection exists, end-to-end scenario B (30→60-day amendment, all four temporal queries) through the binary | S B, staged M2 |
 | T56 | staged end-to-end journey 0→8 as one scripted fresh-store session: M1.5 record/query/health first, then M2 current/time and M3 lore when those commands land | AC 12 (ergonomics), ADR 0026 |

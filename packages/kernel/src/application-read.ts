@@ -56,6 +56,7 @@ import {
   type StreamPosition,
 } from "./ports/capabilities";
 import { type ClaimSemantics, evaluateClaimPolicy, type ValidatedClaimPolicy } from "./ports/claim-policy";
+import { classifyClaimPair, type PositionedClaim } from "./reconciliation";
 
 const DEFAULT_LIMIT = 50;
 const MAX_LIMIT = 200;
@@ -945,23 +946,28 @@ function buildStatusIndex(snapshot: Snapshot, policy: ValidatedClaimPolicy): Sta
   });
 }
 
-function hasDifferentValues(members: readonly PositionedRecord[]): boolean {
-  const first = (members[0]?.record as Claim | undefined)?.value;
-  return first !== undefined && members.some((item) => !jsonValuesEqual((item.record as Claim).value, first));
-}
-
 function unresolvedGroups(
   index: StatusIndex,
 ): readonly { item: UnresolvedExclusiveGroup; position: number }[] {
   const output: { item: UnresolvedExclusiveGroup; position: number }[] = [];
   for (const group of index.groups) {
-    if (group.semantics !== "exclusive" || !hasDifferentValues(group.members)) continue;
-    const representative = group.members[0] as PositionedRecord;
+    if (group.semantics !== "exclusive") continue;
+    const conflictIds = new Set<RecordId>();
+    for (let later = 1; later < group.members.length; later++)
+      for (let earlier = 0; earlier < later; earlier++) {
+        const left = group.members[later] as PositionedRecord & { record: Claim };
+        const right = group.members[earlier] as PositionedRecord & { record: Claim };
+        if (classifyClaimPair(left, right, group.semantics)?.relation === "conflict") {
+          conflictIds.add(left.record.id);
+          conflictIds.add(right.record.id);
+        }
+      }
+    if (conflictIds.size === 0) continue;
+    const participants = group.members.filter((claim) => conflictIds.has(claim.record.id));
+    const representative = participants[0] as PositionedRecord;
     const resolutions = index.resolutionsByTarget.get(representative.record.id) ?? [];
     if (
-      resolutions.some((resolution) =>
-        group.members.every((claim) => resolution.targets.has(claim.record.id)),
-      )
+      resolutions.some((resolution) => participants.every((claim) => resolution.targets.has(claim.record.id)))
     )
       continue;
     output.push({
@@ -969,7 +975,7 @@ function unresolvedGroups(
       item: Object.freeze({
         kind: "unresolved-exclusive-group",
         key: group.key,
-        claim_count: group.members.length,
+        claim_count: participants.length,
         representative: handle(representative.record),
         claims: keyClaimsAffordance(group.key),
       }),
@@ -1120,15 +1126,25 @@ export function createApplicationReadServices(
           }),
           advice: Object.freeze([]),
         });
-      const equal = earlier.filter((item) => jsonValuesEqual(item.record.value, claim.value));
-      const different = earlier.filter((item) => !jsonValuesEqual(item.record.value, claim.value));
+      const current = Object.freeze({ position, record: claim }) satisfies PositionedClaim;
+      const classified = earlier.map((item) => {
+        const pair = classifyClaimPair(current, item as PositionedClaim, semantics);
+        if (!pair) throw new TypeError("same-key Claim pair was not classified");
+        return Object.freeze({ item, relation: pair.relation });
+      });
+      const priority = Object.freeze([
+        "conflict",
+        "duplicate",
+        "corroboration",
+        "support",
+        "coexistence",
+        "temporal-succession",
+      ] as const);
+      const selected = priority.find((relation) => classified.some((item) => item.relation === relation));
+      if (!selected) throw new TypeError("Claim feedback has no pair class");
+      const related = classified.filter((item) => item.relation === selected).map((item) => item.item);
       const state =
-        different.length > 0 && semantics === "exclusive"
-          ? "conflict-candidate"
-          : equal.length > 0
-            ? "corroboration"
-            : "coexisting";
-      const related = state === "corroboration" ? equal : different;
+        selected === "conflict" ? "conflict-candidate" : selected === "coexistence" ? "coexisting" : selected;
       const representative = related[0] as PositionedRecord;
       const claims = keyClaimsAffordance(key);
       const feedback = Object.freeze({

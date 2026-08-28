@@ -45,7 +45,13 @@ export type ReconciliationFeedback =
   | { readonly state: "not-applicable"; readonly related: readonly [] }
   | { readonly state: "new-key"; readonly key: ClaimKey; readonly related: readonly [] }
   | {
-      readonly state: "corroboration" | "conflict-candidate" | "coexisting";
+      readonly state:
+        | "duplicate"
+        | "corroboration"
+        | "support"
+        | "conflict-candidate"
+        | "coexisting"
+        | "temporal-succession";
       readonly key: ClaimKey;
       readonly related_count: number;
       readonly related: readonly [RecordHandle];
