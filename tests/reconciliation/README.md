@@ -13,9 +13,9 @@ and covered by the records suite.
 M2-R rows **T20–T23 and T86** now cover the executable deterministic engine
 foundation: exact pair classes and canonical equality, preferred/disputed primitives,
 active-cycle behavior, strict exact-key isolation, admitted frozen policy context, and
-the 200/201 advisory boundary. Public `current`, temporal projection, complete
-Resolution application, summaries/evidence, replay, and invalidation remain deferred
-under **T24–T30** for M2-P/E. T86 uses the M0 structural JSON equality primitive but
+the 200/201 advisory boundary. Public `current`, temporal projection, and
+complete-Resolution integration, summaries/evidence, replay, and invalidation remain
+deferred under **T24–T30** for M2-P/E. T86 uses the M0 structural JSON equality primitive but
 remains M2 because this is its first use in pair classification. M1.5 T68 continues to
 own the generic cross-key hint as versioned core mechanics, not policy advice.
 
