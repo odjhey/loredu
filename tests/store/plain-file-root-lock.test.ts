@@ -69,13 +69,28 @@ async function exists(path: string): Promise<boolean> {
   }
 }
 
-async function waitFor(path: string, timeoutMilliseconds = 10_000): Promise<void> {
+async function waitForLockOwner(path: string, pid: number, timeoutMilliseconds = 10_000): Promise<void> {
   const deadline = performance.now() + timeoutMilliseconds;
   while (performance.now() < deadline) {
-    if (await exists(path)) return;
+    try {
+      const value: unknown = JSON.parse(await readFile(path, "utf8"));
+      if (
+        typeof value === "object" &&
+        value !== null &&
+        (value as { format?: unknown }).format === "loredu.write-lock/v2" &&
+        (value as { pid?: unknown }).pid === pid &&
+        typeof (value as { bootId?: unknown }).bootId === "string" &&
+        typeof (value as { pidNamespace?: unknown }).pidNamespace === "string" &&
+        typeof (value as { processIncarnation?: unknown }).processIncarnation === "string"
+      ) {
+        return;
+      }
+    } catch (error) {
+      if (!(error instanceof SyntaxError) && (error as { code?: unknown }).code !== "ENOENT") throw error;
+    }
     await Bun.sleep(1);
   }
-  throw new Error(`timed out waiting for ${path}`);
+  throw new Error(`timed out waiting for complete lock owner metadata at ${path}`);
 }
 
 // @covers T17
@@ -193,7 +208,7 @@ test("an owned append lock fails immediately, cannot age stale, and only a prove
 
     const lock = join(root, ".loredu", "write.lock");
     const owner = join(lock, "owner.json");
-    await waitFor(owner);
+    await waitForLockOwner(owner, holder.pid);
     holder.kill("SIGSTOP");
     await Bun.sleep(20);
     expect(await exists(owner)).toBe(true);
