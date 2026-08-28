@@ -361,9 +361,7 @@ test("stdin Entry body survives compiled storage and show byte-exact — @covers
       largeBody,
     ),
   );
-  const largeShown = json(
-    await invoke(home, ["show", (largeAdded.result as { id: string }).id, "--json"]),
-  );
+  const largeShown = json(await invoke(home, ["show", (largeAdded.result as { id: string }).id, "--json"]));
   expect((largeShown.result as { record: { body: string } }).record.body).toBe(largeBody);
 });
 
