@@ -714,11 +714,13 @@ export function createWorkingLoreService(
       const binding = parsed.cursor.rank;
       names = Object.freeze([binding.section]);
       const sectionStream = ranked.filter((item) => item.section === binding.section);
+      if (sectionStream.length === 0) cursorMismatch("Cursor section has no occurrences to resume");
       if (binding.resume.kind === "after") {
         const found = sectionStream[binding.resume.section_ordinal];
         if (!found || found.index !== binding.resume.occurrence_index)
           cursorMismatch("Cursor resume occurrence is absent or moved");
         available = Object.freeze(sectionStream.slice(binding.resume.section_ordinal + 1));
+        if (available.length === 0) cursorMismatch("Cursor resume is already at the end of its section");
       } else available = Object.freeze(sectionStream);
     }
     const selected = selectPrefix(available, parsed.maxItems, parsed.maxChars);

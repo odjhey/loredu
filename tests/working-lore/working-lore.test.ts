@@ -512,6 +512,16 @@ describe("M3 Working Lore public application", () => {
     await expect(application.lore({ cursor: encodeCursor(tampered) })).rejects.toMatchObject({
       code: "CURSOR_MISMATCH",
     });
+    const terminal = cursorPayload(currentCursor);
+    terminal.rank.resume = { kind: "after", section_ordinal: 0, occurrence_index: 1 };
+    await expect(application.lore({ cursor: encodeCursor(terminal) })).rejects.toMatchObject({
+      code: "CURSOR_MISMATCH",
+    });
+    const emptySection = cursorPayload(currentCursor);
+    emptySection.rank.section = "conflicts";
+    await expect(application.lore({ cursor: encodeCursor(emptySection) })).rejects.toMatchObject({
+      code: "CURSOR_MISMATCH",
+    });
     const driftedTime = cursorPayload(currentCursor);
     driftedTime.computed_at = "2026-01-02T03:04:06.000Z";
     await expect(application.lore({ cursor: encodeCursor(driftedTime) })).rejects.toMatchObject({
