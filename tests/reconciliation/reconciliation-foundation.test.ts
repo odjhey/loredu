@@ -223,10 +223,7 @@ describe("ADR 0027 deterministic reconciliation foundation", () => {
   });
 
   test("complete latest Resolution outranks Relations while incomplete judgment has no partial effect", () => {
-    const irrelevant = positionedClaim(
-      1,
-      persistedClaim(ids.c3, { predicate: "owner", value: "elsewhere" }),
-    );
+    const irrelevant = positionedClaim(1, persistedClaim(ids.c3, { predicate: "owner", value: "elsewhere" }));
     const first = positionedClaim(2, persistedClaim(ids.c1, { value: "old" }));
     const second = positionedClaim(3, persistedClaim(ids.c2, { value: "new" }));
     const complete = positionedResolution(

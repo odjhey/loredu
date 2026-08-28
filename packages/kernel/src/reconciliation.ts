@@ -258,9 +258,7 @@ export function reconcileApplicableClaimGroup(input: {
   if (claims.some((claim) => !claimKeysEqual(key, claimKeyOf(claim.record))))
     throw new TypeError("reconciliation cannot cross an exact ClaimKey");
   const claimsById = new Map(claims.map((claim) => [claim.record.id, claim]));
-  const visibleClaimsById = new Map(
-    input.visibleClaims.map((claim) => [claim.record.id, claim] as const),
-  );
+  const visibleClaimsById = new Map(input.visibleClaims.map((claim) => [claim.record.id, claim] as const));
   for (const claim of claims)
     if (!visibleClaimsById.has(claim.record.id))
       throw new TypeError("applicable Claims must belong to the visible Claim index");
