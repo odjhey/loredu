@@ -1,11 +1,11 @@
-import { type WorkingLoreBasis, type WorkingLoreRulesetIdentity, CORE_RULESET_ID } from "./domain/basis";
+import type { WorkingLoreSectionName } from "./application-types";
+import { type CursorTransportPayload, encodeCursorTransport } from "./cursor-transport";
+import { CORE_RULESET_ID, type WorkingLoreBasis, type WorkingLoreRulesetIdentity } from "./domain/basis";
 import type { JsonObject } from "./domain/entry";
 import { copyJsonObject, jsonValuesEqual } from "./domain/portable-json";
 import { normalizeTimestamp } from "./domain/records";
-import { encodeCursorTransport, type CursorTransportPayload } from "./cursor-transport";
 import { LoreduError, type LoreduIssue } from "./errors";
 import type { StreamPosition } from "./ports/capabilities";
-import type { WorkingLoreSectionName } from "./application-types";
 
 const RECORD_ID = /^(ent|clm|rel|res|ver)_[0-9abcdefghjkmnpqrstvwxyz]{16}$/;
 const DIGEST = /^[A-Za-z0-9_-]{43}$/;

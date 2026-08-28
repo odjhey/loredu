@@ -23,11 +23,7 @@ import type {
   WorkingLoreSectionName,
 } from "./application-types";
 import { computeLoreKnowledge, type LoreKnowledgeProjection } from "./current-projection";
-import type {
-  RulesetIdentity,
-  WorkingLoreBasis,
-  WorkingLoreRulesetIdentity,
-} from "./domain/basis";
+import type { RulesetIdentity, WorkingLoreBasis, WorkingLoreRulesetIdentity } from "./domain/basis";
 import type { ClaimId, JsonObject, JsonValue, Scope, SourceRef } from "./domain/entry";
 import {
   compareUnicodeScalars,

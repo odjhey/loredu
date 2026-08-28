@@ -59,10 +59,7 @@ import {
 } from "./ports/capabilities";
 import { type ClaimSemantics, evaluateClaimPolicy, type ValidatedClaimPolicy } from "./ports/claim-policy";
 import { classifyClaimPair, type PositionedClaim } from "./reconciliation";
-import {
-  decodeWorkingLoreCursorPayload,
-  type WorkingLoreCursor,
-} from "./working-lore-cursor";
+import { decodeWorkingLoreCursorPayload, type WorkingLoreCursor } from "./working-lore-cursor";
 
 const DEFAULT_LIMIT = 50;
 const MAX_LIMIT = 200;
