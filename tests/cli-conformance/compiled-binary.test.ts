@@ -113,7 +113,7 @@ async function invokeWithFeedbackReadFailure(
       'while [ ! -d "$LOREDU_TEST_ROOT/.loredu/write.lock" ]; do :; done\n' +
         "i=0\n" +
         'while [ "$i" -lt 10000 ]; do\n' +
-        '  : > "$LOREDU_TEST_ROOT/.loredu/write.lock/padding-$i" 2>/dev/null || break\n' +
+        '  printf "" > "$LOREDU_TEST_ROOT/.loredu/write.lock/padding-$i" 2>/dev/null || break\n' +
         "  i=$((i + 1))\n" +
         "done\n" +
         'while [ -d "$LOREDU_TEST_ROOT/.loredu/write.lock" ]; do :; done\n' +
