@@ -34,6 +34,30 @@ async function invoke(
   return { exitCode, stdout, stderr };
 }
 
+async function invokeWithOpenStdin(home: string, args: readonly string[]): Promise<Invocation> {
+  const process = Bun.spawn([binary, ...args], {
+    cwd: workspace,
+    env: { ...Bun.env, LOREDU_HOME: home },
+    stdin: "pipe",
+    stdout: "pipe",
+    stderr: "pipe",
+  });
+  const outcome = await Promise.race([
+    process.exited.then((exitCode) => ({ kind: "exit" as const, exitCode })),
+    Bun.sleep(1_000).then(() => ({ kind: "timeout" as const })),
+  ]);
+  if (outcome.kind === "timeout") {
+    process.kill();
+    await process.exited;
+    throw new Error("compiled lor waited for stdin before store preflight");
+  }
+  const [stdout, stderr] = await Promise.all([
+    new Response(process.stdout).text(),
+    new Response(process.stderr).text(),
+  ]);
+  return { exitCode: outcome.exitCode, stdout, stderr };
+}
+
 function json(invocation: Invocation): Record<string, unknown> {
   expect(invocation.stdout.endsWith("\n")).toBe(true);
   expect(invocation.stdout.trimEnd().includes("\n")).toBe(false);
@@ -333,6 +357,37 @@ test("version spellings remain ordinary option values", async () => {
     const shown = json(await invoke(home, ["show", (added.result as { id: string }).id, "--json"]));
     expect((shown.result as { record: { body: string } }).record.body).toBe(body);
   }
+});
+
+test("stdin is not consumed before selected-store preflight", async () => {
+  const home = await freshHome();
+  const missing = await invokeWithOpenStdin(home, [
+    "add",
+    "entry",
+    "--store",
+    "missing",
+    "--actor",
+    "agent:compiled-test",
+    "--body",
+    "-",
+    "--json",
+  ]);
+  expect(missing.exitCode).toBe(3);
+  expect((json(missing).error as { code: string }).code).toBe("STORE_NOT_FOUND");
+
+  const invalid = await invokeWithOpenStdin(home, [
+    "add",
+    "entry",
+    "--store",
+    "INVALID",
+    "--actor",
+    "agent:compiled-test",
+    "--body",
+    "-",
+    "--json",
+  ]);
+  expect(invalid.exitCode).toBe(2);
+  expect((json(invalid).error as { code: string }).code).toBe("VALIDATION_FAILED");
 });
 
 test("stdin Entry body survives compiled storage and show byte-exact — @covers T52", async () => {

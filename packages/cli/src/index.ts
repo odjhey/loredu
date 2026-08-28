@@ -750,7 +750,10 @@ async function execute(
       ...(option(parsed, "--title") === undefined ? {} : { title: option(parsed, "--title") }),
     };
     let draft = decodeRecordDraft(draftInput);
+    let prepared: ReturnType<typeof composeApplication> | undefined;
     if (bodyOption === "-") {
+      prepared = composeApplication(parsed.store);
+      await prepared.store.head();
       const stdin = await io.readStdin();
       let body: string;
       try {
@@ -763,7 +766,8 @@ async function execute(
       draft = decodeRecordDraft({ ...draftInput, body });
     }
     return {
-      response: await addDraft(draft, parsed.store),
+      response:
+        prepared === undefined ? await addDraft(draft, parsed.store) : await prepared.application.add(draft),
       exit: 0,
       json: parsed.json,
       ...(parsed.store === undefined ? {} : { selector: parsed.store }),
