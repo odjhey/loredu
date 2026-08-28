@@ -88,10 +88,15 @@
       "group": "M3 — Working Lore",
       "reason": "Working Lore assembly not implemented yet"
     },
+    "T50": {
+      "milestone": "M1.5",
+      "group": "CLI conformance (compiled binary)",
+      "reason": "literal every-semantic-command coverage lands when M15-Q adds history and claims"
+    },
     "T53": {
       "milestone": "M1.5",
       "group": "CLI conformance (compiled binary)",
-      "reason": "Claim feedback and committed-success fallback integration land with M15-Q"
+      "reason": "complete compiled Claim feedback forms and committed-success fallback evidence land with M15-Q"
     },
     "T54": {
       "milestone": "M3",

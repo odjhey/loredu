@@ -66,7 +66,7 @@ afterAll(async () => {
   await Promise.all(homes.map((home) => rm(home, { recursive: true, force: true })));
 });
 
-test("compiled first-slice semantic commands return one JSON envelope — @covers T50", async () => {
+test("compiled first-slice semantic commands return one JSON envelope", async () => {
   const home = await freshHome();
   const initialized = json(await invoke(home, ["init", "work", "--json"]));
   expect(initialized.ok).toBe(true);
@@ -173,7 +173,8 @@ test("compiled first-slice semantic commands return one JSON envelope — @cover
   );
   expect((verification.result as { id: string }).id).toMatch(/^ver_/);
 
-  for (const envelope of [entry, claim, relation, resolution, verification]) {
+  expect((claim.reconciliation as { state: string }).state).toBe("new-key");
+  for (const envelope of [entry, relation, resolution, verification]) {
     expect(Object.keys(envelope)).toEqual(["ok", "result", "reconciliation", "advice", "basis"]);
     expect(envelope.reconciliation).toEqual({ state: "not-applicable", related: [] });
     const result = envelope.result as {

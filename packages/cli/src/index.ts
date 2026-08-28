@@ -1,10 +1,6 @@
 import { homedir } from "node:os";
 import { isAbsolute, sep } from "node:path";
 import {
-  type Claim,
-  type ClaimKey,
-  claimKeyOf,
-  claimKeysEqual,
   createBasis,
   createLoreduApplication,
   createStreamPosition,
@@ -12,16 +8,11 @@ import {
   decodeRecordDraft,
   type JsonObject,
   type JsonValue,
-  jsonValuesEqual,
   LoreduError,
-  type PersistedRecord,
-  type PositionedRecord,
   RECORD_SCHEMA_ID,
   type RecordDraft,
   type RecordId,
-  type RecordKind,
   type Scope,
-  type StreamPosition,
 } from "@loredu/kernel";
 import {
   defaultLoreduHome,
@@ -57,7 +48,7 @@ interface Affordance {
 interface BaseResponse {
   readonly ok: true;
   readonly result: unknown;
-  readonly reconciliation: { readonly state: "not-applicable"; readonly related: readonly [] };
+  readonly reconciliation: unknown;
   readonly advice: readonly Affordance[];
   readonly basis: ReturnType<typeof createBasis> | null;
   readonly page?: { readonly returned: number; readonly total: number };
@@ -78,17 +69,6 @@ interface OptionSpec {
 
 class CliUsageError extends Error {
   readonly code = "CLI_USAGE";
-}
-
-class CliExpectedError extends Error {
-  readonly issues: readonly [] = Object.freeze([]) as readonly [];
-
-  constructor(
-    readonly code: "RECORD_NOT_FOUND",
-    message: string,
-  ) {
-    super(message);
-  }
 }
 
 const NOT_APPLICABLE = Object.freeze({
@@ -392,285 +372,30 @@ function resolveRoot(selector: string | undefined): string {
   }
 }
 
-function basis(position: StreamPosition, query: JsonObject): ReturnType<typeof createBasis> {
-  return createBasis({ stream_position: position, ruleset: DEFAULT_RULESET_IDENTITY, query });
-}
-
-function handle(
-  id: RecordId,
-  kind: RecordKind,
-): {
-  readonly id: RecordId;
-  readonly kind: RecordKind;
-  readonly affordances: readonly Affordance[];
-} {
-  return Object.freeze({
-    id,
-    kind,
-    affordances: Object.freeze([
-      Object.freeze({
-        rel: "show",
-        action: "record.show",
-        params: Object.freeze({ id }),
-        why: "inspect the record",
-      }),
-      Object.freeze({
-        rel: "history",
-        action: "record.history",
-        params: Object.freeze({ id }),
-        why: "inspect directly related history",
-      }),
-    ]),
-  });
-}
-
-function success(result: unknown, position: StreamPosition, query: JsonObject): BaseResponse {
+function initSuccess(root: string, selector: string | undefined): BaseResponse {
+  const position = createStreamPosition(0);
   return Object.freeze({
     ok: true,
-    result,
+    result: Object.freeze({ root, selector: selector ?? "default" }),
     reconciliation: NOT_APPLICABLE,
     advice: Object.freeze([]),
-    basis: basis(position, query),
-  });
-}
-
-function referenceFields(
-  record: PersistedRecord,
-): readonly { readonly path: string; readonly id: RecordId }[] {
-  if (record.kind === "claim") {
-    return record.derived_from.map((id, index) => ({ path: `/derived_from/${index}`, id }));
-  }
-  if (record.kind === "relation") {
-    return [
-      { path: "/from", id: record.from },
-      { path: "/to", id: record.to },
-    ];
-  }
-  if (record.kind === "resolution") {
-    return [
-      ...record.targets.map((id, index) => ({ path: `/targets/${index}`, id })),
-      ...(record.replacement === undefined ? [] : [{ path: "/replacement", id: record.replacement }]),
-    ];
-  }
-  if (record.kind === "verification") {
-    return record.targets.map((id, index) => ({ path: `/targets/${index}`, id }));
-  }
-  return [];
-}
-
-function referencedIds(record: PersistedRecord): readonly RecordId[] {
-  return referenceFields(record).map(({ id }) => id);
-}
-
-function scopesEqual(left: Scope, right: Scope): boolean {
-  const leftKeys = Object.keys(left).sort();
-  const rightKeys = Object.keys(right).sort();
-  return (
-    leftKeys.length === rightKeys.length &&
-    leftKeys.every((key, index) => key === rightKeys[index] && left[key] === right[key])
-  );
-}
-
-function claimsAffordance(key: ClaimKey): Affordance {
-  return Object.freeze({
-    rel: "list",
-    action: "claims.list",
-    params: Object.freeze({
-      query: Object.freeze({
-        scope: key.scope,
-        scope_match: "exact",
-        subject_type: key.subject.type,
-        subject: key.subject.id,
-        predicate: key.predicate,
-        perspective: key.perspective ?? null,
-      }),
+    basis: createBasis({
+      stream_position: position,
+      ruleset: DEFAULT_RULESET_IDENTITY,
+      query: { operation: "init" },
     }),
-    why: "inspect the complete exact-key group",
   });
 }
 
-function cohortClaimsAffordance(scope: Scope, value: JsonValue): Affordance {
-  return Object.freeze({
-    rel: "list",
-    action: "claims.list",
-    params: Object.freeze({
-      query: Object.freeze({ scope, scope_match: "exact", value }),
-    }),
-    why: "inspect claims with this scope and value",
-  });
-}
-
-function distinctAdvice(items: readonly Affordance[]): readonly Affordance[] {
-  const seen = new Set<string>();
-  return Object.freeze(
-    items.filter((item) => {
-      const identity = `${item.rel}\u0000${item.action}\u0000${JSON.stringify(item.params)}`;
-      if (seen.has(identity)) return false;
-      seen.add(identity);
-      return true;
-    }),
-  );
-}
-
-function statusResult(scan: { readonly records: readonly PositionedRecord[] }): {
-  readonly result: Readonly<Record<string, unknown>>;
-  readonly advice: readonly Affordance[];
-  readonly total: number;
-} {
-  type PositionedClaim = PositionedRecord & { readonly record: Claim };
-  const claims = scan.records.filter((item): item is PositionedClaim => item.record.kind === "claim");
-  const byId = new Map(scan.records.map((item) => [item.record.id, item]));
-  const groups: { key: ClaimKey; members: PositionedClaim[] }[] = [];
-  for (const item of claims) {
-    const key = claimKeyOf(item.record);
-    const existing = groups.find((group) => claimKeysEqual(group.key, key));
-    if (existing === undefined) groups.push({ key, members: [item] });
-    else existing.members.push(item);
-  }
-
-  const resolutions = scan.records.filter((item) => item.record.kind === "resolution");
-  const unresolved = groups.filter((group) => {
-    const firstValue = (group.members[0] as PositionedClaim).record.value;
-    if (!group.members.some((item) => !jsonValuesEqual(item.record.value, firstValue))) return false;
-    return !resolutions.some((resolution) => {
-      const record = resolution.record;
-      if (record.kind !== "resolution") return false;
-      const eligible = referenceFields(record).every(({ id }) => {
-        const target = byId.get(id);
-        return target !== undefined && target.position < resolution.position;
-      });
-      return eligible && group.members.every((item) => record.targets.includes(item.record.id));
-    });
-  });
-
-  const dangling = scan.records.flatMap((item) =>
-    referenceFields(item.record)
-      .filter(({ id }) => {
-        const target = byId.get(id);
-        return target === undefined || target.position >= item.position;
-      })
-      .map(({ path, id }) => ({ item, path, target: id })),
-  );
-
-  const attention: Record<string, unknown>[] = [];
-  const advice: Affordance[] = [];
-  for (const group of unresolved) {
-    const representative = group.members[0] as PositionedClaim;
-    const claimsLink = claimsAffordance(group.key);
-    const representativeHandle = handle(representative.record.id, representative.record.kind);
-    attention.push({
-      kind: "unresolved-exclusive-group",
-      key: group.key,
-      claim_count: group.members.length,
-      representative: representativeHandle,
-      claims: claimsLink,
-    });
-    advice.push(claimsLink, representativeHandle.affordances[0] as Affordance);
-  }
-  for (const item of dangling) {
-    const recordHandle = handle(item.item.record.id, item.item.record.kind);
-    attention.push({
-      kind: "dangling-record-reference",
-      record: recordHandle,
-      path: item.path,
-      target: item.target,
-    });
-    advice.push(recordHandle.affordances[0] as Affordance);
-  }
-
-  const cohorts: { scope: Scope; value: JsonValue; members: PositionedClaim[] }[] = [];
-  for (const item of claims) {
-    const cohort = cohorts.find(
-      (candidate) =>
-        scopesEqual(candidate.scope, item.record.scope) &&
-        jsonValuesEqual(candidate.value, item.record.value),
-    );
-    if (cohort === undefined) {
-      cohorts.push({ scope: item.record.scope, value: item.record.value, members: [item] });
-    } else cohort.members.push(item);
-  }
-  const advisories: { item: Record<string, unknown>; position: number }[] = [];
-  for (const cohort of cohorts) {
-    const nodes: { key: ClaimKey; members: PositionedClaim[] }[] = [];
-    for (const member of cohort.members) {
-      const key = claimKeyOf(member.record);
-      const node = nodes.find((candidate) => claimKeysEqual(candidate.key, key));
-      if (node === undefined) nodes.push({ key, members: [member] });
-      else node.members.push(member);
-    }
-    if (nodes.length < 2) continue;
-    const parent = nodes.map((_, index) => index);
-    const find = (index: number): number => {
-      let current = index;
-      let root = current;
-      while (parent[root] !== root) root = parent[root] as number;
-      while (parent[current] !== current) {
-        const next = parent[current] as number;
-        parent[current] = root;
-        current = next;
-      }
-      return root;
-    };
-    const nodeByClaim = new Map<RecordId, number>();
-    for (const [index, node] of nodes.entries()) {
-      for (const member of node.members) nodeByClaim.set(member.record.id, index);
-    }
-    for (const relation of scan.records) {
-      if (relation.record.kind !== "relation" || relation.record.relation_type !== "duplicates") continue;
-      const from = byId.get(relation.record.from);
-      const to = byId.get(relation.record.to);
-      const left = nodeByClaim.get(relation.record.from);
-      const right = nodeByClaim.get(relation.record.to);
-      if (
-        from === undefined ||
-        to === undefined ||
-        from.position >= relation.position ||
-        to.position >= relation.position ||
-        left === undefined ||
-        right === undefined
-      ) {
-        continue;
-      }
-      parent[find(right)] = find(left);
-    }
-    const components = new Map<number, PositionedClaim>();
-    nodes.forEach((node, index) => {
-      const representative = node.members[0] as PositionedClaim;
-      const root = find(index);
-      const current = components.get(root);
-      if (current === undefined || representative.position < current.position) {
-        components.set(root, representative);
-      }
-    });
-    const representatives = [...components.values()].sort((left, right) => left.position - right.position);
-    if (representatives.length < 2) continue;
-    advisories.push({
-      position: (representatives[0] as PositionedClaim).position,
-      item: {
-        kind: "key-divergence",
-        scope: cohort.scope,
-        value: cohort.value,
-        component_count: representatives.length,
-        representatives: representatives.slice(0, 2).map((item) => handle(item.record.id, item.record.kind)),
-        claims: cohortClaimsAffordance(cohort.scope, cohort.value),
-      },
-    });
-  }
-  advisories.sort((left, right) => left.position - right.position);
-  const healthy = unresolved.length === 0 && dangling.length === 0;
+function composeApplication(selector: string | undefined) {
+  const store = new PlainFileStore(resolveRoot(selector));
   return {
-    result: Object.freeze({
-      healthy,
-      health: Object.freeze({
-        unresolved_exclusive_groups: unresolved.length,
-        dangling_record_references: dangling.length,
-      }),
-      advisory_count: advisories.length,
-      attention: Object.freeze(attention),
-      advisories: Object.freeze(advisories.map(({ item }) => item)),
+    store,
+    application: createLoreduApplication({
+      store,
+      clock: new SystemClock(),
+      randomSource: new CryptographicRandomSource(),
     }),
-    advice: distinctAdvice(advice),
-    total: attention.length + advisories.length,
   };
 }
 
@@ -861,7 +586,7 @@ function cliFailure(
   if (error instanceof CliUsageError) {
     code = "CLI_USAGE";
     message = error.message;
-  } else if (error instanceof LoreduError || error instanceof CliExpectedError) {
+  } else if (error instanceof LoreduError) {
     code = error.code;
     message = error.message;
     issues = error.issues;
@@ -924,22 +649,10 @@ function cliFailure(
   return { envelope, exit };
 }
 
-async function appendDraft(draft: RecordDraft, selector: string | undefined): Promise<BaseResponse> {
-  const store = new PlainFileStore(resolveRoot(selector));
+async function addDraft(draft: RecordDraft, selector: string | undefined): Promise<BaseResponse> {
+  const { store, application } = composeApplication(selector);
   await store.head();
-  const application = createLoreduApplication({
-    store,
-    clock: new SystemClock(),
-    randomSource: new CryptographicRandomSource(),
-  });
-  const appended = await application.append(draft);
-  const result = Object.freeze({
-    id: appended.record.id,
-    kind: appended.record.kind,
-    position: appended.position,
-    handle: handle(appended.record.id, appended.record.kind),
-  });
-  return success(result, appended.position, { operation: "add", id: appended.record.id });
+  return application.add(draft);
 }
 
 function commonSpecs(extra: Readonly<Record<string, OptionSpec>>): Readonly<Record<string, OptionSpec>> {
@@ -1014,9 +727,7 @@ async function execute(
     const root = resolveRoot(selector);
     await initializePlainFileStore(root);
     return {
-      response: success(Object.freeze({ root, selector: selector ?? "default" }), createStreamPosition(0), {
-        operation: "init",
-      }),
+      response: initSuccess(root, selector),
       exit: 0,
       json: parsed.json,
       ...(selector === undefined ? {} : { selector }),
@@ -1051,7 +762,7 @@ async function execute(
       draft = decodeRecordDraft({ ...draftInput, body });
     }
     return {
-      response: await appendDraft(draft, parsed.store),
+      response: await addDraft(draft, parsed.store),
       exit: 0,
       json: parsed.json,
       ...(parsed.store === undefined ? {} : { selector: parsed.store }),
@@ -1101,7 +812,7 @@ async function execute(
         : { derived_from: options(parsed, "--derived-from") }),
     });
     return {
-      response: await appendDraft(draft, parsed.store),
+      response: await addDraft(draft, parsed.store),
       exit: 0,
       json: parsed.json,
       ...(parsed.store === undefined ? {} : { selector: parsed.store }),
@@ -1123,7 +834,7 @@ async function execute(
       relation_type: requiredOption(parsed, "--type"),
     });
     return {
-      response: await appendDraft(draft, parsed.store),
+      response: await addDraft(draft, parsed.store),
       exit: 0,
       json: parsed.json,
       ...(parsed.store === undefined ? {} : { selector: parsed.store }),
@@ -1157,7 +868,7 @@ async function execute(
         : { effective_at: option(parsed, "--effective-at") }),
     });
     return {
-      response: await appendDraft(draft, parsed.store),
+      response: await addDraft(draft, parsed.store),
       exit: 0,
       json: parsed.json,
       ...(parsed.store === undefined ? {} : { selector: parsed.store }),
@@ -1185,7 +896,7 @@ async function execute(
       result: requiredOption(parsed, "--result"),
     });
     return {
-      response: await appendDraft(draft, parsed.store),
+      response: await addDraft(draft, parsed.store),
       exit: 0,
       json: parsed.json,
       ...(parsed.store === undefined ? {} : { selector: parsed.store }),
@@ -1196,26 +907,7 @@ async function execute(
     const parsed = parseOptions(optionTokens, {}, global);
     if (parsed.positionals.length !== 1) usage("show requires exactly one record id");
     const id = recordId(parsed.positionals[0] as string);
-    const scan = await new PlainFileStore(resolveRoot(parsed.store)).scan();
-    const item = scan.records.find(({ record }) => record.id === id);
-    if (item === undefined) throw new CliExpectedError("RECORD_NOT_FOUND", `record not found: ${id}`);
-    const byId = new Map(scan.records.map((candidate) => [candidate.record.id, candidate]));
-    const handles = [handle(item.record.id, item.record.kind)];
-    for (const reference of referencedIds(item.record)) {
-      const target = byId.get(reference);
-      if (
-        target !== undefined &&
-        target.position < item.position &&
-        !handles.some((value) => value.id === reference)
-      ) {
-        handles.push(handle(target.record.id, target.record.kind));
-      }
-    }
-    const response = success(
-      Object.freeze({ record: item.record, position: item.position, handles: Object.freeze(handles) }),
-      scan.head,
-      { operation: "show", id },
-    );
+    const response = await composeApplication(parsed.store).application.show(id);
     return {
       response,
       exit: 0,
@@ -1227,9 +919,8 @@ async function execute(
   if (path === "head") {
     const parsed = parseOptions(optionTokens, {}, global);
     if (parsed.positionals.length > 0) usage("head accepts no positional arguments");
-    const position = await new PlainFileStore(resolveRoot(parsed.store)).head();
     return {
-      response: success(Object.freeze({ stream_position: position }), position, { operation: "head" }),
+      response: await composeApplication(parsed.store).application.readHead(),
       exit: 0,
       json: parsed.json,
       ...(parsed.store === undefined ? {} : { selector: parsed.store }),
@@ -1238,16 +929,11 @@ async function execute(
 
   const parsed = parseOptions(optionTokens, { "--check": { value: false } }, global);
   if (parsed.positionals.length > 0) usage("status accepts no positional arguments");
-  const scan = await new PlainFileStore(resolveRoot(parsed.store)).scan();
-  const status = statusResult(scan);
-  const response = Object.freeze({
-    ...success(status.result, scan.head, { operation: "status" }),
-    advice: status.advice,
-    page: Object.freeze({ returned: status.total, total: status.total }),
-  });
+  const response = await composeApplication(parsed.store).application.status();
+  const statusResult = response.result as { readonly healthy: boolean };
   return {
     response,
-    exit: parsed.flags.has("--check") && status.result.healthy === false ? 5 : 0,
+    exit: parsed.flags.has("--check") && !statusResult.healthy ? 5 : 0,
     json: parsed.json,
     ...(parsed.store === undefined ? {} : { selector: parsed.store }),
   };
