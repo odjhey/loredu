@@ -88,16 +88,6 @@
       "group": "M3 — Working Lore",
       "reason": "Working Lore assembly not implemented yet"
     },
-    "T50": {
-      "milestone": "M1.5",
-      "group": "CLI conformance (compiled binary)",
-      "reason": "literal every-semantic-command coverage lands when M15-Q adds history and claims"
-    },
-    "T53": {
-      "milestone": "M1.5",
-      "group": "CLI conformance (compiled binary)",
-      "reason": "complete compiled Claim feedback forms and committed-success fallback evidence land with M15-Q"
-    },
     "T54": {
       "milestone": "M3",
       "group": "CLI conformance (compiled binary)",
@@ -112,26 +102,6 @@
       "milestone": "M3",
       "group": "CLI conformance (compiled binary)",
       "reason": "complete staged journey requires M2 current and M3 lore commands"
-    },
-    "T57": {
-      "milestone": "M1.5",
-      "group": "CLI conformance (compiled binary)",
-      "reason": "the complete measured M1.5 orientation and two-command recording journey lands with M15-Q"
-    },
-    "T65": {
-      "milestone": "M1.5",
-      "group": "Agent-reactive envelope (ships with the early CLI)",
-      "reason": "source-exact embedded skill output is implemented; the complete query/disclosure/manual-resolution journey lands with M15-Q"
-    },
-    "T73": {
-      "milestone": "M1.5",
-      "group": "Pagination and link-following (ADR 0009)",
-      "reason": "mutation, status, and show affordances are implemented; the complete query/history chain lands with M15-Q"
-    },
-    "T74": {
-      "milestone": "M1.5",
-      "group": "Pagination and link-following (ADR 0009)",
-      "reason": "direct add/show disclosure is implemented; list disclosure and application equivalence land at M1.5 fan-in"
     },
     "T75": {
       "milestone": "M3",

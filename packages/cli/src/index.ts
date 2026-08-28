@@ -1,18 +1,22 @@
 import { homedir } from "node:os";
 import { isAbsolute, sep } from "node:path";
 import {
+  type Actor,
+  type Affordance,
+  type ClaimQuery,
   createBasis,
   createLoreduApplication,
   createStreamPosition,
   DEFAULT_RULESET_IDENTITY,
   decodeRecordDraft,
-  type JsonObject,
+  type HistoryQuery,
   type JsonValue,
   LoreduError,
   RECORD_SCHEMA_ID,
   type RecordDraft,
   type RecordId,
   type Scope,
+  type StatusQuery,
 } from "@loredu/kernel";
 import {
   defaultLoreduHome,
@@ -32,26 +36,13 @@ export interface CliIo {
   readonly readStdin: () => Promise<Uint8Array>;
 }
 
-interface Affordance {
-  readonly rel: "show" | "history" | "list" | "status" | "continue" | "init";
-  readonly action:
-    | "record.show"
-    | "record.history"
-    | "claims.list"
-    | "history.list"
-    | "status.read"
-    | "store.init";
-  readonly params: JsonObject;
-  readonly why: string;
-}
-
 interface BaseResponse {
   readonly ok: true;
   readonly result: unknown;
   readonly reconciliation: unknown;
   readonly advice: readonly Affordance[];
   readonly basis: ReturnType<typeof createBasis> | null;
-  readonly page?: { readonly returned: number; readonly total: number };
+  readonly page?: { readonly returned: number; readonly total: number; readonly cursor?: string };
 }
 
 interface ParsedOptions {
@@ -93,8 +84,10 @@ const HELP: Readonly<Record<string, string>> = {
   "add verification":
     "usage: lor add verification --actor <type:id> --target <claim-id>... --verified-against-json <SourceRef>... --result <result> [common options]",
   show: "usage: lor show <record-id> [--json]",
+  history: "usage: lor history [<record-id>] [--limit <n>] [--cursor <token>] [--json]",
+  claims: "usage: lor claims [filters] [--limit <n>] [--cursor <token>] [--json]",
   head: "usage: lor head [--json]",
-  status: "usage: lor status [--check] [--json]",
+  status: "usage: lor status [--check] [--limit <n>] [--cursor <token>] [--json]",
   skill: "usage: lor skill [--json]",
 };
 
@@ -153,6 +146,23 @@ function recognizedValueOptions(argv: readonly string[]): ReadonlySet<string> {
   if (path === "relate") add("--from", "--to", "--type");
   if (path === "resolve") add("--target", "--decision", "--replacement", "--reason", "--effective-at");
   if (path === "add verification") add("--target", "--verified-against-json", "--result");
+  if (path === "history") add("--limit", "--cursor");
+  if (path === "claims") {
+    add(
+      "--scope",
+      "--subject-type",
+      "--subject",
+      "--predicate",
+      "--perspective",
+      "--value",
+      "--value-json",
+      "--actor",
+      "--since",
+      "--limit",
+      "--cursor",
+    );
+  }
+  if (path === "status") add("--limit", "--cursor");
   return values;
 }
 
@@ -344,6 +354,15 @@ function recordId(value: string): RecordId {
     ]);
   }
   return value as RecordId;
+}
+
+function limitOption(optionsValue: ParsedOptions): number | undefined {
+  const value = option(optionsValue, "--limit");
+  return value === undefined ? undefined : Number(value);
+}
+
+function hasAnyOption(optionsValue: ParsedOptions, names: readonly string[]): boolean {
+  return names.some((name) => optionsValue.values.has(name) || optionsValue.flags.has(name));
 }
 
 function selectionFor(selector: string | undefined): StoreRootSelection {
@@ -698,7 +717,9 @@ async function execute(
   ) {
     path = `add ${tokens[1]}`;
     optionTokens = tokens.slice(2);
-  } else if (["init", "relate", "resolve", "show", "head", "status", "skill"].includes(first)) {
+  } else if (
+    ["init", "relate", "resolve", "show", "history", "claims", "head", "status", "skill"].includes(first)
+  ) {
     path = first;
     optionTokens = tokens.slice(1);
   } else {
@@ -931,6 +952,118 @@ async function execute(
     };
   }
 
+  if (path === "history") {
+    const parsed = parseOptions(
+      optionTokens,
+      { "--limit": { value: true }, "--cursor": { value: true } },
+      global,
+    );
+    const cursor = option(parsed, "--cursor");
+    if (cursor === undefined && parsed.positionals.length !== 1)
+      usage("history requires exactly one record id without --cursor");
+    if (cursor !== undefined && parsed.positionals.length > 0)
+      usage("history positional id cannot accompany --cursor");
+    const limit = limitOption(parsed);
+    const query: HistoryQuery =
+      cursor === undefined
+        ? {
+            id: recordId(parsed.positionals[0] as string),
+            ...(limit === undefined ? {} : { limit }),
+          }
+        : { cursor, ...(limit === undefined ? {} : { limit }) };
+    return {
+      response: await composeApplication(parsed.store).application.history(query),
+      exit: 0,
+      json: parsed.json,
+      ...(parsed.store === undefined ? {} : { selector: parsed.store }),
+    };
+  }
+
+  if (path === "claims") {
+    const parsed = parseOptions(
+      optionTokens,
+      {
+        "--scope": { value: true, repeat: true },
+        "--exact-scope": { value: false },
+        "--subject-type": { value: true },
+        "--subject": { value: true },
+        "--predicate": { value: true },
+        "--perspective": { value: true },
+        "--without-perspective": { value: false },
+        "--value": { value: true },
+        "--value-json": { value: true },
+        "--actor": { value: true },
+        "--since": { value: true },
+        "--limit": { value: true },
+        "--cursor": { value: true },
+      },
+      global,
+    );
+    if (parsed.positionals.length > 0) usage("claims accepts no positional arguments");
+    const cursor = option(parsed, "--cursor");
+    const limit = limitOption(parsed);
+    const filterOptions = [
+      "--scope",
+      "--exact-scope",
+      "--subject-type",
+      "--subject",
+      "--predicate",
+      "--perspective",
+      "--without-perspective",
+      "--value",
+      "--value-json",
+      "--actor",
+      "--since",
+    ] as const;
+    if (cursor !== undefined && hasAnyOption(parsed, filterOptions))
+      usage("claim filters cannot accompany --cursor");
+
+    let query: ClaimQuery;
+    if (cursor !== undefined) {
+      query = { cursor, ...(limit === undefined ? {} : { limit }) };
+    } else {
+      const scopePairs = options(parsed, "--scope");
+      const exactScope = parsed.flags.has("--exact-scope");
+      const perspective = option(parsed, "--perspective");
+      const withoutPerspective = parsed.flags.has("--without-perspective");
+      if (perspective !== undefined && withoutPerspective)
+        usage("--perspective and --without-perspective are mutually exclusive");
+      const scalarValue = option(parsed, "--value");
+      const jsonValue = option(parsed, "--value-json");
+      if (scalarValue !== undefined && jsonValue !== undefined)
+        usage("--value and --value-json are mutually exclusive");
+      const actorValue = option(parsed, "--actor");
+      const subjectType = option(parsed, "--subject-type");
+      const subject = option(parsed, "--subject");
+      const predicate = option(parsed, "--predicate");
+      const since = option(parsed, "--since");
+      const scope =
+        scopePairs.length === 0 ? (exactScope ? ({} as Scope) : undefined) : parseScope(scopePairs);
+      query = {
+        ...(scope === undefined ? {} : { scope }),
+        ...(exactScope ? { scope_match: "exact" as const } : {}),
+        ...(subjectType === undefined ? {} : { subject_type: subjectType }),
+        ...(subject === undefined ? {} : { subject }),
+        ...(predicate === undefined ? {} : { predicate }),
+        ...(withoutPerspective ? { perspective: null } : perspective === undefined ? {} : { perspective }),
+        ...(scalarValue !== undefined
+          ? { value: scalarValue }
+          : jsonValue === undefined
+            ? {}
+            : { value: parseJson(jsonValue, "/value") as JsonValue }),
+        ...(actorValue === undefined ? {} : { actor: parseActor(actorValue) as Actor }),
+        ...(since === undefined ? {} : { since }),
+        ...(limit === undefined ? {} : { limit }),
+      };
+    }
+    return {
+      response: await composeApplication(parsed.store).application.claims(query),
+      exit: 0,
+      json: parsed.json,
+      ...(parsed.store === undefined ? {} : { selector: parsed.store }),
+    };
+  }
+
   if (path === "head") {
     const parsed = parseOptions(optionTokens, {}, global);
     if (parsed.positionals.length > 0) usage("head accepts no positional arguments");
@@ -942,9 +1075,20 @@ async function execute(
     };
   }
 
-  const parsed = parseOptions(optionTokens, { "--check": { value: false } }, global);
+  const parsed = parseOptions(
+    optionTokens,
+    { "--check": { value: false }, "--limit": { value: true }, "--cursor": { value: true } },
+    global,
+  );
   if (parsed.positionals.length > 0) usage("status accepts no positional arguments");
-  const response = await composeApplication(parsed.store).application.status();
+  const cursor = option(parsed, "--cursor");
+  if (cursor !== undefined && parsed.flags.has("--check")) usage("--check cannot accompany --cursor");
+  const limit = limitOption(parsed);
+  const query: StatusQuery =
+    cursor === undefined
+      ? { ...(limit === undefined ? {} : { limit }) }
+      : { cursor, ...(limit === undefined ? {} : { limit }) };
+  const response = await composeApplication(parsed.store).application.status(query);
   const statusResult = response.result as { readonly healthy: boolean };
   return {
     response,
