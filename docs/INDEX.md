@@ -3,7 +3,7 @@ name: docs_index
 description: "Flat index of the initial Loredu design and v0.x documents."
 type: index
 tags: [docs, meta]
-generated: "ChatGPT GPT-5.6 Sol, 2026-08-28"
+generated: "ChatGPT GPT-5.6 Sol and OpenAI coding agent gpt-5.6-sol, 2026-08-28"
 created_at: 2026-08-26T12:10:00+08:00
 ---
 
@@ -57,6 +57,7 @@ created_at: 2026-08-26T12:10:00+08:00
 | [0026: M1.5 application and CLI contract closure](./decisions/0026-m15-application-cli-contract.md) | Exact application/CLI protocol, mechanics, pagination, disclosure, host capabilities, embedded skill, and staged M2/M3 boundary |
 | [0027: M2 reconciliation and projection contract closure](./decisions/0027-m2-reconciliation-projection-contract.md) | Exact relations/states, advice, precedence, temporal current/status, history/evidence, invalidation, and ADR 0006 semantic-equality narrowing |
 | [0028: Reject relative Loredu homes](./decisions/0028-reject-relative-loredu-homes.md) | Absolute configured/OS homes keep named and default store identity independent of cwd |
+| [0029: CLI composition seam](./decisions/0029-cli-composition-seam.md) | Explicit application policy and host ports reuse the exact parser/renderer while shipped `lor` retains production defaults |
 | [0018: Capability ports for time and identity](./decisions/0018-capability-ports.md) | `Clock` and `RandomSource` injected; the application stamps `id`/`recorded_at`, the store assigns only the position |
 | [0017: Branch protection posture](./decisions/0017-branch-protection-posture.md) | `ci-required` the only required status, zero reviews, squash-only, no bypass actors, up-to-date-before-merge on |
 

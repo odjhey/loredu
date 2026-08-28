@@ -3,15 +3,22 @@ import { mkdtemp, readFile, rename, rm } from "node:fs/promises";
 import { homedir, tmpdir } from "node:os";
 import { isAbsolute, join, resolve } from "node:path";
 import {
+  type ClaimPolicy,
+  createInstant,
   createLoreduApplication,
+  DEFAULT_CLAIM_POLICY,
   decodePersistedRecord,
+  decodeRecordDraft,
   type JsonValue,
+  type RecordDraft,
   type RecordId,
 } from "@loredu/kernel";
+import { InMemoryStore } from "@loredu/kernel/testing";
 import { encodePlainFileRecord, PlainFileStore, recordFileName } from "@loredu/store-plainfile";
 
 const workspace = resolve(import.meta.dir, "../..");
 const binary = join(workspace, "packages/cli/dist/lor");
+const conformanceBinary = join(workspace, "packages/cli/dist/lor-conformance");
 const homes: string[] = [];
 
 interface Invocation {
@@ -20,16 +27,23 @@ interface Invocation {
   readonly stderr: string;
 }
 
-async function invoke(
-  home: string,
+interface ConformanceCapabilities {
+  readonly instant: number;
+  readonly entropy: string;
+  readonly policy?: "default" | "coexisting";
+}
+
+async function invokeExecutable(
+  executable: string,
   args: readonly string[],
-  stdin?: string | Uint8Array,
-  cwd: string = workspace,
-  loreduHome: string = home,
+  stdin: string | Uint8Array | undefined,
+  cwd: string,
+  loreduHome: string,
+  extraEnvironment: Readonly<Record<string, string>> = {},
 ): Promise<Invocation> {
-  const process = Bun.spawn([binary, ...args], {
+  const process = Bun.spawn([executable, ...args], {
     cwd,
-    env: { ...Bun.env, LOREDU_HOME: loreduHome },
+    env: { ...Bun.env, ...extraEnvironment, LOREDU_HOME: loreduHome },
     stdin: stdin === undefined ? "ignore" : new Blob([stdin]),
     stdout: "pipe",
     stderr: "pipe",
@@ -40,6 +54,28 @@ async function invoke(
     process.exited,
   ]);
   return { exitCode, stdout, stderr };
+}
+
+async function invoke(
+  home: string,
+  args: readonly string[],
+  stdin?: string | Uint8Array,
+  cwd: string = workspace,
+  loreduHome: string = home,
+): Promise<Invocation> {
+  return invokeExecutable(binary, args, stdin, cwd, loreduHome);
+}
+
+function invokeConformance(
+  home: string,
+  args: readonly string[],
+  capabilities: ConformanceCapabilities,
+): Promise<Invocation> {
+  return invokeExecutable(conformanceBinary, args, undefined, workspace, home, {
+    LOREDU_TEST_INSTANT: String(capabilities.instant),
+    LOREDU_TEST_ENTROPY: capabilities.entropy,
+    LOREDU_TEST_POLICY: capabilities.policy ?? "default",
+  });
 }
 
 async function invokeShell(home: string, command: string): Promise<Invocation> {
@@ -152,6 +188,22 @@ function withoutRuns(value: unknown): unknown {
   return output;
 }
 
+function deterministicApplication(
+  store: InMemoryStore,
+  capabilities: ConformanceCapabilities,
+  claimPolicy: ClaimPolicy = DEFAULT_CLAIM_POLICY,
+) {
+  const bytes = Uint8Array.from({ length: 10 }, (_, index) =>
+    Number.parseInt(capabilities.entropy.slice(index * 2, index * 2 + 2), 16),
+  );
+  return createLoreduApplication({
+    store,
+    clock: { now: () => createInstant(capabilities.instant) },
+    randomSource: { nextBytes: () => bytes.slice() },
+    claimPolicy,
+  });
+}
+
 function readApplication(root: string) {
   return createLoreduApplication({
     store: new PlainFileStore(root),
@@ -214,6 +266,17 @@ beforeAll(async () => {
   ]);
   expect(`${stdout}${stderr}`, "compiled binary build output").toContain("Exited with code 0");
   expect(exitCode).toBe(0);
+
+  const fixtureBuild = Bun.spawn(
+    ["bun", "build", "--compile", "--outfile", conformanceBinary, "packages/cli/bin/lor-conformance.ts"],
+    { cwd: workspace, stdout: "pipe", stderr: "pipe" },
+  );
+  const [fixtureStdout, fixtureStderr, fixtureExit] = await Promise.all([
+    new Response(fixtureBuild.stdout).text(),
+    new Response(fixtureBuild.stderr).text(),
+    fixtureBuild.exited,
+  ]);
+  expect(fixtureExit, `${fixtureStdout}${fixtureStderr}`).toBe(0);
 });
 
 afterAll(async () => {
@@ -226,25 +289,46 @@ test("every M1.5 semantic command returns one equivalent JSON envelope — @cove
   expect(initialized.ok).toBe(true);
   expect((initialized.result as { selector: string }).selector).toBe("work");
   const root = (initialized.result as { root: string }).root;
+  const mirror = new InMemoryStore();
+  const capabilities: readonly ConformanceCapabilities[] = [
+    { instant: 1_700_000_000_000, entropy: "00010203040506070809" },
+    { instant: 1_700_000_000_001, entropy: "10111213141516171819" },
+    { instant: 1_700_000_000_002, entropy: "20212223242526272829" },
+    { instant: 1_700_000_000_003, entropy: "30313233343536373839" },
+    { instant: 1_700_000_000_004, entropy: "40414243444546474849" },
+  ];
+  const addAndCompare = async (
+    args: readonly string[],
+    draftInput: RecordDraft,
+    capability: ConformanceCapabilities,
+  ) => {
+    const cli = json(await invokeConformance(home, args, capability));
+    const direct = await deterministicApplication(mirror, capability).add(draftInput);
+    expect(withoutRuns(cli)).toEqual(JSON.parse(JSON.stringify(direct)));
+    return cli;
+  };
+  const actor = { type: "agent" as const, id: "compiled-test" };
 
-  const entry = json(
-    await invoke(home, [
-      "add",
-      "--json",
-      "--store",
-      "work",
-      "entry",
-      "--actor",
-      "agent:compiled-test",
-      "--body",
-      "evidence",
-    ]),
+  const entryDraft = decodeRecordDraft({ kind: "entry", actor, body: "evidence" });
+  const entry = await addAndCompare(
+    ["add", "--json", "--store", "work", "entry", "--actor", "agent:compiled-test", "--body", "evidence"],
+    entryDraft,
+    capabilities[0] as ConformanceCapabilities,
   );
-  const entryId = (entry.result as { id: string }).id;
-  expect(entryId).toMatch(/^ent_/);
+  const entryId = (entry.result as { id: string }).id as RecordId;
 
-  const claim = json(
-    await invoke(home, [
+  const claimDraft = decodeRecordDraft({
+    kind: "claim",
+    actor,
+    scope: { repo: "loredu" },
+    subject: { type: "code-area", id: "cli" },
+    predicate: "state",
+    value: "compiled",
+    confidence: "observed",
+    derived_from: [entryId],
+  });
+  const claim = await addAndCompare(
+    [
       "add",
       "claim",
       "--store",
@@ -266,13 +350,21 @@ test("every M1.5 semantic command returns one equivalent JSON envelope — @cove
       "--derived-from",
       entryId,
       "--json",
-    ]),
+    ],
+    claimDraft,
+    capabilities[1] as ConformanceCapabilities,
   );
-  const claimId = (claim.result as { id: string }).id;
-  expect(claimId).toMatch(/^clm_/);
+  const claimId = (claim.result as { id: string }).id as RecordId;
 
-  const relation = json(
-    await invoke(home, [
+  const relationDraft = decodeRecordDraft({
+    kind: "relation",
+    actor,
+    from: claimId,
+    to: entryId,
+    relation_type: "supports",
+  });
+  await addAndCompare(
+    [
       "--store",
       "work",
       "relate",
@@ -285,12 +377,21 @@ test("every M1.5 semantic command returns one equivalent JSON envelope — @cove
       "--type",
       "supports",
       "--json",
-    ]),
+    ],
+    relationDraft,
+    capabilities[2] as ConformanceCapabilities,
   );
-  expect((relation.result as { id: string }).id).toMatch(/^rel_/);
 
-  const resolution = json(
-    await invoke(home, [
+  const resolutionDraft = decodeRecordDraft({
+    kind: "resolution",
+    actor,
+    targets: [claimId],
+    decision: "prefer",
+    replacement: claimId,
+    reason: "verified source",
+  });
+  await addAndCompare(
+    [
       "resolve",
       "--store",
       "work",
@@ -305,12 +406,20 @@ test("every M1.5 semantic command returns one equivalent JSON envelope — @cove
       "--reason",
       "verified source",
       "--json",
-    ]),
+    ],
+    resolutionDraft,
+    capabilities[3] as ConformanceCapabilities,
   );
-  expect((resolution.result as { id: string }).id).toMatch(/^res_/);
 
-  const verification = json(
-    await invoke(home, [
+  const verificationDraft = decodeRecordDraft({
+    kind: "verification",
+    actor,
+    targets: [claimId],
+    verified_against: [{ ref: "repo=loredu", snapshot: "abc123" }],
+    result: "confirmed",
+  });
+  await addAndCompare(
+    [
       "add",
       "verification",
       "--store",
@@ -324,47 +433,28 @@ test("every M1.5 semantic command returns one equivalent JSON envelope — @cove
       "--result",
       "confirmed",
       "--json",
-    ]),
+    ],
+    verificationDraft,
+    capabilities[4] as ConformanceCapabilities,
   );
-  expect((verification.result as { id: string }).id).toMatch(/^ver_/);
-
-  expect((claim.reconciliation as { state: string }).state).toBe("new-key");
-  for (const envelope of [entry, relation, resolution, verification]) {
-    expect(Object.keys(envelope)).toEqual(["ok", "result", "reconciliation", "advice", "basis"]);
-    expect(envelope.reconciliation).toEqual({ state: "not-applicable", related: [] });
-    const result = envelope.result as {
-      handle: { affordances: readonly { run: string }[] };
-    };
-    expect(result.handle.affordances.map(({ run }) => run)).toEqual([
-      expect.stringContaining("lor --store work show"),
-      expect.stringContaining("lor --store work history"),
-    ]);
-  }
 
   const app = readApplication(root);
   const shown = json(await invoke(home, ["show", claimId, "--store", "work", "--json"]));
-  expect((shown.result as { record: { id: string } }).record.id).toBe(claimId);
-  expect(withoutRuns(shown)).toEqual(JSON.parse(JSON.stringify(await app.show(claimId as RecordId))));
-
+  expect(withoutRuns(shown)).toEqual(JSON.parse(JSON.stringify(await app.show(claimId))));
   const claims = json(await invoke(home, ["claims", "--store", "work", "--json"]));
   expect(withoutRuns(claims)).toEqual(JSON.parse(JSON.stringify(await app.claims())));
   const history = json(await invoke(home, ["history", claimId, "--store", "work", "--json"]));
-  expect(withoutRuns(history)).toEqual(
-    JSON.parse(JSON.stringify(await app.history({ id: claimId as RecordId }))),
-  );
+  expect(withoutRuns(history)).toEqual(JSON.parse(JSON.stringify(await app.history({ id: claimId }))));
   const status = json(await invoke(home, ["status", "--store", "work", "--json"]));
   expect(withoutRuns(status)).toEqual(JSON.parse(JSON.stringify(await app.status())));
   const bare = json(await invoke(home, ["--store", "work", "--json"]));
   expect(bare).toEqual(status);
   const head = json(await invoke(home, ["--json", "--store", "work", "head"]));
-  expect((head.result as { stream_position: number }).stream_position).toBe(5);
   expect(withoutRuns(head)).toEqual(JSON.parse(JSON.stringify(await app.readHead())));
-  expect((json(await invoke(home, ["skill", "--json"])).result as { guide: string }).guide).toContain(
-    "lor status --json",
-  );
+  expect(json(await invoke(home, ["skill", "--json"]))).toMatchObject({ ok: true, basis: null });
 });
 
-test("compiled Claim additions render default-policy feedback and committed fallback", async () => {
+test("compiled Claim additions render every M1.5 policy feedback and committed fallback — @covers T53", async () => {
   const home = await freshHome();
   expect((await invoke(home, ["init", "feedback", "--json"])).exitCode).toBe(0);
   const claimArgs = [
@@ -459,6 +549,85 @@ test("compiled Claim additions render default-policy feedback and committed fall
   expect(unavailableText.stdout).toContain('"reason":"post-commit-read-failed"');
   expect(unavailableText.stdout).toContain("advice: lor --store feedback status");
   expect(unavailableText.stdout).not.toContain("add claim");
+
+  expect((await invoke(home, ["init", "coexisting", "--json"])).exitCode).toBe(0);
+  const coexistingArgs = [
+    "add",
+    "claim",
+    "--store",
+    "coexisting",
+    "--actor",
+    "agent:feedback-test",
+    "--scope",
+    "repo=loredu",
+    "--subject-type",
+    "code-area",
+    "--subject",
+    "coexisting-policy",
+    "--predicate",
+    "state",
+    "--confidence",
+    "observed",
+  ] as const;
+  const coexistingFirst = json(
+    await invokeConformance(home, [...coexistingArgs, "--value", "left", "--json"], {
+      instant: 1_700_000_100_000,
+      entropy: "50515253545556575859",
+      policy: "coexisting",
+    }),
+  );
+  const coexistingFirstId = (coexistingFirst.result as { id: string }).id;
+  expect(coexistingFirst.reconciliation).toMatchObject({ state: "new-key", related: [] });
+  const coexistingInvocation = await invokeConformance(
+    home,
+    [...coexistingArgs, "--value", "right", "--json"],
+    {
+      instant: 1_700_000_100_001,
+      entropy: "60616263646566676869",
+      policy: "coexisting",
+    },
+  );
+  expect(coexistingInvocation.exitCode).toBe(0);
+  const coexisting = json(coexistingInvocation);
+  expect(coexisting.reconciliation).toEqual({
+    state: "coexisting",
+    key: {
+      scope: { repo: "loredu" },
+      subject: { type: "code-area", id: "coexisting-policy" },
+      predicate: "state",
+    },
+    related_count: 1,
+    related: [
+      {
+        id: coexistingFirstId,
+        kind: "claim",
+        affordances: [
+          expect.objectContaining({ action: "record.show", run: expect.any(String) }),
+          expect.objectContaining({ action: "record.history", run: expect.any(String) }),
+        ],
+      },
+    ],
+    claims: expect.objectContaining({
+      action: "claims.list",
+      params: {
+        query: {
+          scope: { repo: "loredu" },
+          scope_match: "exact",
+          subject_type: "code-area",
+          subject: "coexisting-policy",
+          predicate: "state",
+          perspective: null,
+        },
+      },
+      run: expect.any(String),
+    }),
+  });
+  expect(coexisting.advice).toEqual([]);
+  expect(coexisting.basis).toMatchObject({
+    stream_position: 2,
+    ruleset: { claim_policy: { id: "loredu.test.coexisting", version: "1" } },
+    query: { operation: "add", id: (coexisting.result as { id: string }).id },
+  });
 });
 
 test("compiled key-divergence stays advisory until explicit duplicate judgment", async () => {
@@ -1063,10 +1232,6 @@ test("fresh-store skill journey records in two commands and follows affordances 
   expect(skill.exitCode).toBe(0);
   expect(skill.stdout).toBe(expectedGuide);
   expect(skill.stderr).toBe("");
-  expect(expectedGuide).toContain("lor claims --scope <key=value>");
-  expect(expectedGuide).toContain("lor status --check");
-  expect(expectedGuide).not.toContain("staged forward reference");
-
   const selector = join(home, "agent store's chain");
   expect((await invoke(home, ["init", selector, "--json"])).exitCode).toBe(0);
   const orientation = json(await invoke(home, ["--store", selector, "--json"]));

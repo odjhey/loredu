@@ -3,15 +3,19 @@ import { isAbsolute, sep } from "node:path";
 import {
   type Actor,
   type Affordance,
+  type ClaimPolicy,
   type ClaimQuery,
+  type Clock,
   createBasis,
   createLoreduApplication,
   createStreamPosition,
+  DEFAULT_CLAIM_POLICY,
   DEFAULT_RULESET_IDENTITY,
   decodeRecordDraft,
   type HistoryQuery,
   type JsonValue,
   LoreduError,
+  type RandomSource,
   RECORD_SCHEMA_ID,
   type RecordDraft,
   type RecordId,
@@ -34,6 +38,13 @@ export interface CliIo {
   readonly out: (text: string) => void;
   readonly err: (text: string) => void;
   readonly readStdin: () => Promise<Uint8Array>;
+}
+
+/** Optional application dependencies supplied by an embedding composition root. */
+export interface CliRunOptions {
+  readonly claimPolicy?: ClaimPolicy;
+  readonly clock?: Clock;
+  readonly randomSource?: RandomSource;
 }
 
 interface BaseResponse {
@@ -416,14 +427,15 @@ function initSuccess(root: string, selector: string | undefined): BaseResponse {
   });
 }
 
-function composeApplication(selector: string | undefined) {
+function composeApplication(selector: string | undefined, options: CliRunOptions) {
   const store = new PlainFileStore(resolveRoot(selector));
   return {
     store,
     application: createLoreduApplication({
       store,
-      clock: new SystemClock(),
-      randomSource: new CryptographicRandomSource(),
+      clock: options.clock ?? new SystemClock(),
+      randomSource: options.randomSource ?? new CryptographicRandomSource(),
+      claimPolicy: options.claimPolicy ?? DEFAULT_CLAIM_POLICY,
     }),
   };
 }
@@ -678,8 +690,12 @@ function cliFailure(
   return { envelope, exit };
 }
 
-async function addDraft(draft: RecordDraft, selector: string | undefined): Promise<BaseResponse> {
-  const { store, application } = composeApplication(selector);
+async function addDraft(
+  draft: RecordDraft,
+  selector: string | undefined,
+  options: CliRunOptions,
+): Promise<BaseResponse> {
+  const { store, application } = composeApplication(selector, options);
   await store.head();
   return application.add(draft);
 }
@@ -691,6 +707,7 @@ function commonSpecs(extra: Readonly<Record<string, OptionSpec>>): Readonly<Reco
 async function execute(
   argv: readonly string[],
   io: CliIo,
+  runOptions: CliRunOptions,
 ): Promise<{
   readonly response?: BaseResponse;
   readonly direct?: string;
@@ -783,7 +800,7 @@ async function execute(
     let draft = decodeRecordDraft(draftInput);
     let prepared: ReturnType<typeof composeApplication> | undefined;
     if (bodyOption === "-") {
-      prepared = composeApplication(parsed.store);
+      prepared = composeApplication(parsed.store, runOptions);
       await prepared.store.head();
       const stdin = await io.readStdin();
       let body: string;
@@ -798,7 +815,9 @@ async function execute(
     }
     return {
       response:
-        prepared === undefined ? await addDraft(draft, parsed.store) : await prepared.application.add(draft),
+        prepared === undefined
+          ? await addDraft(draft, parsed.store, runOptions)
+          : await prepared.application.add(draft),
       exit: 0,
       json: parsed.json,
       ...(parsed.store === undefined ? {} : { selector: parsed.store }),
@@ -848,7 +867,7 @@ async function execute(
         : { derived_from: options(parsed, "--derived-from") }),
     });
     return {
-      response: await addDraft(draft, parsed.store),
+      response: await addDraft(draft, parsed.store, runOptions),
       exit: 0,
       json: parsed.json,
       ...(parsed.store === undefined ? {} : { selector: parsed.store }),
@@ -870,7 +889,7 @@ async function execute(
       relation_type: requiredOption(parsed, "--type"),
     });
     return {
-      response: await addDraft(draft, parsed.store),
+      response: await addDraft(draft, parsed.store, runOptions),
       exit: 0,
       json: parsed.json,
       ...(parsed.store === undefined ? {} : { selector: parsed.store }),
@@ -904,7 +923,7 @@ async function execute(
         : { effective_at: option(parsed, "--effective-at") }),
     });
     return {
-      response: await addDraft(draft, parsed.store),
+      response: await addDraft(draft, parsed.store, runOptions),
       exit: 0,
       json: parsed.json,
       ...(parsed.store === undefined ? {} : { selector: parsed.store }),
@@ -932,7 +951,7 @@ async function execute(
       result: requiredOption(parsed, "--result"),
     });
     return {
-      response: await addDraft(draft, parsed.store),
+      response: await addDraft(draft, parsed.store, runOptions),
       exit: 0,
       json: parsed.json,
       ...(parsed.store === undefined ? {} : { selector: parsed.store }),
@@ -943,7 +962,7 @@ async function execute(
     const parsed = parseOptions(optionTokens, {}, global);
     if (parsed.positionals.length !== 1) usage("show requires exactly one record id");
     const id = recordId(parsed.positionals[0] as string);
-    const response = await composeApplication(parsed.store).application.show(id);
+    const response = await composeApplication(parsed.store, runOptions).application.show(id);
     return {
       response,
       exit: 0,
@@ -972,7 +991,7 @@ async function execute(
           }
         : { cursor, ...(limit === undefined ? {} : { limit }) };
     return {
-      response: await composeApplication(parsed.store).application.history(query),
+      response: await composeApplication(parsed.store, runOptions).application.history(query),
       exit: 0,
       json: parsed.json,
       ...(parsed.store === undefined ? {} : { selector: parsed.store }),
@@ -1057,7 +1076,7 @@ async function execute(
       };
     }
     return {
-      response: await composeApplication(parsed.store).application.claims(query),
+      response: await composeApplication(parsed.store, runOptions).application.claims(query),
       exit: 0,
       json: parsed.json,
       ...(parsed.store === undefined ? {} : { selector: parsed.store }),
@@ -1068,7 +1087,7 @@ async function execute(
     const parsed = parseOptions(optionTokens, {}, global);
     if (parsed.positionals.length > 0) usage("head accepts no positional arguments");
     return {
-      response: await composeApplication(parsed.store).application.readHead(),
+      response: await composeApplication(parsed.store, runOptions).application.readHead(),
       exit: 0,
       json: parsed.json,
       ...(parsed.store === undefined ? {} : { selector: parsed.store }),
@@ -1088,7 +1107,7 @@ async function execute(
     cursor === undefined
       ? { ...(limit === undefined ? {} : { limit }) }
       : { cursor, ...(limit === undefined ? {} : { limit }) };
-  const response = await composeApplication(parsed.store).application.status(query);
+  const response = await composeApplication(parsed.store, runOptions).application.status(query);
   const statusResult = response.result as { readonly healthy: boolean };
   return {
     response,
@@ -1104,11 +1123,11 @@ export function versionLine(home: string = defaultLoreduHome({}, homedir())): st
 }
 
 /** Runs one CLI invocation. Every emitted payload owns its trailing LF. */
-export async function run(argv: readonly string[], io: CliIo): Promise<number> {
+export async function run(argv: readonly string[], io: CliIo, options: CliRunOptions = {}): Promise<number> {
   const wantsJson = detectsJson(argv);
   let selector: string | undefined;
   try {
-    const execution = await execute(argv, io);
+    const execution = await execute(argv, io, options);
     selector = execution.selector;
     if (execution.direct !== undefined) io.out(execution.direct);
     else if (execution.response !== undefined) {

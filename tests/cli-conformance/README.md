@@ -13,7 +13,10 @@ owns the protocol those rows exercise.
 
 These tests **spawn the compiled `lor`** (`bun run build` → `packages/cli/dist/lor`),
 not the library: the point is that the shipped artifact behaves, including its exit
-codes and stdout/stderr split. Parse `--json` output; assert on the envelope, never
-on prose wording. Point `LOREDU_HOME` at a temp directory per test.
+codes and stdout/stderr split. A compiled conformance entry additionally supplies
+explicit policy/Clock/RandomSource ports through ADR 0029's production composition
+seam; it reuses the exact parser and renderer and does not add shipped grammar. Parse
+`--json` output; assert on the envelope, never on prose wording. Point `LOREDU_HOME`
+at a temp directory per test.
 
 Decision: [ADR 0026](../../docs/decisions/0026-m15-application-cli-contract.md).

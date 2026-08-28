@@ -57,8 +57,11 @@ agent's) start from what you record now.
    its exact-key `lor claims` advice and every continuation command. Inspect
    every Claim in the complete current group and verify against the source.
    A Resolution closes health only when it repeats `--target <claim-id>` for
-   every listed Claim, including same-value corroborations. Then record your
-   judgment:
+   every listed Claim, including same-value corroborations. Record the evidence
+   you actually checked with one or more repeatable targets:
+   `lor add verification --actor agent:<agent-id> --target <claim-id>... --verified-against-json '{"ref":"<source>","snapshot":"<version>"}' --result confirmed`
+   A Verification records the snapshotted evidence and result; it does not by
+   itself settle the conflict or make health pass. Then record your judgment:
    `lor resolve --actor agent:<agent-id> --target <claim-id>... --decision prefer --replacement <preferred-target> --reason "<what you checked>"`
    If you cannot verify, use `--decision leave_disputed` — a recorded open
    question beats a guessed answer. Never try to delete the losing claim. A

@@ -88,11 +88,6 @@
       "group": "M3 — Working Lore",
       "reason": "Working Lore assembly not implemented yet"
     },
-    "T53": {
-      "milestone": "M1.5",
-      "group": "CLI conformance (compiled binary)",
-      "reason": "the shipped binary proves default exclusive feedback and committed-success fallback; coexisting-policy CLI feedback remains unexercised because the fixed composition root intentionally assembles only the default policy"
-    },
     "T54": {
       "milestone": "M3",
       "group": "CLI conformance (compiled binary)",

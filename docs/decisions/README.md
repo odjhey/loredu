@@ -3,7 +3,7 @@ name: decisions_index
 description: "Format and index for durable Loredu architecture and product decisions."
 type: index
 tags: [decisions]
-generated: "ChatGPT GPT-5.6 Sol, 2026-08-28"
+generated: "ChatGPT GPT-5.6 Sol and OpenAI coding agent gpt-5.6-sol, 2026-08-28"
 created_at: 2026-08-26T12:10:00+08:00
 ---
 
@@ -41,3 +41,4 @@ Initial decisions:
 - [0026: Close the M1.5 application and CLI contract before command fan-out](./0026-m15-application-cli-contract.md) — exact reads/responses/filters/health/cursors/disclosure, CLI grammar/errors/exits, composition capabilities, embedded skill, and M2/M3 sequencing boundary
 - [0027: Close deterministic reconciliation and Current Knowledge before M2 implementation](./0027-m2-reconciliation-projection-contract.md) — exact pair/state vocabulary, policy advice, Resolution precedence, bitemporal current API, bounded history/evidence, and invalidation; additively supersedes ADR 0024's M0 rejection of `advise`, narrows ADR 0026 status health at M2, and narrowly supersedes ADR 0006's same-Basis byte-identity wording
 - [0028: Reject relative Loredu homes](./0028-reject-relative-loredu-homes.md) — requires absolute configured and OS home paths so named/default store identity never changes with cwd; narrowly supersedes ADR 0022's acceptance of any nonempty configured home
+- [0029: Expose one CLI composition seam without changing `lor` grammar](./0029-cli-composition-seam.md) — optional explicit ClaimPolicy/Clock/RandomSource ports reuse the exact parser and renderer while the shipped entry retains production defaults

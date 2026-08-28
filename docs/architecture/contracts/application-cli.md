@@ -364,6 +364,14 @@ The CLI package is the production composition root. It creates one host `Clock` 
 
 Read-only commands may assemble the application with these capabilities but cannot call them. `init`, version, skill, and help require neither capability.
 
+[Decision 0029](../../decisions/0029-cli-composition-seam.md) exposes the same CLI
+parser/composer/renderer through `run(argv, io, options?)`. An embedding composition
+root may explicitly supply an existing `ClaimPolicy`, `Clock`, and `RandomSource`;
+the runner passes them unchanged into `createLoreduApplication`. Omitted options use
+`DEFAULT_CLAIM_POLICY`, `SystemClock`, and `CryptographicRandomSource`, and the shipped
+`lor` entry omits the options object. This seam adds no argv or environment grammar,
+no CLI-owned policy semantics, and no alternate renderer.
+
 ## Embedded skill
 
 `docs/v0.x/execution/agent-skill.md` is the only skill source. The compile step embeds its UTF-8 bytes; no runtime filesystem lookup, network access, generated second copy, or separately installed skill is allowed. Text `lor skill` removes only the YAML frontmatter including its delimiters and writes the remaining Markdown bytes exactly, preserving the source's final LF. It resolves no store and emits no envelope decoration. `lor skill --json` returns the same Markdown string as `result.guide` in the CLI success envelope with `reconciliation` not applicable, empty advice, and `basis:null`; this is the sole successful non-store envelope with a null basis.
