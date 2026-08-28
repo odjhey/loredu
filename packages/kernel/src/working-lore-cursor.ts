@@ -2,12 +2,7 @@ import type { WorkingLoreSectionName } from "./application-types";
 import { type CursorTransportPayload, encodeCursorTransport } from "./cursor-transport";
 import { CORE_RULESET_ID, type WorkingLoreBasis, type WorkingLoreRulesetIdentity } from "./domain/basis";
 import type { JsonObject } from "./domain/entry";
-import {
-  copyJsonObject,
-  isScalarText,
-  jsonValuesEqual,
-  scalarLength,
-} from "./domain/portable-json";
+import { copyJsonObject, isScalarText, jsonValuesEqual, scalarLength } from "./domain/portable-json";
 import { normalizeTimestamp } from "./domain/records";
 import { LoreduError, type LoreduIssue } from "./errors";
 import type { StreamPosition } from "./ports/capabilities";
@@ -56,12 +51,7 @@ function integer(value: unknown): value is number {
 }
 
 function rulesetToken(value: unknown): string {
-  if (
-    typeof value !== "string" ||
-    !isScalarText(value) ||
-    scalarLength(value) > 128 ||
-    !TOKEN.test(value)
-  )
+  if (typeof value !== "string" || !isScalarText(value) || scalarLength(value) > 128 || !TOKEN.test(value))
     cursorInvalid();
   return value;
 }
