@@ -133,65 +133,10 @@
       "group": "CLI conformance (compiled binary)",
       "reason": "lor binary not built yet"
     },
-    "T60": {
-      "milestone": "M1.5",
-      "group": "Agent-reactive envelope (ships with the early CLI)",
-      "reason": "response envelope not implemented yet"
-    },
-    "T61": {
-      "milestone": "M1.5",
-      "group": "Agent-reactive envelope (ships with the early CLI)",
-      "reason": "response envelope not implemented yet"
-    },
-    "T62": {
-      "milestone": "M1.5",
-      "group": "Agent-reactive envelope (ships with the early CLI)",
-      "reason": "response envelope not implemented yet"
-    },
-    "T63": {
-      "milestone": "M1.5",
-      "group": "Agent-reactive envelope (ships with the early CLI)",
-      "reason": "response envelope not implemented yet"
-    },
-    "T64": {
-      "milestone": "M1.5",
-      "group": "Agent-reactive envelope (ships with the early CLI)",
-      "reason": "response envelope not implemented yet"
-    },
     "T65": {
       "milestone": "M1.5",
       "group": "Agent-reactive envelope (ships with the early CLI)",
-      "reason": "response envelope not implemented yet"
-    },
-    "T66": {
-      "milestone": "M1.5",
-      "group": "Agent-reactive envelope (ships with the early CLI)",
-      "reason": "response envelope not implemented yet"
-    },
-    "T67": {
-      "milestone": "M1.5",
-      "group": "Agent-reactive envelope (ships with the early CLI)",
-      "reason": "response envelope not implemented yet"
-    },
-    "T68": {
-      "milestone": "M1.5",
-      "group": "Agent-reactive envelope (ships with the early CLI)",
-      "reason": "response envelope not implemented yet"
-    },
-    "T70": {
-      "milestone": "M1.5",
-      "group": "Pagination and link-following (ADR 0009)",
-      "reason": "pagination and affordance links not implemented yet"
-    },
-    "T71": {
-      "milestone": "M1.5",
-      "group": "Pagination and link-following (ADR 0009)",
-      "reason": "pagination and affordance links not implemented yet"
-    },
-    "T72": {
-      "milestone": "M1.5",
-      "group": "Pagination and link-following (ADR 0009)",
-      "reason": "pagination and affordance links not implemented yet"
+      "reason": "embedded skill and compiled CLI journey belong to M15-B/M15-Q"
     },
     "T73": {
       "milestone": "M1.5",

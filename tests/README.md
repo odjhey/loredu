@@ -18,6 +18,7 @@ bun test tests/store           # one group
 |---|---|
 | [`records/`](./records/README.md) | M0 records/application (T01–T08, T19, T80, T83–T85, T87) |
 | [`store/`](./store/README.md) | M1 durable plain-file conformance (T10–T18) |
+| [`application/`](./application/README.md) | M1.5 surface-neutral responses, reads, feedback, health, and cursors (application portions of T60–T68 and T70–T72; T65's skill/binary assertion remains CLI-owned) |
 | [`reconciliation/`](./reconciliation/README.md) | M0 identity primitives (T81–T82); M2 reconciliation/projections (T20–T30, T86) |
 | [`working-lore/`](./working-lore/README.md) | M3 — Working Lore (T40–T45) |
 | [`cli-conformance/`](./cli-conformance/README.md) | CLI conformance (T50–T58), agent-reactive envelope (T60–T68), pagination and link-following (T70–T75) |

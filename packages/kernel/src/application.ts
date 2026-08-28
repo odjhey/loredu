@@ -1,3 +1,24 @@
+import {
+  affordance,
+  createApplicationReadServices,
+  EMPTY_RECONCILIATION,
+  handle,
+  makeBasis,
+} from "./application-read";
+import type {
+  AddedRecordResult,
+  ApplicationListResponse,
+  ApplicationResponse,
+  ApplicationStatusResponse,
+  ClaimItem,
+  ClaimQuery,
+  HeadResult,
+  HistoryItem,
+  HistoryQuery,
+  ShownRecordResult,
+  StatusQuery,
+} from "./application-types";
+import { createRulesetIdentity } from "./domain/basis";
 import { claimKeyOf } from "./domain/claim-key";
 import {
   type PersistedRecord,
@@ -21,9 +42,10 @@ import {
 } from "./ports/capabilities";
 import {
   type ClaimPolicy,
+  type ClaimSemantics,
   DEFAULT_CLAIM_POLICY,
+  evaluateClaimPolicy,
   type ValidatedClaimPolicy,
-  validateClaimForAppend,
   validateClaimPolicy,
 } from "./ports/claim-policy";
 
@@ -41,6 +63,14 @@ export interface LoreduApplicationDependencies {
 }
 export interface LoreduApplication {
   append<D extends RecordDraft>(draft: D): Promise<AppendRecordResult<PersistedRecordFor<D>>>;
+  add<D extends RecordDraft>(
+    draft: D,
+  ): Promise<ApplicationResponse<AddedRecordResult<PersistedRecordFor<D>>>>;
+  show(id: RecordId): Promise<ApplicationResponse<ShownRecordResult>>;
+  history(query: HistoryQuery): Promise<ApplicationListResponse<HistoryItem>>;
+  claims(query?: ClaimQuery): Promise<ApplicationListResponse<ClaimItem>>;
+  status(query?: StatusQuery): Promise<ApplicationStatusResponse>;
+  readHead(): Promise<ApplicationResponse<HeadResult>>;
 }
 
 const ALPHABET = "0123456789abcdefghjkmnpqrstvwxyz";
@@ -170,20 +200,23 @@ async function checkReferences(store: RecordStore, references: readonly Referenc
     );
 }
 
-function validateDraft(input: unknown, policy: ValidatedClaimPolicy): RecordDraft {
+function validateDraft(
+  input: unknown,
+  policy: ValidatedClaimPolicy,
+): { readonly draft: RecordDraft; readonly semantics?: ClaimSemantics } {
   const draft = decodeRecordDraft(input);
-  if (draft.kind !== "claim") return draft;
-  const issues = validateClaimForAppend(policy, claimKeyOf(draft));
-  if (issues.length > 0) {
+  if (draft.kind !== "claim") return Object.freeze({ draft });
+  const evaluated = evaluateClaimPolicy(policy, claimKeyOf(draft));
+  if (evaluated.issues.length > 0 || evaluated.semantics === undefined) {
     const ordered = Object.freeze(
-      [...issues].sort(
+      [...evaluated.issues].sort(
         (left, right) =>
           compareUnicodeScalars(left.path, right.path) || compareUnicodeScalars(left.code, right.code),
       ),
     );
     throw new LoreduError("VALIDATION_FAILED", "Claim policy validation failed", ordered);
   }
-  return draft;
+  return Object.freeze({ draft, semantics: evaluated.semantics });
 }
 
 function stamp(draft: RecordDraft, id: RecordId, recordedAt: string): PersistedRecord {
@@ -202,35 +235,100 @@ export function createLoreduApplication({
   claimPolicy = DEFAULT_CLAIM_POLICY,
 }: LoreduApplicationDependencies): LoreduApplication {
   const policy = validateClaimPolicy(claimPolicy);
+  const ruleset = createRulesetIdentity(policy.policy);
+  const reads = createApplicationReadServices(store, policy, ruleset);
+
+  async function executeAppend<D extends RecordDraft>(
+    input: D,
+  ): Promise<{
+    readonly result: AppendRecordResult<PersistedRecordFor<D>>;
+    readonly semantics?: ClaimSemantics;
+  }> {
+    const validated = validateDraft(input, policy);
+    const draft = validated.draft;
+    await checkReferences(store, referencesOf(draft));
+
+    let id: RecordId;
+    try {
+      id = idFrom(randomSource.nextBytes(10), draft.kind);
+    } catch {
+      throw new LoreduError("RANDOM_SOURCE_FAILED", "RandomSource failed");
+    }
+
+    let recordedAt: string;
+    try {
+      const instant = createInstant(clock.now());
+      recordedAt = new Date(instant).toISOString();
+    } catch {
+      throw new LoreduError("CLOCK_FAILED", "Clock failed");
+    }
+
+    const record = stamp(draft, id, recordedAt);
+    try {
+      const position = createStreamPosition(await store.append(record));
+      if (position === 0) throw new RangeError("append position must be positive");
+      return Object.freeze({
+        result: Object.freeze({ record, position }) as AppendRecordResult<PersistedRecordFor<D>>,
+        ...(validated.semantics === undefined ? {} : { semantics: validated.semantics }),
+      });
+    } catch (error) {
+      if (error instanceof LoreduError && error.code === "DUPLICATE_RECORD_ID") throw error;
+      throw new LoreduError("STORE_APPEND_FAILED", `Store append failed for record ${id}`);
+    }
+  }
+
   return Object.freeze({
     async append<D extends RecordDraft>(input: D) {
-      const draft = validateDraft(input, policy);
-      await checkReferences(store, referencesOf(draft));
-
-      let id: RecordId;
+      return (await executeAppend(input)).result;
+    },
+    async add<D extends RecordDraft>(input: D) {
+      const appended = await executeAppend(input);
+      const { record, position } = appended.result;
+      const result = Object.freeze({
+        id: record.id,
+        kind: record.kind,
+        position,
+        handle: handle(record),
+      }) as AddedRecordResult<PersistedRecordFor<D>>;
+      const basis = makeBasis(position, ruleset, { operation: "add", id: record.id });
+      if (record.kind !== "claim")
+        return Object.freeze({
+          ok: true,
+          result,
+          reconciliation: EMPTY_RECONCILIATION,
+          advice: Object.freeze([]),
+          basis,
+        });
       try {
-        id = idFrom(randomSource.nextBytes(10), draft.kind);
+        const feedback = await reads.claimFeedback(record, position, appended.semantics as ClaimSemantics);
+        return Object.freeze({
+          ok: true,
+          result,
+          reconciliation: feedback.feedback,
+          advice: feedback.advice,
+          basis,
+        });
       } catch {
-        throw new LoreduError("RANDOM_SOURCE_FAILED", "RandomSource failed");
-      }
-
-      let recordedAt: string;
-      try {
-        const instant = createInstant(clock.now());
-        recordedAt = new Date(instant).toISOString();
-      } catch {
-        throw new LoreduError("CLOCK_FAILED", "Clock failed");
-      }
-
-      const record = stamp(draft, id, recordedAt);
-      try {
-        const position = createStreamPosition(await store.append(record));
-        if (position === 0) throw new RangeError("append position must be positive");
-        return Object.freeze({ record, position }) as AppendRecordResult<PersistedRecordFor<D>>;
-      } catch (error) {
-        if (error instanceof LoreduError && error.code === "DUPLICATE_RECORD_ID") throw error;
-        throw new LoreduError("STORE_APPEND_FAILED", `Store append failed for record ${id}`);
+        return Object.freeze({
+          ok: true,
+          result,
+          reconciliation: Object.freeze({
+            state: "unavailable",
+            key: claimKeyOf(record),
+            reason: "post-commit-read-failed",
+            related: Object.freeze([]) as readonly [],
+          }),
+          advice: Object.freeze([
+            affordance("status", "status.read", {}, "inspect store status after feedback became unavailable"),
+          ]),
+          basis,
+        });
       }
     },
+    show: reads.show,
+    history: reads.history,
+    claims: reads.claims,
+    status: reads.status,
+    readHead: reads.readHead,
   });
 }
