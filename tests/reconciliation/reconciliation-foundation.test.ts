@@ -153,6 +153,7 @@ describe("ADR 0027 deterministic reconciliation foundation", () => {
     );
     const reconciled = reconcileApplicableClaimGroup({
       claims: [first, second],
+      visibleClaims: [first, second],
       semantics: "exclusive",
     });
     expect(reconciled).toMatchObject({
@@ -178,7 +179,11 @@ describe("ADR 0027 deterministic reconciliation foundation", () => {
   test("exclusive different values dispute and an active one-value supersedes cycle removes nobody — @covers T21", () => {
     const old = positionedClaim(1, persistedClaim(ids.c1, { value: "old" }));
     const newer = positionedClaim(2, persistedClaim(ids.c2, { value: "new" }));
-    const disputed = reconcileApplicableClaimGroup({ claims: [old, newer], semantics: "exclusive" });
+    const disputed = reconcileApplicableClaimGroup({
+      claims: [old, newer],
+      visibleClaims: [old, newer],
+      semantics: "exclusive",
+    });
     expect(disputed.state).toBe("disputed");
     expect(disputed.relations.map(({ relation }) => relation)).toEqual(["conflict"]);
     expect(disputed.claims.map(({ record }) => String(record.id))).toEqual([ids.c1, ids.c2]);
@@ -189,6 +194,7 @@ describe("ADR 0027 deterministic reconciliation foundation", () => {
     const backward = positionedRelation(4, relation(ids.r2, ids.c1, ids.c2));
     const cycle = reconcileApplicableClaimGroup({
       claims: [equalOld, equalNew],
+      visibleClaims: [equalOld, equalNew],
       relations: [forward, backward],
       semantics: "exclusive",
     });
@@ -198,6 +204,7 @@ describe("ADR 0027 deterministic reconciliation foundation", () => {
     expect(
       reconcileApplicableClaimGroup({
         claims: [equalOld, equalNew],
+        visibleClaims: [equalOld, equalNew],
         relations: [forward, backward],
         semantics: "coexisting",
       }).state,
@@ -206,6 +213,7 @@ describe("ADR 0027 deterministic reconciliation foundation", () => {
     const deactivation = positionedResolution(5, resolution(ids.s1, [ids.r2], { decision: "retract" }));
     const noCycle = reconcileApplicableClaimGroup({
       claims: [equalOld, equalNew],
+      visibleClaims: [equalOld, equalNew],
       relations: [forward, backward],
       resolutions: [deactivation],
       semantics: "exclusive",
@@ -215,19 +223,24 @@ describe("ADR 0027 deterministic reconciliation foundation", () => {
   });
 
   test("complete latest Resolution outranks Relations while incomplete judgment has no partial effect", () => {
-    const first = positionedClaim(1, persistedClaim(ids.c1, { value: "old" }));
-    const second = positionedClaim(2, persistedClaim(ids.c2, { value: "new" }));
+    const irrelevant = positionedClaim(
+      1,
+      persistedClaim(ids.c3, { predicate: "owner", value: "elsewhere" }),
+    );
+    const first = positionedClaim(2, persistedClaim(ids.c1, { value: "old" }));
+    const second = positionedClaim(3, persistedClaim(ids.c2, { value: "new" }));
     const complete = positionedResolution(
-      3,
-      resolution(ids.s1, [ids.c1, ids.c2], { decision: "prefer", replacement: ids.c2 }),
+      4,
+      resolution(ids.s1, [ids.c1, ids.c2, ids.c3], { decision: "prefer", replacement: ids.c2 }),
     );
     const incompleteLater = positionedResolution(
-      4,
+      5,
       resolution(ids.s2, [ids.c1], { decision: "prefer", replacement: ids.c1 }),
     );
-    const explicitOpposite = positionedRelation(5, relation(ids.r1, ids.c1, ids.c2));
+    const explicitOpposite = positionedRelation(6, relation(ids.r1, ids.c1, ids.c2));
     const resolved = reconcileApplicableClaimGroup({
       claims: [first, second],
+      visibleClaims: [irrelevant, first, second],
       relations: [explicitOpposite],
       resolutions: [complete, incompleteLater],
       semantics: "exclusive",
@@ -240,6 +253,7 @@ describe("ADR 0027 deterministic reconciliation foundation", () => {
     const edge = positionedRelation(3, relation(ids.r1, ids.c2, ids.c1));
     const relationSelected = reconcileApplicableClaimGroup({
       claims: [equalFirst, equalSecond],
+      visibleClaims: [equalFirst, equalSecond],
       relations: [edge],
       semantics: "exclusive",
     });
@@ -408,6 +422,7 @@ describe("ADR 0027 deterministic reconciliation foundation", () => {
     expect(() =>
       reconcileApplicableClaimGroup({
         claims: [documented, observed],
+        visibleClaims: [documented, observed],
         relations: [crossKey],
         semantics: "exclusive",
       }),

@@ -193,17 +193,18 @@ function valueGroups(
 
 function backwardResolution(
   resolution: PositionedResolution,
-  claimsById: ReadonlyMap<string, PositionedClaim>,
+  visibleClaimsById: ReadonlyMap<string, PositionedClaim>,
   relationsById: ReadonlyMap<string, PositionedRelation>,
 ): boolean {
   return (
     resolution.record.targets.length > 0 &&
     resolution.record.targets.every((id) => {
-      const target = claimsById.get(id) ?? relationsById.get(id);
+      const target = visibleClaimsById.get(id) ?? relationsById.get(id);
       return target !== undefined && target.position < resolution.position;
     }) &&
     (resolution.record.replacement === undefined ||
-      (claimsById.get(resolution.record.replacement)?.position ?? resolution.position) < resolution.position)
+      (visibleClaimsById.get(resolution.record.replacement)?.position ?? resolution.position) <
+        resolution.position)
   );
 }
 
@@ -246,6 +247,7 @@ function hasDirectedCycle(edges: readonly (readonly [ClaimId, ClaimId])[]): bool
  */
 export function reconcileApplicableClaimGroup(input: {
   readonly claims: readonly PositionedClaim[];
+  readonly visibleClaims: readonly PositionedClaim[];
   readonly relations?: readonly PositionedRelation[];
   readonly resolutions?: readonly PositionedResolution[];
   readonly semantics: ClaimSemantics;
@@ -256,13 +258,19 @@ export function reconcileApplicableClaimGroup(input: {
   if (claims.some((claim) => !claimKeysEqual(key, claimKeyOf(claim.record))))
     throw new TypeError("reconciliation cannot cross an exact ClaimKey");
   const claimsById = new Map(claims.map((claim) => [claim.record.id, claim]));
+  const visibleClaimsById = new Map(
+    input.visibleClaims.map((claim) => [claim.record.id, claim] as const),
+  );
+  for (const claim of claims)
+    if (!visibleClaimsById.has(claim.record.id))
+      throw new TypeError("applicable Claims must belong to the visible Claim index");
   const relations = Object.freeze(
     [...(input.relations ?? [])].sort((a, b) => Number(a.position) - Number(b.position)),
   );
   const relationsById = new Map(relations.map((relation) => [relation.record.id, relation]));
   const resolutions = Object.freeze(
     [...(input.resolutions ?? [])]
-      .filter((resolution) => backwardResolution(resolution, claimsById, relationsById))
+      .filter((resolution) => backwardResolution(resolution, visibleClaimsById, relationsById))
       .sort((a, b) => Number(a.position) - Number(b.position)),
   );
   const derived: ClassifiedClaimPair[] = [];
