@@ -19,4 +19,10 @@ seam; it reuses the exact parser and renderer and does not add shipped grammar. 
 `--json` output; assert on the envelope, never on prose wording. Point `LOREDU_HOME`
 at a temp directory per test.
 
+M2-E's deterministic compiled A/B/C narratives use the scenario fixtures under
+[`tests/scenarios`](../scenarios/README.md). Scenario B owns executable T55 evidence;
+scenario A stops before M3 Working Lore/revalidation and therefore does not claim T54.
+Each narrative reopens its fresh plain-file store between commands and proves that
+projection reads append no derived records.
+
 Decision: [ADR 0026](../../docs/decisions/0026-m15-application-cli-contract.md).

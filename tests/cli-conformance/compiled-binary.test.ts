@@ -15,6 +15,7 @@ import {
 } from "@loredu/kernel";
 import { InMemoryStore } from "@loredu/kernel/testing";
 import { encodePlainFileRecord, PlainFileStore, recordFileName } from "@loredu/store-plainfile";
+import { persistedTypeForDerived, scenarioCapabilities } from "../scenarios/m2-exit-fixtures";
 
 const workspace = resolve(import.meta.dir, "../..");
 const binary = join(workspace, "packages/cli/dist/lor");
@@ -1656,6 +1657,894 @@ test("compiled cursors reject malformed and wrong operation/query/ruleset/store 
   expect(wrongStore.exitCode).toBe(2);
   expect((json(wrongStore).error as { code: string }).code).toBe("CURSOR_MISMATCH");
   expect(json(wrongStore).result as unknown).toBeNull();
+});
+
+test("M2 scenario A compares technical derivation with manual judgment without changing history", async () => {
+  const home = await freshHome();
+  const selector = "scenario-a";
+  const initialized = json(await invoke(home, ["init", selector, "--json"]));
+  const root = (initialized.result as { root: string }).root;
+  let ordinal = 1;
+  const run = async (instant: string, args: readonly string[]): Promise<Record<string, unknown>> => {
+    const invocation = await invokeConformance(
+      home,
+      [...args, "--store", selector, "--json"],
+      scenarioCapabilities(instant, ordinal++),
+    );
+    expect(invocation.exitCode).toBe(0);
+    return json(invocation);
+  };
+  const addEntry = async (instant: string, body: string, snapshot: string) =>
+    run(instant, [
+      "add",
+      "entry",
+      "--actor",
+      "agent:scenario-a",
+      "--type",
+      "finding",
+      "--title",
+      "command registration",
+      "--source-json",
+      `{"ref":"repo=loredu","locator":"commands","snapshot":"${snapshot}"}`,
+      "--body",
+      body,
+    ]);
+  const addClaim = async (
+    instant: string,
+    value: string,
+    entryId: string,
+    validFrom: string,
+    validUntil?: string,
+  ) =>
+    run(instant, [
+      "add",
+      "claim",
+      "--actor",
+      "agent:scenario-a",
+      "--scope",
+      "repo=loredu",
+      "--subject-type",
+      "code-area",
+      "--subject",
+      "command-registration",
+      "--predicate",
+      "location",
+      "--value",
+      value,
+      "--confidence",
+      "observed",
+      "--valid-from",
+      validFrom,
+      ...(validUntil === undefined ? [] : ["--valid-until", validUntil]),
+      "--derived-from",
+      entryId,
+    ]);
+
+  const entryOne = await addEntry(
+    "2026-01-01T08:00:00.000Z",
+    "Commands are registered under src/commands.",
+    "code-v1",
+  );
+  const claimOne = await addClaim(
+    "2026-01-02T08:00:00.000Z",
+    "src/commands",
+    (entryOne.result as { id: string }).id,
+    "2026-01-01T00:00:00.000Z",
+    "2026-01-31T23:59:59.999Z",
+  );
+  const entryTwo = await addEntry(
+    "2026-02-01T08:00:00.000Z",
+    "Plugins can register commands dynamically outside src/commands.",
+    "code-v2",
+  );
+  const claimTwo = await addClaim(
+    "2026-02-02T08:00:00.000Z",
+    "src/commands plus dynamic plugins",
+    (entryTwo.result as { id: string }).id,
+    "2026-02-01T00:00:00.000Z",
+    "2026-02-28T23:59:59.999Z",
+  );
+  const claimOneId = (claimOne.result as { id: string }).id;
+  const claimTwoId = (claimTwo.result as { id: string }).id;
+  const firstManual = await run("2026-02-03T08:00:00.000Z", [
+    "relate",
+    "--actor",
+    "agent:scenario-a",
+    "--from",
+    claimTwoId,
+    "--to",
+    claimOneId,
+    "--type",
+    "supersedes",
+  ]);
+
+  const entryThree = await addEntry(
+    "2026-03-01T08:00:00.000Z",
+    "Registration moved to src/cli/commands while plugin registration remains dynamic.",
+    "code-v3",
+  );
+  const claimThree = await addClaim(
+    "2026-03-02T08:00:00.000Z",
+    "src/cli/commands plus dynamic plugins",
+    (entryThree.result as { id: string }).id,
+    "2026-03-01T00:00:00.000Z",
+  );
+  const claimThreeId = (claimThree.result as { id: string }).id;
+  const secondManual = await run("2026-03-03T08:00:00.000Z", [
+    "relate",
+    "--actor",
+    "agent:scenario-a",
+    "--from",
+    claimThreeId,
+    "--to",
+    claimTwoId,
+    "--type",
+    "supersedes",
+  ]);
+  const disagreeingManual = await run("2026-03-03T09:00:00.000Z", [
+    "relate",
+    "--actor",
+    "agent:scenario-a",
+    "--from",
+    claimThreeId,
+    "--to",
+    claimOneId,
+    "--type",
+    "supports",
+  ]);
+  const resolution = await run("2026-03-04T08:00:00.000Z", [
+    "resolve",
+    "--actor",
+    "agent:scenario-a",
+    "--target",
+    claimOneId,
+    "--target",
+    claimTwoId,
+    "--target",
+    claimThreeId,
+    "--decision",
+    "prefer",
+    "--replacement",
+    claimThreeId,
+    "--effective-at",
+    "2026-03-01T00:00:00.000Z",
+    "--reason",
+    "code-v3 confirms both the move and dynamic registration",
+  ]);
+
+  const current = await run("2026-04-01T00:00:00.000Z", ["current", "--scope", "repo=loredu"]);
+  const currentItem = (current.result as { items: Record<string, unknown>[] }).items[0] as {
+    key: { subject: { id: string } };
+    state: string;
+    values: { value: unknown; representative: { id: string } }[];
+    history: {
+      claim_count: number;
+      derived_relation_count: number;
+      explicit_relation_count: number;
+      resolution_count: number;
+      relations: { relation: string; from: { id: string }; to: { id: string } }[];
+    };
+  };
+  expect(current).toMatchObject({
+    ok: true,
+    page: { returned: 1, total: 1 },
+    reconciliation: {
+      state: "projection",
+      relations: { temporal_succession: 3 },
+      knowledge: { preferred: 1, disputed: 0 },
+      policy_advisories: 0,
+    },
+    basis: {
+      stream_position: 10,
+      query: { operation: "current", scope: { repo: "loredu" }, valid_at: "2026-04-01T00:00:00.000Z" },
+    },
+    advice: [],
+  });
+  expect((current.result as { computed_at: string }).computed_at).toBe("2026-04-01T00:00:00.000Z");
+  expect(currentItem).toMatchObject({
+    key: { subject: { id: "command-registration" } },
+    state: "preferred",
+    values: [{ value: "src/cli/commands plus dynamic plugins", representative: { id: claimThreeId } }],
+    history: {
+      claim_count: 3,
+      derived_relation_count: 3,
+      explicit_relation_count: 3,
+      resolution_count: 1,
+    },
+  });
+  expect(currentItem.values[0]?.value).not.toBe("src/commands");
+  const shownLatestEntry = await run("2026-04-01T00:00:00.000Z", [
+    "show",
+    (entryThree.result as { id: string }).id,
+  ]);
+  expect(shownLatestEntry.result).toMatchObject({
+    record: {
+      body: "Registration moved to src/cli/commands while plugin registration remains dynamic.",
+      sources: [{ ref: "repo=loredu", locator: "commands", snapshot: "code-v3" }],
+    },
+  });
+
+  const manualRecords = await Promise.all(
+    [firstManual, secondManual, disagreeingManual].map(async (item) => {
+      const shown = await run("2026-04-01T00:00:00.000Z", ["show", (item.result as { id: string }).id]);
+      const record = (
+        shown.result as {
+          record: { from: string; to: string; relation_type: string };
+        }
+      ).record;
+      return { from: record.from, to: record.to, relation_type: record.relation_type };
+    }),
+  );
+  const mappedPreview = currentItem.history.relations.map(({ relation, from, to }) => ({
+    from: from.id,
+    to: to.id,
+    relation_type: persistedTypeForDerived(
+      relation as "duplicate" | "corroboration" | "support" | "conflict" | "temporal-succession",
+    ),
+  }));
+  const comparison = mappedPreview.map((derived) => ({
+    derived,
+    manual: manualRecords.find(({ from, to }) => from === derived.from && to === derived.to),
+  }));
+  expect(comparison).toEqual([
+    {
+      derived: { from: claimTwoId, to: claimOneId, relation_type: "supersedes" },
+      manual: { from: claimTwoId, to: claimOneId, relation_type: "supersedes" },
+    },
+    {
+      derived: { from: claimThreeId, to: claimOneId, relation_type: "supersedes" },
+      manual: { from: claimThreeId, to: claimOneId, relation_type: "supports" },
+    },
+  ]);
+
+  const historical = await run("2026-04-01T00:00:00.000Z", [
+    "current",
+    "--scope",
+    "repo=loredu",
+    "--as-of",
+    "2026-02-15T00:00:00.000Z",
+  ]);
+  expect(historical).toMatchObject({
+    page: { returned: 1, total: 1 },
+    basis: {
+      stream_position: 10,
+      query: {
+        operation: "current",
+        scope: { repo: "loredu" },
+        as_of: "2026-02-15T00:00:00.000Z",
+        valid_at: "2026-02-15T00:00:00.000Z",
+      },
+    },
+  });
+  expect(
+    (historical.result as { items: { values: { value: unknown }[] }[] }).items[0]?.values[0]?.value,
+  ).toBe("src/commands plus dynamic plugins");
+
+  const exactClaims = await run("2026-04-01T00:00:00.000Z", [
+    "claims",
+    "--scope",
+    "repo=loredu",
+    "--exact-scope",
+    "--subject-type",
+    "code-area",
+    "--subject",
+    "command-registration",
+    "--predicate",
+    "location",
+    "--without-perspective",
+  ]);
+  expect((exactClaims.result as { id: string }[]).map(({ id }) => id)).toEqual([
+    claimOneId,
+    claimTwoId,
+    claimThreeId,
+  ]);
+  expect((await run("2026-04-01T00:00:00.000Z", ["status", "--check"])).result).toMatchObject({
+    healthy: true,
+    health: { unresolved_exclusive_groups: 0, dangling_record_references: 0 },
+  });
+
+  const scan = await new PlainFileStore(root).scan();
+  expect(scan.records.map(({ record }) => record.kind)).toEqual([
+    "entry",
+    "claim",
+    "entry",
+    "claim",
+    "relation",
+    "entry",
+    "claim",
+    "relation",
+    "relation",
+    "resolution",
+  ]);
+  expect(scan.records.map(({ record }) => String(record.id))).toContain(
+    (resolution.result as { id: string }).id,
+  );
+  expect(
+    (scan.records[8]?.record as { relation_type?: string } | undefined)?.relation_type,
+    "the manual disagreement remains canonical review evidence",
+  ).toBe("supports");
+  expect(await run("2026-04-01T00:00:00.000Z", ["current", "--scope", "repo=loredu"])).toEqual(current);
+  expect(Number(await new PlainFileStore(root).head())).toBe(10);
+});
+
+test("compiled M2 scenario B preserves all four temporal modes and canonical history — @covers T55", async () => {
+  const home = await freshHome();
+  const selector = "scenario-b";
+  const initialized = json(await invoke(home, ["init", selector, "--json"]));
+  const root = (initialized.result as { root: string }).root;
+  let ordinal = 40;
+  const run = async (instant: string, args: readonly string[]) => {
+    const invocation = await invokeConformance(
+      home,
+      [...args, "--store", selector, "--json"],
+      scenarioCapabilities(instant, ordinal++),
+    );
+    expect(invocation.exitCode).toBe(0);
+    return json(invocation);
+  };
+
+  const baseEntry = await run("2026-01-01T08:00:00.000Z", [
+    "add",
+    "entry",
+    "--actor",
+    "human:policy-counsel",
+    "--type",
+    "source-review",
+    "--title",
+    "base notice clause",
+    "--source-json",
+    '{"ref":"agreement=vendor","locator":"section-12","snapshot":"base-v1"}',
+    "--body",
+    "The base agreement requires 30 days notice.",
+  ]);
+  const baseClaim = await run("2026-01-02T08:00:00.000Z", [
+    "add",
+    "claim",
+    "--actor",
+    "human:policy-counsel",
+    "--scope",
+    "agreement=vendor",
+    "--subject-type",
+    "agreement-clause",
+    "--subject",
+    "notice-period",
+    "--predicate",
+    "duration",
+    "--value",
+    "30 days",
+    "--confidence",
+    "confirmed",
+    "--valid-from",
+    "2026-01-01T00:00:00.000Z",
+    "--valid-until",
+    "2026-12-31T23:59:59.999Z",
+    "--derived-from",
+    (baseEntry.result as { id: string }).id,
+    "--source-json",
+    '{"ref":"agreement=vendor","locator":"section-12","snapshot":"base-v1"}',
+  ]);
+  const amendmentEntry = await run("2026-03-01T08:00:00.000Z", [
+    "add",
+    "entry",
+    "--actor",
+    "program:policy-import",
+    "--type",
+    "source-review",
+    "--title",
+    "signed notice amendment",
+    "--source-json",
+    '{"ref":"agreement=vendor","locator":"amendment-2","snapshot":"signed-v2"}',
+    "--body",
+    "The signed amendment requires 60 days notice from 1 February.",
+  ]);
+  const amendmentClaim = await run("2026-03-01T08:05:00.000Z", [
+    "add",
+    "claim",
+    "--actor",
+    "program:policy-import",
+    "--scope",
+    "agreement=vendor",
+    "--subject-type",
+    "agreement-clause",
+    "--subject",
+    "notice-period",
+    "--predicate",
+    "duration",
+    "--value",
+    "60 days",
+    "--confidence",
+    "confirmed",
+    "--valid-from",
+    "2026-02-01T00:00:00.000Z",
+    "--valid-until",
+    "2026-12-31T23:59:59.999Z",
+    "--derived-from",
+    (amendmentEntry.result as { id: string }).id,
+    "--source-json",
+    '{"ref":"agreement=vendor","locator":"amendment-2","snapshot":"signed-v2"}',
+  ]);
+  const baseClaimId = (baseClaim.result as { id: string }).id;
+  const amendmentClaimId = (amendmentClaim.result as { id: string }).id;
+  await run("2026-03-01T08:10:00.000Z", [
+    "relate",
+    "--actor",
+    "human:policy-counsel",
+    "--from",
+    amendmentClaimId,
+    "--to",
+    baseClaimId,
+    "--type",
+    "supersedes",
+  ]);
+  const judgment = await run("2026-03-02T08:00:00.000Z", [
+    "resolve",
+    "--actor",
+    "human:policy-counsel",
+    "--target",
+    baseClaimId,
+    "--target",
+    amendmentClaimId,
+    "--decision",
+    "prefer",
+    "--replacement",
+    amendmentClaimId,
+    "--effective-at",
+    "2026-02-01T00:00:00.000Z",
+    "--reason",
+    "the signed amendment controls from its effective date",
+  ]);
+  const verification = await run("2026-03-03T08:00:00.000Z", [
+    "add",
+    "verification",
+    "--actor",
+    "human:policy-counsel",
+    "--target",
+    amendmentClaimId,
+    "--verified-against-json",
+    '{"ref":"registry=agreements","locator":"vendor/amendment-2","snapshot":"signed-v2"}',
+    "--result",
+    "confirmed",
+  ]);
+  const shownAmendment = await run("2026-06-30T12:00:00.000Z", ["show", amendmentClaimId]);
+  expect(shownAmendment.result).toMatchObject({
+    record: {
+      recorded_at: "2026-03-01T08:05:00.000Z",
+      actor: { type: "program", id: "policy-import" },
+      valid_from: "2026-02-01T00:00:00.000Z",
+      valid_until: "2026-12-31T23:59:59.999Z",
+      derived_from: [(amendmentEntry.result as { id: string }).id],
+      sources: [{ ref: "agreement=vendor", locator: "amendment-2", snapshot: "signed-v2" }],
+    },
+  });
+
+  const current = await run("2026-06-30T12:00:00.000Z", ["current", "--scope", "agreement=vendor"]);
+  const asOf = await run("2026-06-30T12:00:00.000Z", [
+    "current",
+    "--scope",
+    "agreement=vendor",
+    "--as-of",
+    "2026-01-15T00:00:00.000Z",
+  ]);
+  const validAt = await run("2026-06-30T12:00:00.000Z", [
+    "current",
+    "--scope",
+    "agreement=vendor",
+    "--valid-at",
+    "2026-06-01T00:00:00.000Z",
+  ]);
+  const combined = await run("2026-06-30T12:00:00.000Z", [
+    "current",
+    "--scope",
+    "agreement=vendor",
+    "--as-of",
+    "2026-01-15T00:00:00.000Z",
+    "--valid-at",
+    "2026-06-01T00:00:00.000Z",
+  ]);
+  const projectedItem = (response: Record<string, unknown>) =>
+    (response.result as { items: Record<string, unknown>[] }).items[0] as {
+      state: string;
+      values: { value: unknown; representative: { id: string }; claim_count: number }[];
+      history: Record<string, unknown>;
+      evidence: Record<string, unknown>;
+    };
+
+  expect(current).toMatchObject({
+    ok: true,
+    page: { returned: 1, total: 1 },
+    advice: [],
+    basis: {
+      stream_position: 7,
+      ruleset: { core: "loredu.reconciliation/v1", claim_policy: { id: "loredu.default", version: "1" } },
+      query: {
+        operation: "current",
+        scope: { agreement: "vendor" },
+        valid_at: "2026-06-30T12:00:00.000Z",
+      },
+    },
+    reconciliation: {
+      state: "projection",
+      relations: {
+        duplicate: 0,
+        corroboration: 0,
+        support: 0,
+        conflict: 1,
+        coexistence: 0,
+        temporal_succession: 0,
+      },
+      knowledge: { preferred: 1, coexisting: 0, disputed: 0, retracted: 0 },
+      policy_advisories: 0,
+      related: [],
+    },
+  });
+  expect((current.result as { computed_at: string }).computed_at).toBe("2026-06-30T12:00:00.000Z");
+  expect(projectedItem(current)).toMatchObject({
+    state: "preferred",
+    values: [{ value: "60 days", representative: { id: amendmentClaimId }, claim_count: 1 }],
+    history: {
+      claim_count: 2,
+      derived_relation_count: 1,
+      explicit_relation_count: 1,
+      resolution_count: 1,
+      latest_resolution: { id: (judgment.result as { id: string }).id },
+    },
+    evidence: {
+      entry_count: 1,
+      source_count: 2,
+      verification: { confirmed: 1, contradicted: 0, unchanged: 0, needs_revalidation: 0 },
+    },
+  });
+  expect(asOf.basis).toMatchObject({
+    stream_position: 7,
+    query: {
+      operation: "current",
+      scope: { agreement: "vendor" },
+      as_of: "2026-01-15T00:00:00.000Z",
+      valid_at: "2026-01-15T00:00:00.000Z",
+    },
+  });
+  expect((asOf.result as { computed_at: string }).computed_at).toBe("2026-06-30T12:00:00.000Z");
+  expect(projectedItem(asOf)).toMatchObject({
+    state: "preferred",
+    values: [{ value: "30 days", representative: { id: baseClaimId }, claim_count: 1 }],
+    history: { claim_count: 1, explicit_relation_count: 0, resolution_count: 0 },
+    evidence: {
+      entry_count: 1,
+      source_count: 1,
+      verification: { confirmed: 0, contradicted: 0, unchanged: 0, needs_revalidation: 0 },
+    },
+  });
+  expect(validAt.basis).toMatchObject({
+    stream_position: 7,
+    query: {
+      operation: "current",
+      scope: { agreement: "vendor" },
+      valid_at: "2026-06-01T00:00:00.000Z",
+    },
+  });
+  expect(projectedItem(validAt).values[0]).toMatchObject({
+    value: "60 days",
+    representative: { id: amendmentClaimId },
+  });
+  expect(combined.basis).toMatchObject({
+    stream_position: 7,
+    query: {
+      operation: "current",
+      scope: { agreement: "vendor" },
+      as_of: "2026-01-15T00:00:00.000Z",
+      valid_at: "2026-06-01T00:00:00.000Z",
+    },
+  });
+  expect(projectedItem(combined).values[0]).toMatchObject({
+    value: "30 days",
+    representative: { id: baseClaimId },
+  });
+  for (const response of [asOf, validAt, combined]) {
+    expect(response).toMatchObject({ ok: true, page: { returned: 1, total: 1 }, advice: [] });
+  }
+
+  const scan = await new PlainFileStore(root).scan();
+  expect(scan.records.map(({ record }) => record.kind)).toEqual([
+    "entry",
+    "claim",
+    "entry",
+    "claim",
+    "relation",
+    "resolution",
+    "verification",
+  ]);
+  expect(scan.records.map(({ record }) => String(record.id))).toContain(
+    (verification.result as { id: string }).id,
+  );
+  expect(Number(scan.head)).toBe(7);
+  expect(await run("2026-06-30T12:00:00.000Z", ["current", "--scope", "agreement=vendor"])).toEqual(current);
+  expect(Number(await new PlainFileStore(root).head())).toBe(7);
+});
+
+test("M2 scenario C keeps legal and process identities mechanical across default and custom policy seams", async () => {
+  const home = await freshHome();
+  const selector = "scenario-c";
+  const initialized = json(await invoke(home, ["init", selector, "--json"]));
+  const root = (initialized.result as { root: string }).root;
+  let ordinal = 80;
+  const run = async (
+    instant: string,
+    args: readonly string[],
+    policy?: ConformanceCapabilities["policy"],
+  ) => {
+    const invocation = await invokeConformance(
+      home,
+      [...args, "--store", selector, "--json"],
+      scenarioCapabilities(instant, ordinal++, policy),
+    );
+    expect(invocation.exitCode).toBe(0);
+    return json(invocation);
+  };
+  const humanEntry = await run("2026-01-01T08:00:00.000Z", [
+    "add",
+    "entry",
+    "--actor",
+    "human:legal-reviewer",
+    "--source-json",
+    '{"ref":"agreement=client","snapshot":"human-review"}',
+    "--body",
+    "The notice period is thirty days.",
+  ]);
+  const humanClaim = await run("2026-01-02T08:00:00.000Z", [
+    "add",
+    "claim",
+    "--actor",
+    "human:legal-reviewer",
+    "--scope",
+    "agreement=client",
+    "--subject-type",
+    "agreement-clause",
+    "--subject",
+    "notice-period",
+    "--predicate",
+    "duration",
+    "--value",
+    "30 days",
+    "--confidence",
+    "observed",
+    "--valid-from",
+    "2026-01-01T00:00:00.000Z",
+    "--derived-from",
+    (humanEntry.result as { id: string }).id,
+  ]);
+  const programEntry = await run("2026-01-03T08:00:00.000Z", [
+    "add",
+    "entry",
+    "--actor",
+    "program:contract-parser",
+    "--source-json",
+    '{"ref":"agreement=client","snapshot":"parser-review"}',
+    "--body",
+    "Parsed notice duration: P30D.",
+  ]);
+  const programClaim = await run("2026-01-04T08:00:00.000Z", [
+    "add",
+    "claim",
+    "--actor",
+    "program:contract-parser",
+    "--scope",
+    "agreement=client",
+    "--subject-type",
+    "agreement-clause",
+    "--subject",
+    "notice-period",
+    "--predicate",
+    "duration",
+    "--value",
+    "30 days",
+    "--confidence",
+    "observed",
+    "--valid-from",
+    "2026-01-01T00:00:00.000Z",
+    "--derived-from",
+    (programEntry.result as { id: string }).id,
+  ]);
+  const humanClaimId = (humanClaim.result as { id: string }).id;
+  const programClaimId = (programClaim.result as { id: string }).id;
+  expect(programClaim.reconciliation).toMatchObject({
+    state: "corroboration",
+    related_count: 1,
+    related: [{ id: humanClaimId }],
+  });
+  const changedClaim = await run("2026-03-02T08:00:00.000Z", [
+    "add",
+    "claim",
+    "--actor",
+    "system:legal-register",
+    "--scope",
+    "agreement=client",
+    "--subject-type",
+    "agreement-clause",
+    "--subject",
+    "notice-period",
+    "--predicate",
+    "duration",
+    "--value",
+    "45 days",
+    "--confidence",
+    "confirmed",
+    "--valid-from",
+    "2026-03-01T00:00:00.000Z",
+  ]);
+  const changedClaimId = (changedClaim.result as { id: string }).id;
+  expect(changedClaim.reconciliation).toMatchObject({ state: "conflict-candidate", related_count: 2 });
+  await run("2026-03-03T08:00:00.000Z", [
+    "resolve",
+    "--actor",
+    "human:legal-reviewer",
+    "--target",
+    humanClaimId,
+    "--target",
+    programClaimId,
+    "--target",
+    changedClaimId,
+    "--decision",
+    "prefer",
+    "--replacement",
+    changedClaimId,
+    "--effective-at",
+    "2026-03-01T00:00:00.000Z",
+    "--reason",
+    "the legal register records the operative amendment",
+  ]);
+  await run("2026-03-04T08:00:00.000Z", [
+    "add",
+    "claim",
+    "--actor",
+    "human:process-owner",
+    "--scope",
+    "process=renewal",
+    "--subject-type",
+    "business-process",
+    "--subject",
+    "approval-sequence",
+    "--predicate",
+    "steps",
+    "--perspective",
+    "documented-process",
+    "--value-json",
+    '["review","approve","notify"]',
+    "--confidence",
+    "confirmed",
+  ]);
+  await run("2026-03-05T08:00:00.000Z", [
+    "add",
+    "claim",
+    "--actor",
+    "program:workflow-observer",
+    "--scope",
+    "process=renewal",
+    "--subject-type",
+    "business-process",
+    "--subject",
+    "approval-sequence",
+    "--predicate",
+    "steps",
+    "--perspective",
+    "observed-process",
+    "--value-json",
+    '["review","notify","approve"]',
+    "--confidence",
+    "observed",
+  ]);
+
+  const february = await run("2026-04-01T00:00:00.000Z", [
+    "current",
+    "--scope",
+    "agreement=client",
+    "--valid-at",
+    "2026-02-15T00:00:00.000Z",
+  ]);
+  const april = await run("2026-04-01T00:00:00.000Z", ["current", "--scope", "agreement=client"]);
+  expect(
+    (february.result as { items: { values: { value: unknown; claim_count: number }[] }[] }).items[0]
+      ?.values[0],
+  ).toMatchObject({ value: "30 days", claim_count: 2 });
+  expect(
+    (april.result as { items: { state: string; values: { value: unknown }[] }[] }).items[0],
+  ).toMatchObject({
+    state: "preferred",
+    values: [{ value: "45 days" }],
+  });
+  const processProjection = await run("2026-04-01T00:00:00.000Z", ["current", "--scope", "process=renewal"]);
+  const processItems = (
+    processProjection.result as {
+      items: { key: { perspective?: string }; state: string }[];
+    }
+  ).items;
+  expect(processItems).toHaveLength(2);
+  expect(processItems.map(({ key, state }) => [key.perspective, state])).toEqual([
+    ["documented-process", "preferred"],
+    ["observed-process", "preferred"],
+  ]);
+  expect((processProjection.reconciliation as { relations: { conflict: number } }).relations.conflict).toBe(
+    0,
+  );
+
+  const claimsRun = (
+    (april.result as { items: { claims: { run: string } }[] }).items[0] as {
+      claims: { run: string };
+    }
+  ).claims.run;
+  const disclosed = json(await invokeShell(home, `${claimsRun} --json`));
+  expect((disclosed.result as { id: string }[]).map(({ id }) => id)).toEqual([
+    humanClaimId,
+    programClaimId,
+    changedClaimId,
+  ]);
+  expectRenderedAffordances(disclosed, selector);
+  expect(Number(await new PlainFileStore(root).head())).toBe(8);
+
+  const customSelector = "scenario-c-custom";
+  const customInitialized = json(await invoke(home, ["init", customSelector, "--json"]));
+  const customRoot = (customInitialized.result as { root: string }).root;
+  const customArgs = [
+    "add",
+    "claim",
+    "--store",
+    customSelector,
+    "--actor",
+    "program:process-model",
+    "--scope",
+    "process=renewal",
+    "--subject-type",
+    "business-process",
+    "--subject",
+    "handoff-mode",
+    "--predicate",
+    "mode",
+    "--confidence",
+    "observed",
+    "--json",
+  ] as const;
+  const customOne = json(
+    await invokeConformance(home, [...customArgs, "--value", "synchronous"], {
+      ...scenarioCapabilities("2026-03-06T08:00:00.000Z", 120),
+      policy: "coexisting",
+    }),
+  );
+  const customTwo = json(
+    await invokeConformance(home, [...customArgs, "--value", "asynchronous"], {
+      ...scenarioCapabilities("2026-03-07T08:00:00.000Z", 121),
+      policy: "coexisting",
+    }),
+  );
+  expect(customTwo.reconciliation).toMatchObject({ state: "coexisting", related_count: 1 });
+  const coexistingPolicy: ClaimPolicy = {
+    id: "loredu.test.coexisting",
+    version: "1",
+    validateClaimKey: () => [],
+    semantics: () => "coexisting",
+  };
+  const customApplication = createLoreduApplication({
+    store: new PlainFileStore(customRoot),
+    clock: { now: () => createInstant(Date.parse("2026-04-01T00:00:00.000Z")) },
+    randomSource: { nextBytes: () => new Uint8Array(10) },
+    claimPolicy: coexistingPolicy,
+  });
+  const customProjection = await customApplication.current({ scope: { process: "renewal" } });
+  expect(customProjection.basis.ruleset.claim_policy).toEqual({ id: "loredu.test.coexisting", version: "1" });
+  expect(customProjection.result.items).toMatchObject([
+    {
+      kind: "knowledge",
+      semantics: "coexisting",
+      state: "coexisting",
+      value_count: 2,
+      values: [
+        { value: "synchronous", representative: { id: (customOne.result as { id: string }).id } },
+        { value: "asynchronous", representative: { id: (customTwo.result as { id: string }).id } },
+      ],
+    },
+  ]);
+  expect((await customApplication.claims()).result.map(({ id }) => String(id))).toEqual([
+    (customOne.result as { id: string }).id,
+    (customTwo.result as { id: string }).id,
+  ]);
 });
 
 test("embedded skill text remains source-exact and requires no store", async () => {

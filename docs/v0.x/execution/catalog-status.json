@@ -38,11 +38,6 @@
       "group": "CLI conformance (compiled binary)",
       "reason": "full scenario requires M2 projections and M3 Working Lore"
     },
-    "T55": {
-      "milestone": "M2",
-      "group": "CLI conformance (compiled binary)",
-      "reason": "compiled end-to-end scenario B remains for sequential M2-E after public projection lands"
-    },
     "T56": {
       "milestone": "M3",
       "group": "CLI conformance (compiled binary)",
