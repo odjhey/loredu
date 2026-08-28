@@ -1,5 +1,5 @@
 ---
-name: agent_skill_draft
+name: agent_skill
 description: "Agent guide shipped inside the lor binary (printed by `lor skill`), v1 for the manual-reconciliation era."
 type: plan
 tags: [v0.x, execution, agents, skill]
