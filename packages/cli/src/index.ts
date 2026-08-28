@@ -406,7 +406,9 @@ function success(result: unknown, position: StreamPosition, query: JsonObject): 
   });
 }
 
-function referenceFields(record: PersistedRecord): readonly { readonly path: string; readonly id: RecordId }[] {
+function referenceFields(
+  record: PersistedRecord,
+): readonly { readonly path: string; readonly id: RecordId }[] {
   if (record.kind === "claim") {
     return record.derived_from.map((id, index) => ({ path: `/derived_from/${index}`, id }));
   }
@@ -482,17 +484,13 @@ function distinctAdvice(items: readonly Affordance[]): readonly Affordance[] {
   );
 }
 
-function statusResult(scan: {
-  readonly records: readonly PositionedRecord[];
-}): {
+function statusResult(scan: { readonly records: readonly PositionedRecord[] }): {
   readonly result: Readonly<Record<string, unknown>>;
   readonly advice: readonly Affordance[];
   readonly total: number;
 } {
   type PositionedClaim = PositionedRecord & { readonly record: Claim };
-  const claims = scan.records.filter(
-    (item): item is PositionedClaim => item.record.kind === "claim",
-  );
+  const claims = scan.records.filter((item): item is PositionedClaim => item.record.kind === "claim");
   const byId = new Map(scan.records.map((item) => [item.record.id, item]));
   const groups: { key: ClaimKey; members: PositionedClaim[] }[] = [];
   for (const item of claims) {
@@ -556,7 +554,8 @@ function statusResult(scan: {
   for (const item of claims) {
     const cohort = cohorts.find(
       (candidate) =>
-        scopesEqual(candidate.scope, item.record.scope) && jsonValuesEqual(candidate.value, item.record.value),
+        scopesEqual(candidate.scope, item.record.scope) &&
+        jsonValuesEqual(candidate.value, item.record.value),
     );
     if (cohort === undefined) {
       cohorts.push({ scope: item.record.scope, value: item.record.value, members: [item] });
@@ -574,17 +573,20 @@ function statusResult(scan: {
     if (nodes.length < 2) continue;
     const parent = nodes.map((_, index) => index);
     const find = (index: number): number => {
-      let root = index;
+      let current = index;
+      let root = current;
       while (parent[root] !== root) root = parent[root] as number;
-      while (parent[index] !== index) {
-        const next = parent[index] as number;
-        parent[index] = root;
-        index = next;
+      while (parent[current] !== current) {
+        const next = parent[current] as number;
+        parent[current] = root;
+        current = next;
       }
       return root;
     };
     const nodeByClaim = new Map<RecordId, number>();
-    nodes.forEach((node, index) => node.members.forEach((member) => nodeByClaim.set(member.record.id, index)));
+    for (const [index, node] of nodes.entries()) {
+      for (const member of node.members) nodeByClaim.set(member.record.id, index);
+    }
     for (const relation of scan.records) {
       if (relation.record.kind !== "relation" || relation.record.relation_type !== "duplicates") continue;
       const from = byId.get(relation.record.from);
