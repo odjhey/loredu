@@ -96,9 +96,10 @@ agent's) start from what you record now.
    (`contradicts`, `duplicates`, and `supersedes` are the other common types.)
 8. **Finish healthy.** Before ending the activity: `lor status --check`.
    Exit 5 means blocking health remains; work the corrective `advice:` list
-   until it passes. Provider/validation failures use other exits. Do not leave
-   attention items you created unhandled — resolve them or mark them disputed
-   with a reason.
+   until it passes. Provider/validation failures use other exits. Working Lore
+   attention is a review queue, not status health: inspect candidates and
+   revalidation evidence, then append a Verification, Relation, or Resolution
+   only when the evidence warrants it.
 
 ### Rules
 
