@@ -1202,7 +1202,13 @@ test("compiled empty Working Lore is definitive and grammar-safe — @covers T40
     ["lore", "--store", selector, "--wat", "--json"],
     ["lore", "--store", selector, "--activity", "one", "--activity", "two", "--json"],
     ["lore", "--store", selector, "--cursor", "bad", "--activity", "one", "--json"],
-    [
+  ]) {
+    const failed = await invoke(home, args);
+    expect(failed.exitCode).toBe(2);
+    expect(["CLI_USAGE", "VALIDATION_FAILED"]).toContain((json(failed).error as { code: string }).code);
+  }
+  const invalidCorpus = json(
+    await invoke(home, [
       "lore",
       "--store",
       selector,
@@ -1211,12 +1217,12 @@ test("compiled empty Working Lore is definitive and grammar-safe — @covers T40
       "--corpus-json",
       '{"ref":"repo=loredu","snapshot":"v1","extra":true}',
       "--json",
-    ],
-  ]) {
-    const failed = await invoke(home, args);
-    expect(failed.exitCode).toBe(2);
-    expect(["CLI_USAGE", "VALIDATION_FAILED"]).toContain((json(failed).error as { code: string }).code);
-  }
+    ]),
+  );
+  expect((invalidCorpus.error as { code: string }).code).toBe("VALIDATION_FAILED");
+  expect((invalidCorpus.error as { issues: Array<{ path: string }> }).issues).toEqual([
+    expect.objectContaining({ path: "/corpus/extra" }),
+  ]);
   expect(await snapshotStoreArtifacts(root)).toEqual(before);
 });
 
@@ -2639,6 +2645,17 @@ test("one compiled fresh-store journey runs orientation through Working Lore —
     ),
   ).toEqual(["current"]);
   expectRenderedAffordances(continued, selector);
+  const continuedText = await invokeShell(home, continuation?.run as string);
+  expect(continuedText.exitCode).toBe(0);
+  expect(continuedText.stderr).toBe("");
+  for (const line of [
+    "current: returned=1 total=1",
+    "patterns: returned=0 total=0",
+    "candidates: returned=0 total=0",
+    "conflicts: returned=0 total=0",
+    "needs_revalidation: returned=0 total=1",
+  ])
+    expect(continuedText.stdout).toContain(line);
 
   const attentionItem = lorePacket.sections.find(({ name }) => name === "needs_revalidation")?.items[0];
   let anchored = json(
@@ -2704,6 +2721,13 @@ test("one compiled fresh-store journey runs orientation through Working Lore —
   const wrongFamily = await invoke(home, ["claims", "--store", selector, "--same-key-as", entryId, "--json"]);
   expect(wrongFamily.exitCode).toBe(2);
   expect((json(wrongFamily).error as { code: string }).code).toBe("VALIDATION_FAILED");
+  const malformedAnchor = json(
+    await invoke(home, ["claims", "--store", selector, "--same-key-as", "not-a-record-id", "--json"]),
+  );
+  expect((malformedAnchor.error as { code: string }).code).toBe("VALIDATION_FAILED");
+  expect((malformedAnchor.error as { issues: Array<{ path: string }> }).issues).toEqual([
+    expect.objectContaining({ path: "/same_key_as" }),
+  ]);
   const mutuallyExclusive = await invoke(home, [
     "claims",
     "--store",

@@ -3,7 +3,6 @@ import { isAbsolute, sep } from "node:path";
 import {
   type Actor,
   type Affordance,
-  type ClaimId,
   type ClaimPolicy,
   type ClaimQuery,
   type Clock,
@@ -22,7 +21,6 @@ import {
   type RecordDraft,
   type RecordId,
   type Scope,
-  type SourceRef,
   type StatusQuery,
   type WorkingLoreBasis,
   type WorkingLoreQuery,
@@ -333,18 +331,6 @@ function parseActor(value: string): unknown {
     ]);
   }
   return { type: value.slice(0, separator), id: value.slice(separator + 1) };
-}
-
-function parseSourceRef(value: string): SourceRef {
-  const draft = decodeRecordDraft({
-    kind: "entry",
-    actor: { type: "agent", id: "cli-source-decoder" },
-    body: "source boundary",
-    sources: [parseJson(value, "/corpus")],
-  });
-  const source = draft.sources?.[0];
-  if (source === undefined) throw new TypeError("decoded SourceRef is missing");
-  return source;
 }
 
 function parseScope(values: readonly string[]): Scope | undefined {
@@ -682,14 +668,25 @@ function emitText(io: CliIo, response: BaseResponse, selector: string | undefine
     );
     io.out(`activity: ${String(packet.activity)}\nfilters: ${JSON.stringify(packet.filters)}\n`);
     const continuationCursors = new Set<string>();
-    for (const section of packet.sections as readonly Record<string, unknown>[]) {
-      const page = section.page as {
-        readonly returned: number;
-        readonly total: number;
-        readonly cursor?: string;
-      };
-      io.out(`${String(section.name)}: returned=${page.returned} total=${page.total}\n`);
-      for (const item of section.items as readonly Record<string, unknown>[]) {
+    const packetSections = new Map(
+      (packet.sections as readonly Record<string, unknown>[]).map((section) => [section.name, section]),
+    );
+    const sectionCounts = [
+      ["current", "current_count"],
+      ["patterns", "pattern_count"],
+      ["candidates", "candidate_count"],
+      ["conflicts", "conflict_count"],
+      ["needs_revalidation", "needs_revalidation_count"],
+    ] as const;
+    for (const [name, count] of sectionCounts) {
+      const section = packetSections.get(name);
+      const page = section?.page as
+        | { readonly returned: number; readonly total: number; readonly cursor?: string }
+        | undefined;
+      io.out(
+        `${name}: returned=${page?.returned ?? 0} total=${page?.total ?? orientation[count]}\n`,
+      );
+      for (const item of (section?.items as readonly Record<string, unknown>[] | undefined) ?? []) {
         const knowledge = item.knowledge as Record<string, unknown>;
         io.out(`  item: ${String(item.summary)}\n`);
         io.out(
@@ -702,7 +699,7 @@ function emitText(io: CliIo, response: BaseResponse, selector: string | undefine
             io.out(`      disclosure: ${runFor(affordance, selector)}\n`);
         }
       }
-      if (page.cursor !== undefined) {
+      if (page?.cursor !== undefined) {
         continuationCursors.add(page.cursor);
         const continuation = response.advice.find(
           (item) => item.action === "lore.read" && item.params.cursor === page.cursor,
@@ -1218,7 +1215,7 @@ async function execute(
       const scope =
         scopePairs.length === 0 ? (exactScope ? ({} as Scope) : undefined) : parseScope(scopePairs);
       query = {
-        ...(sameKeyAs === undefined ? {} : { same_key_as: recordId(sameKeyAs) as ClaimId }),
+        ...(sameKeyAs === undefined ? {} : { same_key_as: sameKeyAs }),
         ...(scope === undefined ? {} : { scope }),
         ...(exactScope ? { scope_match: "exact" as const } : {}),
         ...(subjectType === undefined ? {} : { subject_type: subjectType }),
@@ -1233,7 +1230,7 @@ async function execute(
         ...(actorValue === undefined ? {} : { actor: parseActor(actorValue) as Actor }),
         ...(since === undefined ? {} : { since }),
         ...(limit === undefined ? {} : { limit }),
-      };
+      } as ClaimQuery;
     }
     return {
       response: await composeApplication(parsed.store, runOptions).application.claims(query),
@@ -1311,9 +1308,9 @@ async function execute(
       query = {
         activity: requiredOption(parsed, "--activity"),
         ...(scope === undefined ? {} : { scope }),
-        ...(corpusText === undefined ? {} : { corpus: parseSourceRef(corpusText) }),
+        ...(corpusText === undefined ? {} : { corpus: parseJson(corpusText, "/corpus") }),
         ...budgets,
-      };
+      } as WorkingLoreQuery;
     }
     return {
       response: await composeApplication(parsed.store, runOptions).application.lore(query),
