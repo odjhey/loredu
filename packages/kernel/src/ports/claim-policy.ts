@@ -94,7 +94,13 @@ interface ReadPolicyField {
 function readDataProperty(value: object, key: string, path: string, issues: LoreduIssue[]): ReadPolicyField {
   try {
     let current: object | null = value;
+    const visited = new Set<object>();
     while (current !== null) {
+      if (visited.has(current)) {
+        issues.push(makeIssue("TYPE", path, "could not inspect ClaimPolicy field"));
+        return Object.freeze({ present: false, readable: false });
+      }
+      visited.add(current);
       const descriptor = Reflect.getOwnPropertyDescriptor(current, key);
       if (descriptor) {
         if (!("value" in descriptor)) {

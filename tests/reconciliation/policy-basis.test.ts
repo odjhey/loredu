@@ -522,6 +522,30 @@ describe("M0 ClaimPolicy seam", () => {
       expect(caught).toMatchObject({ code: "VALIDATION_FAILED", message: "ClaimPolicy validation failed" });
       expect(JSON.stringify(caught)).not.toContain("proxy-secret");
     }
+
+    let cyclicPrototypePolicy: ClaimPolicy;
+    cyclicPrototypePolicy = new Proxy(base, {
+      getPrototypeOf() {
+        return cyclicPrototypePolicy;
+      },
+    });
+    for (const assemble of [
+      () => createRulesetIdentity(cyclicPrototypePolicy),
+      () => createLoreduApplication({ ...dependencies, claimPolicy: cyclicPrototypePolicy }),
+    ])
+      expect(assemble).toThrow(
+        expect.objectContaining({
+          code: "VALIDATION_FAILED",
+          message: "ClaimPolicy validation failed",
+          issues: [
+            {
+              code: "TYPE",
+              path: "/advise",
+              message: "could not inspect ClaimPolicy field",
+            },
+          ],
+        }),
+      );
     expect(getterCalls).toBe(0);
     expect(calls).toEqual({ validate: 0, semantics: 0, advise: 1, clock: 0, random: 0, store: 0 });
   });

@@ -210,6 +210,32 @@ describe("ADR 0027 deterministic reconciliation foundation", () => {
       }).state,
     ).toBe("disputed");
 
+    const a = positionedClaim(1, persistedClaim(ids.c1, { value: "a" }));
+    const b = positionedClaim(2, persistedClaim(ids.c2, { value: "b" }));
+    const c = positionedClaim(3, persistedClaim(ids.c3, { value: "c" }));
+    const d = positionedClaim(4, persistedClaim(ids.c4, { value: "d" }));
+    const cycleWithAcyclicEdge = reconcileApplicableClaimGroup({
+      claims: [a, b, c, d],
+      visibleClaims: [a, b, c, d],
+      relations: [
+        positionedRelation(5, relation(ids.r1, ids.c1, ids.c2)),
+        positionedRelation(6, relation(ids.r2, ids.c2, ids.c1)),
+        positionedRelation(7, relation(ids.r3, ids.c4, ids.c3)),
+      ],
+      semantics: "exclusive",
+    });
+    expect(cycleWithAcyclicEdge).toMatchObject({ state: "disputed", cycle: true });
+    expect(cycleWithAcyclicEdge.claims.map(({ record }) => String(record.id))).toEqual([
+      ids.c1,
+      ids.c2,
+      ids.c4,
+    ]);
+    expect(
+      cycleWithAcyclicEdge.values.map(({ claims: contributing }) =>
+        contributing.map(({ record }) => String(record.id)),
+      ),
+    ).toEqual([[ids.c1], [ids.c2], [ids.c4]]);
+
     const deactivation = positionedResolution(5, resolution(ids.s1, [ids.r2], { decision: "retract" }));
     const noCycle = reconcileApplicableClaimGroup({
       claims: [equalOld, equalNew],

@@ -220,25 +220,29 @@ function completeResolution(resolution: PositionedResolution, claims: readonly P
   return resolution.record.replacement === undefined;
 }
 
-function hasDirectedCycle(edges: readonly (readonly [ClaimId, ClaimId])[]): boolean {
+function directedCycleMembers(edges: readonly (readonly [ClaimId, ClaimId])[]): ReadonlySet<ClaimId> {
   const outgoing = new Map<ClaimId, ClaimId[]>();
   for (const [from, to] of edges) {
     const values = outgoing.get(from) ?? [];
     values.push(to);
     outgoing.set(from, values);
   }
-  const visiting = new Set<ClaimId>();
-  const visited = new Set<ClaimId>();
-  const visit = (id: ClaimId): boolean => {
-    if (visiting.has(id)) return true;
-    if (visited.has(id)) return false;
-    visiting.add(id);
-    for (const next of outgoing.get(id) ?? []) if (visit(next)) return true;
-    visiting.delete(id);
-    visited.add(id);
-    return false;
-  };
-  return [...outgoing.keys()].some(visit);
+  const members = new Set<ClaimId>();
+  for (const start of outgoing.keys()) {
+    const pending = [...(outgoing.get(start) ?? [])];
+    const visited = new Set<ClaimId>();
+    while (pending.length > 0) {
+      const current = pending.pop() as ClaimId;
+      if (current === start) {
+        members.add(start);
+        break;
+      }
+      if (visited.has(current)) continue;
+      visited.add(current);
+      pending.push(...(outgoing.get(current) ?? []));
+    }
+  }
+  return members;
 }
 
 /**
@@ -331,28 +335,27 @@ export function reconcileApplicableClaimGroup(input: {
     if (control && control.record.decision !== "prefer") continue;
     activeEdges.push(Object.freeze([from.record.id, to.record.id]));
   }
-  if (hasDirectedCycle(activeEdges))
-    return Object.freeze({
-      key,
-      semantics: input.semantics,
-      state: "disputed",
-      claims,
-      values: valueGroups(claims),
-      relations: Object.freeze(derived),
-      cycle: true,
-    });
-
-  const removed = new Set(activeEdges.map((edge) => edge[1]));
+  const cycleMembers = directedCycleMembers(activeEdges);
+  const removed = new Set(
+    activeEdges.filter((edge) => !cycleMembers.has(edge[1])).map((edge) => edge[1]),
+  );
   const survivors = Object.freeze(claims.filter((claim) => !removed.has(claim.record.id)));
   const values = valueGroups(survivors);
   return Object.freeze({
     key,
     semantics: input.semantics,
-    state: values.length === 1 ? "preferred" : input.semantics === "coexisting" ? "coexisting" : "disputed",
+    state:
+      cycleMembers.size > 0
+        ? "disputed"
+        : values.length === 1
+          ? "preferred"
+          : input.semantics === "coexisting"
+            ? "coexisting"
+            : "disputed",
     claims: survivors,
     values,
     relations: Object.freeze(derived),
-    cycle: false,
+    cycle: cycleMembers.size > 0,
   });
 }
 
