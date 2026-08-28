@@ -18,7 +18,7 @@ Initial decisions:
 - [0003: Plain files first](./0003-plain-files-first.md)
 - [0004: Claim identity is a declared key](./0004-claim-identity-key.md)
 - [0005: Embedded kernel, not a standalone product](./0005-embedded-kernel-compatibility.md)
-- [0006: Versioning is explicit at every layer](./0006-explicit-version-basis.md)
+- [0006: Versioning is explicit at every layer](./0006-explicit-version-basis.md) — same-Basis byte-identical/byte-comparable wording is narrowly superseded by ADR 0027's semantic-content equality; structural Basis, staleness, and invalidation remain
 - [0007: TypeScript on Bun](./0007-typescript-bun.md)
 - [0008: CLI before full reconciliation; agent-reactive responses](./0008-cli-first-agent-reactive.md)
 - [0009: Hypermedia responses and basis-pinned pagination](./0009-hypermedia-pagination.md)
@@ -39,4 +39,5 @@ Initial decisions:
 - [0024: Validate M0 policy and Basis inputs at their public construction boundaries](./0024-m0-policy-and-basis-runtime-boundaries.md) — exact runtime rejection, callback-free ruleset snapshot, and canonical closed Basis behavior without pulling M0-A forward
 - [0025: Keep every generic M0 append failure inside its owning phase](./0025-m0-application-append-phase-boundaries.md) — exact custom-policy callback/result handling, ordered reference-read failures, canonical all-family stamping, and detached InMemoryStore snapshots
 - [0026: Close the M1.5 application and CLI contract before command fan-out](./0026-m15-application-cli-contract.md) — exact reads/responses/filters/health/cursors/disclosure, CLI grammar/errors/exits, composition capabilities, embedded skill, and M2/M3 sequencing boundary
+- [0027: Close deterministic reconciliation and Current Knowledge before M2 implementation](./0027-m2-reconciliation-projection-contract.md) — exact pair/state vocabulary, policy advice, Resolution precedence, bitemporal current API, bounded history/evidence, and invalidation; additively supersedes ADR 0024's M0 rejection of `advise`, narrows ADR 0026 status health at M2, and narrowly supersedes ADR 0006's same-Basis byte-identity wording
 - [0028: Reject relative Loredu homes](./0028-reject-relative-loredu-homes.md) — requires absolute configured and OS home paths so named/default store identity never changes with cwd; narrowly supersedes ADR 0022's acceptance of any nonempty configured home
