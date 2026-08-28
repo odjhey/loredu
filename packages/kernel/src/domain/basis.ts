@@ -1,6 +1,11 @@
 import { LoreduError, type LoreduIssue } from "../errors";
 import type { StreamPosition } from "../ports/capabilities";
-import { type ClaimPolicy, DEFAULT_CLAIM_POLICY, validateClaimPolicy } from "../ports/claim-policy";
+import {
+  type ClaimPolicy,
+  DEFAULT_CLAIM_POLICY,
+  type ValidatedClaimPolicy,
+  validateClaimPolicy,
+} from "../ports/claim-policy";
 import type { JsonObject } from "./entry";
 import {
   compareUnicodeScalars,
@@ -113,12 +118,15 @@ function parseRuleset(value: unknown, issues: LoreduIssue[]): RulesetIdentity | 
   });
 }
 
-export function createRulesetIdentity(policy: ClaimPolicy): RulesetIdentity {
-  const validated = validateClaimPolicy(policy);
+export function rulesetIdentityFromValidatedPolicy({ id, version }: ValidatedClaimPolicy): RulesetIdentity {
   return Object.freeze({
     core: CORE_RULESET_ID,
-    claim_policy: Object.freeze({ id: validated.id, version: validated.version }),
+    claim_policy: Object.freeze({ id, version }),
   });
+}
+
+export function createRulesetIdentity(policy: ClaimPolicy): RulesetIdentity {
+  return rulesetIdentityFromValidatedPolicy(validateClaimPolicy(policy));
 }
 
 export const DEFAULT_RULESET_IDENTITY: RulesetIdentity = createRulesetIdentity(DEFAULT_CLAIM_POLICY);

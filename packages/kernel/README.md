@@ -19,7 +19,7 @@ Anything the kernel needs from its environment arrives through a port in
 
 ## Public surface
 
-Only `@loredu/kernel` and `@loredu/kernel/testing` are entrypoints; deep imports are unsupported. The exact value/type allowlists and signatures are the [kernel API contract](../../docs/architecture/contracts/kernel-api.md). The normal runtime exports the five draft/record families, portable JSON codec/equality, ClaimKey, Instant/position constructors, versioned ClaimPolicy/default semantics, structural RulesetIdentity/Basis primitives, and the family-narrowed generic append application. M1 adds the full RecordStore query types without adding a normal-entrypoint runtime value. Testing exports exactly InMemoryStore, FixedClock, SeededRandomSource, and the runner-neutral `recordStoreConformance`; its fixture, subject, and case shapes are type-only exports.
+Only `@loredu/kernel` and `@loredu/kernel/testing` are entrypoints; deep imports are unsupported. The exact value/type allowlists and signatures are the [kernel API contract](../../docs/architecture/contracts/kernel-api.md). The normal runtime exports the five draft/record families, portable JSON codec/equality, ClaimKey, Instant/position constructors, versioned ClaimPolicy/default semantics, structural RulesetIdentity/Basis primitives, and the assembled application. M1 adds the full RecordStore query types; M1.5 adds only type exports for surface-neutral responses, queries, diagnostics, and affordances. Neither milestone adds a normal-entrypoint runtime value. Testing exports exactly InMemoryStore, FixedClock, SeededRandomSource, and the runner-neutral `recordStoreConformance`; its fixture, subject, and case shapes are type-only exports.
 
 ## Layout
 
@@ -37,4 +37,4 @@ port. Concrete adapter status lives in the
 
 ## State
 
-M0 is complete and its behavior remains intact. M1-K adds the exact kind-only atomic scan, snapshot-bounded exclusive-after stream, head, positioned records, M1-complete InMemoryStore, and reusable runner-neutral conformance kit. Catalog rows T10, T13, and T15 run against InMemoryStore. Plain-file implementation status is maintained by the adapter; policy advice and reconciliation remain later milestones.
+M0 and M1 are complete and their behavior remains intact. M1.5 application services add `add`, `show`, `history`, `claims`, `status`, and `readHead`: exact AND-composed Claim filters, stream order, Basis-pinned opaque cursors, bounded overlap feedback, health, core key-divergence advisories, and progressive-disclosure affordances. They do not render CLI commands or implement M2 reconciliation/projections/current/as-of. CLI adapter status remains in [`packages/cli`](../cli/README.md).

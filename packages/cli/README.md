@@ -19,5 +19,7 @@ Scaffold. `--version`/`-v` is the only implemented invocation; anything else
 prints an honest "no commands yet" line and exits nonzero. The
 [application and CLI contract](../../docs/architecture/contracts/application-cli.md)
 owns the exact M1.5 command/exit surface and its staged M2/M3 additions.
-Protocol evidence T50–T75 belongs in the CLI conformance suite at
-[`../../tests/cli-conformance/`](../../tests/cli-conformance/README.md).
+Compiled rendering, command, and exit evidence belongs in the CLI conformance suite at
+[`../../tests/cli-conformance/`](../../tests/cli-conformance/README.md); the
+surface-neutral application semantics are covered separately in
+[`../../tests/application/`](../../tests/application/README.md).

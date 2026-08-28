@@ -10,7 +10,10 @@ export type LoreduErrorCode =
   | "STORE_IO_FAILED"
   | "RANDOM_SOURCE_FAILED"
   | "CLOCK_FAILED"
-  | "STORE_APPEND_FAILED";
+  | "STORE_APPEND_FAILED"
+  | "RECORD_NOT_FOUND"
+  | "INVALID_CURSOR"
+  | "CURSOR_MISMATCH";
 export type LoreduIssueCode =
   | "REQUIRED"
   | "TYPE"

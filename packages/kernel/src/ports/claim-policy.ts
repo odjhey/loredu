@@ -187,30 +187,43 @@ function copyPolicyIssues(value: unknown): readonly LoreduIssue[] | undefined {
   return orderedIssues(copied);
 }
 
-/** Internal Claim append policy phase over the already canonical declared key. */
-export function validateClaimForAppend(
+/** Internal Claim policy phase over an already canonical declared key. */
+export function evaluateClaimPolicy(
   validated: ValidatedClaimPolicy,
   key: ClaimKey,
-): readonly LoreduIssue[] {
+): { readonly issues: readonly LoreduIssue[]; readonly semantics?: ClaimSemantics } {
   let returned: unknown;
   try {
     returned = validated.validateClaimKey(key);
   } catch {
-    return invalidCallbackResult("ClaimPolicy validateClaimKey failed");
+    return Object.freeze({ issues: invalidCallbackResult("ClaimPolicy validateClaimKey failed") });
   }
   const issues = copyPolicyIssues(returned);
-  if (!issues) return invalidCallbackResult("ClaimPolicy validateClaimKey must return LoreduIssue[]");
-  if (issues.length > 0) return issues;
+  if (!issues)
+    return Object.freeze({
+      issues: invalidCallbackResult("ClaimPolicy validateClaimKey must return LoreduIssue[]"),
+    });
+  if (issues.length > 0) return Object.freeze({ issues });
 
   let semantics: unknown;
   try {
     semantics = validated.semantics(key);
   } catch {
-    return invalidCallbackResult("ClaimPolicy semantics failed");
+    return Object.freeze({ issues: invalidCallbackResult("ClaimPolicy semantics failed") });
   }
   if (semantics !== "exclusive" && semantics !== "coexisting")
-    return Object.freeze([makeIssue("FORMAT", "", "ClaimPolicy semantics returned an unsupported value")]);
-  return EMPTY_ISSUES;
+    return Object.freeze({
+      issues: Object.freeze([makeIssue("FORMAT", "", "ClaimPolicy semantics returned an unsupported value")]),
+    });
+  return Object.freeze({ issues: EMPTY_ISSUES, semantics });
+}
+
+/** Internal compatibility helper for the append validation phase. */
+export function validateClaimForAppend(
+  validated: ValidatedClaimPolicy,
+  key: ClaimKey,
+): readonly LoreduIssue[] {
+  return evaluateClaimPolicy(validated, key).issues;
 }
 
 /** Internal runtime boundary shared by assembly and structural ruleset construction. */

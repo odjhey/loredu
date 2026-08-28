@@ -4,6 +4,30 @@ export type {
   LoreduApplicationDependencies,
 } from "./application";
 export { createLoreduApplication } from "./application";
+export type {
+  AddedRecordResult,
+  Affordance,
+  ApplicationListResponse,
+  ApplicationResponse,
+  ApplicationStatusResponse,
+  ClaimFilters,
+  ClaimItem,
+  ClaimQuery,
+  DanglingRecordReference,
+  HeadResult,
+  HealthItem,
+  HistoryItem,
+  HistoryQuery,
+  KeyDivergenceAdvisory,
+  Page,
+  ReconciliationFeedback,
+  RecordHandle,
+  RecordSummary,
+  ShownRecordResult,
+  StatusQuery,
+  StatusResult,
+  UnresolvedExclusiveGroup,
+} from "./application-types";
 export type { Basis, RulesetIdentity } from "./domain/basis";
 export {
   basisEquals,
