@@ -29,6 +29,9 @@ function fixture(parent = tmpParent()): string {
   temporaryRoots.push(root);
   mkdirSync(join(root, "packages"));
   cpSync(join(REPO_ROOT, "tsconfig.base.json"), join(root, "tsconfig.base.json"));
+  const skillDirectory = join(root, "docs/v0.x/execution");
+  mkdirSync(skillDirectory, { recursive: true });
+  cpSync(join(REPO_ROOT, "docs/v0.x/execution/agent-skill.md"), join(skillDirectory, "agent-skill.md"));
   for (const name of ["kernel", "store-plainfile", "cli"])
     cpSync(join(REPO_ROOT, "packages", name), join(root, "packages", name), {
       recursive: true,
@@ -62,6 +65,18 @@ afterEach(() => {
 
 describe("authoritative workspace boundary guard", () => {
   test("the real workspace is clean", () => expect(scanWorkspace(REPO_ROOT)).toEqual([]));
+
+  test("the CLI embedded-skill import is restricted to its regular canonical source", () => {
+    const root = fixture();
+    rmSync(join(root, "docs/v0.x/execution/agent-skill.md"));
+    expect(scanWorkspace(root)).toContainEqual(
+      violation(
+        "packages/cli/src/embedded-skill.ts",
+        "boundary-unresolved",
+        "1:20 embedded skill source is not a regular file",
+      ),
+    );
+  });
 
   test.each([
     ["node protocol", 'import "node:fs";', "1:8 kernel imports environment module node:fs"],

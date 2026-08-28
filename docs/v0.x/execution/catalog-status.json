@@ -5,103 +5,88 @@
   "deferred": {
     "T20": {
       "milestone": "M2",
-      "group": "M2 — reconciliation, resolution, projections",
+      "group": "M2 \u2014 reconciliation, resolution, projections",
       "reason": "reconciliation and projection engine not implemented yet"
     },
     "T21": {
       "milestone": "M2",
-      "group": "M2 — reconciliation, resolution, projections",
+      "group": "M2 \u2014 reconciliation, resolution, projections",
       "reason": "reconciliation and projection engine not implemented yet"
     },
     "T22": {
       "milestone": "M2",
-      "group": "M2 — reconciliation, resolution, projections",
+      "group": "M2 \u2014 reconciliation, resolution, projections",
       "reason": "reconciliation and projection engine not implemented yet"
     },
     "T23": {
       "milestone": "M2",
-      "group": "M2 — reconciliation, resolution, projections",
+      "group": "M2 \u2014 reconciliation, resolution, projections",
       "reason": "reconciliation and projection engine not implemented yet"
     },
     "T24": {
       "milestone": "M2",
-      "group": "M2 — reconciliation, resolution, projections",
+      "group": "M2 \u2014 reconciliation, resolution, projections",
       "reason": "reconciliation and projection engine not implemented yet"
     },
     "T25": {
       "milestone": "M2",
-      "group": "M2 — reconciliation, resolution, projections",
+      "group": "M2 \u2014 reconciliation, resolution, projections",
       "reason": "reconciliation and projection engine not implemented yet"
     },
     "T26": {
       "milestone": "M2",
-      "group": "M2 — reconciliation, resolution, projections",
+      "group": "M2 \u2014 reconciliation, resolution, projections",
       "reason": "reconciliation and projection engine not implemented yet"
     },
     "T27": {
       "milestone": "M2",
-      "group": "M2 — reconciliation, resolution, projections",
+      "group": "M2 \u2014 reconciliation, resolution, projections",
       "reason": "reconciliation and projection engine not implemented yet"
     },
     "T28": {
       "milestone": "M2",
-      "group": "M2 — reconciliation, resolution, projections",
+      "group": "M2 \u2014 reconciliation, resolution, projections",
       "reason": "reconciliation and projection engine not implemented yet"
     },
     "T29": {
       "milestone": "M2",
-      "group": "M2 — reconciliation, resolution, projections",
+      "group": "M2 \u2014 reconciliation, resolution, projections",
       "reason": "reconciliation and projection engine not implemented yet"
     },
     "T30": {
       "milestone": "M2",
-      "group": "M2 — reconciliation, resolution, projections",
+      "group": "M2 \u2014 reconciliation, resolution, projections",
       "reason": "reconciliation and projection engine not implemented yet"
     },
     "T40": {
       "milestone": "M3",
-      "group": "M3 — Working Lore",
+      "group": "M3 \u2014 Working Lore",
       "reason": "Working Lore assembly not implemented yet"
     },
     "T41": {
       "milestone": "M3",
-      "group": "M3 — Working Lore",
+      "group": "M3 \u2014 Working Lore",
       "reason": "Working Lore assembly not implemented yet"
     },
     "T42": {
       "milestone": "M3",
-      "group": "M3 — Working Lore",
+      "group": "M3 \u2014 Working Lore",
       "reason": "Working Lore assembly not implemented yet"
     },
     "T43": {
       "milestone": "M3",
-      "group": "M3 — Working Lore",
+      "group": "M3 \u2014 Working Lore",
       "reason": "Working Lore assembly not implemented yet"
     },
     "T44": {
       "milestone": "M3",
-      "group": "M3 — Working Lore",
+      "group": "M3 \u2014 Working Lore",
       "reason": "Working Lore assembly not implemented yet"
     },
     "T45": {
       "milestone": "M3",
-      "group": "M3 — Working Lore",
+      "group": "M3 \u2014 Working Lore",
       "reason": "Working Lore assembly not implemented yet"
-    },
-    "T50": {
-      "milestone": "M1.5",
-      "group": "CLI conformance (compiled binary)",
-      "reason": "lor binary not built yet"
-    },
-    "T51": {
-      "milestone": "M1.5",
-      "group": "CLI conformance (compiled binary)",
-      "reason": "lor binary not built yet"
-    },
-    "T52": {
-      "milestone": "M1.5",
-      "group": "CLI conformance (compiled binary)",
-      "reason": "lor binary not built yet"
     },
     "T53": {
       "milestone": "M1.5",
@@ -128,15 +113,10 @@
       "group": "CLI conformance (compiled binary)",
       "reason": "lor binary not built yet"
     },
-    "T58": {
-      "milestone": "M1.5",
-      "group": "CLI conformance (compiled binary)",
-      "reason": "lor binary not built yet"
-    },
     "T65": {
       "milestone": "M1.5",
       "group": "Agent-reactive envelope (ships with the early CLI)",
-      "reason": "embedded skill and compiled CLI journey belong to M15-B/M15-Q"
+      "reason": "source-exact embedded skill output is implemented; the complete query/disclosure/manual-resolution journey lands with M15-Q"
     },
     "T73": {
       "milestone": "M1.5",
@@ -155,7 +135,7 @@
     },
     "T86": {
       "milestone": "M2",
-      "group": "M2 — reconciliation, resolution, projections",
+      "group": "M2 \u2014 reconciliation, resolution, projections",
       "reason": "value canonicalization lands with the kernel in M0; its use in conflict detection is M2"
     }
   }

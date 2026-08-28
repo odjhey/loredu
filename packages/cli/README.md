@@ -15,11 +15,17 @@ bun bin/lor.ts --version
 
 ## State
 
-Scaffold. `--version`/`-v` is the only implemented invocation; anything else
-prints an honest "no commands yet" line and exits nonzero. The
-[application and CLI contract](../../docs/architecture/contracts/application-cli.md)
-owns the exact M1.5 command/exit surface and its staged M2/M3 additions.
-Compiled rendering, command, and exit evidence belongs in the CLI conformance suite at
-[`../../tests/cli-conformance/`](../../tests/cli-conformance/README.md); the
-surface-neutral application semantics are covered separately in
+The first compiled-binary slice is implemented: exact store selection and `init`,
+all five record mutation forms, `show`, `head`, stdin Entry bodies, JSON/text
+rendering, bare empty-store orientation, direct version/help, stable failure
+categories, production host capabilities, and the build-time embedded `lor skill`.
+The application query/feedback crew supplies Claim feedback and full status
+mechanics; the query integration crew supplies `history`, `claims`, pagination,
+and the complete agent chain. M2/M3 still own `current` and `lore`.
+
+Compiled-binary evidence lives in
+[`../../tests/cli-conformance/`](../../tests/cli-conformance/README.md). T50–T52
+and T58 are complete; T60 and T65 remain catalog-deferred until their application
+feedback and complete query-chain portions land. The surface-neutral application
+semantics are covered separately in
 [`../../tests/application/`](../../tests/application/README.md).
