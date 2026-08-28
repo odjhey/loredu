@@ -7,7 +7,6 @@ import {
   dataValue,
   escapePointer,
   hasOwnDescriptor,
-  inspectArray,
   inspectObject,
   isScalarText,
   jsonValuesEqual,
@@ -541,6 +540,91 @@ function adviceArray(value: unknown): readonly unknown[] {
   return result;
 }
 
+function adviceClaimTuple(
+  value: unknown,
+  path: string,
+  issues: LoreduIssue[],
+): readonly unknown[] | undefined {
+  let array = false;
+  let length: unknown;
+  try {
+    array = Array.isArray(value);
+    if (array) {
+      const descriptor = Reflect.getOwnPropertyDescriptor(value as object, "length");
+      length = descriptor && "value" in descriptor ? descriptor.value : undefined;
+    }
+  } catch {
+    issues.push(makeIssue("TYPE", path, "could not inspect advisory Claim tuple"));
+    return undefined;
+  }
+  if (!array) {
+    issues.push(makeIssue("TYPE", path, "must be an array"));
+    return undefined;
+  }
+  if (length !== 1 && length !== 2) {
+    issues.push(makeIssue("RANGE", path, "must name one or two Claims"));
+    return undefined;
+  }
+
+  let prototype: object | null;
+  let snapshotLength: PropertyDescriptor | undefined;
+  try {
+    prototype = Reflect.getPrototypeOf(value as object);
+    snapshotLength = Reflect.getOwnPropertyDescriptor(value as object, "length");
+  } catch {
+    issues.push(makeIssue("TYPE", path, "could not inspect advisory Claim tuple"));
+    return undefined;
+  }
+  if (!snapshotLength || !("value" in snapshotLength) || snapshotLength.value !== length) {
+    issues.push(makeIssue("TYPE", path, "array length changed during inspection"));
+    return undefined;
+  }
+
+  let keys: readonly PropertyKey[];
+  try {
+    keys = Reflect.ownKeys(value as object);
+  } catch {
+    issues.push(makeIssue("TYPE", path, "could not inspect advisory Claim tuple"));
+    return undefined;
+  }
+  const issueCount = issues.length;
+  if (prototype !== Array.prototype) issues.push(makeIssue("TYPE", path, "must have Array.prototype"));
+  const indexes = new Set<number>();
+  for (const key of keys) {
+    if (typeof key === "symbol") {
+      issues.push(makeIssue("UNKNOWN_FIELD", path, "must not have symbol fields"));
+      continue;
+    }
+    if (key === "length") continue;
+    const index = Number(key);
+    if (!Number.isSafeInteger(index) || index < 0 || index >= length || String(index) !== key)
+      issues.push(
+        makeIssue("UNKNOWN_FIELD", `${path}/${escapePointer(key)}`, "is an array extra property"),
+      );
+    else indexes.add(index);
+  }
+  for (let index = 0; index < length; index++)
+    if (!indexes.has(index)) issues.push(makeIssue("REQUIRED", `${path}/${index}`, "array must be dense"));
+  if (issues.length > issueCount) return undefined;
+
+  const result: unknown[] = [];
+  try {
+    for (let index = 0; index < length; index++) {
+      const descriptor = Reflect.getOwnPropertyDescriptor(value as object, String(index));
+      if (!descriptor) issues.push(makeIssue("REQUIRED", `${path}/${index}`, "array must be dense"));
+      else if (!("value" in descriptor) || !descriptor.enumerable)
+        issues.push(makeIssue("TYPE", `${path}/${index}`, "must be an enumerable own data element"));
+      else result[index] = descriptor.value;
+    }
+  } catch {
+    issues.push(makeIssue("TYPE", path, "could not inspect advisory Claim tuple"));
+    return undefined;
+  }
+  if (issues.length > issueCount) return undefined;
+  result.length = length;
+  return result;
+}
+
 function required(
   data: Readonly<Record<string, PropertyDescriptor>>,
   key: string,
@@ -582,15 +666,13 @@ export function evaluateClaimPolicyAdvice(
     const code = required(data, "code", `${path}/code`, issues);
     if (typeof code !== "string" || !isScalarText(code) || scalarLength(code) > 128 || !TOKEN.test(code))
       issues.push(makeIssue("FORMAT", `${path}/code`, "must be an identifier-safe token"));
-    const claimValues = inspectArray(
+    const claimValues = adviceClaimTuple(
       required(data, "claims", `${path}/claims`, issues),
       `${path}/claims`,
       issues,
     );
     const ids: ClaimId[] = [];
     if (claimValues) {
-      if (claimValues.length < 1 || claimValues.length > 2)
-        issues.push(makeIssue("RANGE", `${path}/claims`, "must name one or two Claims"));
       for (let claimIndex = 0; claimIndex < claimValues.length; claimIndex++) {
         const id = claimValues[claimIndex];
         if (typeof id !== "string" || !CLAIM_ID.test(id))

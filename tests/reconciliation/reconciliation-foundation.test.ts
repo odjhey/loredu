@@ -398,6 +398,119 @@ describe("ADR 0027 deterministic reconciliation foundation", () => {
     expect(lengthDescriptorReads).toBe(2);
     expect(elementDescriptorReads).toBe(0);
     expect(elementValueReads).toBe(0);
+
+    const tupleCounters = {
+      callback: 0,
+      lengthDescriptors: 0,
+      ownKeys: 0,
+      elementDescriptors: 0,
+      elementValues: 0,
+    };
+    const hugeTuple = new Proxy(new Array(4_294_967_295), {
+      getOwnPropertyDescriptor(target, property) {
+        if (property === "length") tupleCounters.lengthDescriptors++;
+        else tupleCounters.elementDescriptors++;
+        return Reflect.getOwnPropertyDescriptor(target, property);
+      },
+      ownKeys(target) {
+        tupleCounters.ownKeys++;
+        return Reflect.ownKeys(target);
+      },
+      get(target, property, receiver) {
+        if (typeof property === "string" && String(Number(property)) === property)
+          tupleCounters.elementValues++;
+        return Reflect.get(target, property, receiver);
+      },
+    });
+    const hugeTuplePolicy = validateClaimPolicy({
+      ...policy,
+      advise() {
+        tupleCounters.callback++;
+        return [{ code: "gap", claims: hugeTuple, details: {} }] as never;
+      },
+    });
+    let hugeTupleFailure: unknown;
+    try {
+      evaluateClaimPolicyAdvice(hugeTuplePolicy, context);
+    } catch (error) {
+      hugeTupleFailure = error;
+    }
+    expect(hugeTupleFailure).toMatchObject({
+      code: "VALIDATION_FAILED",
+      message: "ClaimPolicy advice validation failed",
+      issues: [{ code: "RANGE", path: "/0/claims", message: "must name one or two Claims" }],
+    });
+    expect(JSON.stringify(hugeTupleFailure)).not.toContain("foreign");
+    expect(tupleCounters).toEqual({
+      callback: 1,
+      lengthDescriptors: 1,
+      ownKeys: 0,
+      elementDescriptors: 0,
+      elementValues: 0,
+    });
+
+    const driftingTupleCounters = {
+      callback: 0,
+      lengthDescriptors: 0,
+      ownKeys: 0,
+      elementDescriptors: 0,
+      elementValues: 0,
+    };
+    const driftingTuple = new Proxy(new Array(4_294_967_295), {
+      getOwnPropertyDescriptor(target, property) {
+        if (property === "length") {
+          driftingTupleCounters.lengthDescriptors++;
+          const descriptor = Reflect.getOwnPropertyDescriptor(target, property) as PropertyDescriptor;
+          return {
+            ...descriptor,
+            value: driftingTupleCounters.lengthDescriptors === 1 ? 1 : 4_294_967_295,
+          };
+        }
+        driftingTupleCounters.elementDescriptors++;
+        return Reflect.getOwnPropertyDescriptor(target, property);
+      },
+      ownKeys(target) {
+        driftingTupleCounters.ownKeys++;
+        return Reflect.ownKeys(target);
+      },
+      get(target, property, receiver) {
+        if (typeof property === "string" && String(Number(property)) === property)
+          driftingTupleCounters.elementValues++;
+        return Reflect.get(target, property, receiver);
+      },
+    });
+    const driftingTuplePolicy = validateClaimPolicy({
+      ...policy,
+      advise() {
+        driftingTupleCounters.callback++;
+        return [{ code: "gap", claims: driftingTuple, details: {} }] as never;
+      },
+    });
+    let driftingTupleFailure: unknown;
+    try {
+      evaluateClaimPolicyAdvice(driftingTuplePolicy, context);
+    } catch (error) {
+      driftingTupleFailure = error;
+    }
+    expect(driftingTupleFailure).toMatchObject({
+      code: "VALIDATION_FAILED",
+      message: "ClaimPolicy advice validation failed",
+      issues: [
+        {
+          code: "TYPE",
+          path: "/0/claims",
+          message: "array length changed during inspection",
+        },
+      ],
+    });
+    expect(JSON.stringify(driftingTupleFailure)).not.toContain("foreign");
+    expect(driftingTupleCounters).toEqual({
+      callback: 1,
+      lengthDescriptors: 2,
+      ownKeys: 0,
+      elementDescriptors: 0,
+      elementValues: 0,
+    });
   });
 
   test("advice validation rejects active, sparse, foreign, malformed, and duplicate output without partial data", () => {
