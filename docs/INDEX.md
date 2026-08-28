@@ -39,7 +39,7 @@ created_at: 2026-08-26T12:10:00+08:00
 | [0006: Versioning is explicit at every layer](./decisions/0006-explicit-version-basis.md) | Stream/ruleset/Basis identity; same-Basis byte-identity wording narrowed to semantic content by ADR 0027 |
 | [0007: TypeScript on Bun](./decisions/0007-typescript-bun.md) | Strict TypeScript core, bun:test suites, CLI compiled to a single binary |
 | [0008: CLI before full reconciliation; agent-reactive responses](./decisions/0008-cli-first-agent-reactive.md) | Ship `lor` after M1 with deterministic next-step advice; agents chain until healthy |
-| [0009: Hypermedia responses and basis-pinned pagination](./decisions/0009-hypermedia-pagination.md) | Responses embed runnable affordances; lists paginate by basis-pinned cursor with explicit counts |
+| [0009: Hypermedia responses and basis-pinned pagination](./decisions/0009-hypermedia-pagination.md) | Responses embed runnable affordances and use pinned cursors/explicit counts; its generic Working Lore `--limit` requirement is narrowly superseded by ADR 0030 |
 | [0010: The ClaimPolicy extension seam](./decisions/0010-claim-policy-seam.md) | One versioned seam for consumer claim semantics; kernel invariants stay in core |
 | [0011: Repository and package architecture](./decisions/0011-repo-package-architecture.md) | Bun workspaces (kernel · store-plainfile · cli), structural dependency law, catalog-shaped tests |
 | [0012: Developer experience and CI gating](./decisions/0012-dx-and-ci-gating.md) | Biome + cspell, single fail-closed ci-required gate with fail-safe path selection, catalog drift check, AGENTS.md symlink convention |
@@ -58,7 +58,7 @@ created_at: 2026-08-26T12:10:00+08:00
 | [0027: M2 reconciliation and projection contract closure](./decisions/0027-m2-reconciliation-projection-contract.md) | Exact relations/states, advice, precedence, temporal current/status, history/evidence, invalidation, and ADR 0006 semantic-equality narrowing |
 | [0028: Reject relative Loredu homes](./decisions/0028-reject-relative-loredu-homes.md) | Absolute configured/OS homes keep named and default store identity independent of cwd |
 | [0029: CLI composition seam](./decisions/0029-cli-composition-seam.md) | Explicit application policy and host ports reuse the exact parser/renderer while shipped `lor` retains production defaults |
-| [0030: Working Lore and Ranker contract closure](./decisions/0030-working-lore-ranker-contract.md) | Exact activity query, bounded sections/descriptors, ordering-only Ranker, summary budgets, permutation-bound cursors, anchored disclosure, and M3 Basis |
+| [0030: Working Lore and Ranker contract closure](./decisions/0030-working-lore-ranker-contract.md) | Exact activity query, bounded sections/descriptors, ordering-only Ranker, two-budget controls, permutation-bound cursors, anchored disclosure, and narrow ADR 0009 Working Lore `--limit` supersession |
 | [0018: Capability ports for time and identity](./decisions/0018-capability-ports.md) | `Clock` and `RandomSource` injected; the application stamps `id`/`recorded_at`, the store assigns only the position |
 | [0017: Branch protection posture](./decisions/0017-branch-protection-posture.md) | `ci-required` the only required status, zero reviews, squash-only, no bypass actors, up-to-date-before-merge on |
 

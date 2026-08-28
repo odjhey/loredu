@@ -21,7 +21,7 @@ Initial decisions:
 - [0006: Versioning is explicit at every layer](./0006-explicit-version-basis.md) — same-Basis byte-identical/byte-comparable wording is narrowly superseded by ADR 0027's semantic-content equality; structural Basis, staleness, and invalidation remain
 - [0007: TypeScript on Bun](./0007-typescript-bun.md)
 - [0008: CLI before full reconciliation; agent-reactive responses](./0008-cli-first-agent-reactive.md)
-- [0009: Hypermedia responses and basis-pinned pagination](./0009-hypermedia-pagination.md)
+- [0009: Hypermedia responses and basis-pinned pagination](./0009-hypermedia-pagination.md) — its generic Working Lore `--limit` requirement is narrowly superseded by ADR 0030's exact `--max-items`/`--max-chars` controls; pinned cursors, explicit counts, no-silent-truncation, deterministic ordering, and disclosure ownership remain
 - [0010: The ClaimPolicy extension seam](./0010-claim-policy-seam.md)
 - [0011: Repository and package architecture](./0011-repo-package-architecture.md)
 - [0012: Developer experience and CI gating](./0012-dx-and-ci-gating.md)
@@ -42,4 +42,4 @@ Initial decisions:
 - [0027: Close deterministic reconciliation and Current Knowledge before M2 implementation](./0027-m2-reconciliation-projection-contract.md) — exact pair/state vocabulary, policy advice, Resolution precedence, bitemporal current API, bounded history/evidence, and invalidation; additively supersedes ADR 0024's M0 rejection of `advise`, narrows ADR 0026 status health at M2, and narrowly supersedes ADR 0006's same-Basis byte-identity wording
 - [0028: Reject relative Loredu homes](./0028-reject-relative-loredu-homes.md) — requires absolute configured and OS home paths so named/default store identity never changes with cwd; narrowly supersedes ADR 0022's acceptance of any nonempty configured home
 - [0029: Expose one CLI composition seam without changing `lor` grammar](./0029-cli-composition-seam.md) — optional explicit ClaimPolicy/Clock/RandomSource ports reuse the exact parser and renderer while the shipped entry retains production defaults
-- [0030: Close Working Lore and Ranker boundaries before M3 implementation](./0030-working-lore-ranker-contract.md) — exact activity query, bounded descriptors, ordering-only Ranker, summary budgets, permutation-bound section cursors, anchored disclosure, and Working Lore Basis
+- [0030: Close Working Lore and Ranker boundaries before M3 implementation](./0030-working-lore-ranker-contract.md) — exact activity query, bounded descriptors, ordering-only Ranker, summary budgets, permutation-bound section cursors, anchored disclosure, and Working Lore Basis; narrowly supersedes only ADR 0009's generic Working Lore `--limit` requirement

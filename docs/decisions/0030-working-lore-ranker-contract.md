@@ -48,6 +48,8 @@ The complete Scope remains internal for semantics and once in normalized Basis q
 
 ### Global first-packet budgets and per-section continuation
 
+This decision narrowly supersedes [ADR 0009](./0009-hypermedia-pagination.md) only where its generic rule requires every Working Lore section to accept `--limit`. M3 instead uses the exact `max_items`/`--max-items` and `max_chars`/`--max-chars` controls for both global first-packet selection and section-only continuation. ADR 0009 remains in force for opaque Basis-pinned cursors, explicit returned/full-total counts, no silent truncation, deterministic ordering, and application-owned disclosure/affordances; its `--limit` rule remains unchanged for Claims, history, and other ordinary paginated collections.
+
 The first packet has defaults `max_items=40` and `max_chars=12000`; accepted bounds are 1–200 items and 512–1,000,000 summary characters. Character accounting is exactly the sum of Unicode scalar values in returned summaries. Closed fixed-cardinality item descriptors plus the item bound constrain store-induced per-item structural growth; caller Scope in Basis/cursor transport remains outside this guarantee. Core selects the longest ranked prefix satisfying both limits and never skips an oversized next occurrence.
 
 All five sections state `returned` and full pinned `total`, including zero. Text always renders all five count lines in `current`, `patterns`, `candidates`, `conflicts`, `needs_revalidation` order; only item details are conditional. Every truncated section has its own opaque continuation and affordance.
@@ -74,7 +76,7 @@ M3 adds `lor lore --activity <token>` with repeated scope, optional corpus JSON,
 - A global first-packet budget can omit every item from a later display section; explicit full totals and start-of-section cursors make that omission visible and recoverable.
 - M3 reuses M2 reconciliation/evidence and does not append derived records, reinterpret Resolution, crawl sources, or create another projection store.
 
-This decision additively closes ADR 0005/0010's conceptual Ranker boundary and ADR 0009's Working Lore continuation follow-up. It does not supersede their ownership rules. It specializes ADR 0006/0027 Basis and semantic-replay rules only for Working Lore, without changing existing Basis values.
+This decision additively closes ADR 0005/0010's conceptual Ranker boundary and ADR 0009's Working Lore continuation follow-up. It narrowly supersedes only ADR 0009's generic Working Lore `--limit` spelling with the exact two-budget controls above; ADR 0009's pagination and disclosure ownership rules remain in force. It specializes ADR 0006/0027 Basis and semantic-replay rules only for Working Lore, without changing existing Basis values.
 
 ## Rule / follow-up
 
