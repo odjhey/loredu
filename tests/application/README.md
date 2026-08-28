@@ -1,7 +1,8 @@
-# application — M1.5 surface-neutral services
+# application — M1.5 and M2-R surface-neutral services
 
-Public application tests for M1.5 response envelopes, exact-key feedback, filters,
-health/advisories, disclosure, and pinned cursor pagination. These tests use only
+Public application tests for M1.5 response envelopes, filters, disclosure, and
+pinned cursor pagination plus M2-R exact pair feedback and overlap-aware status
+health. These tests use only
 `@loredu/kernel` and `@loredu/kernel/testing`; CLI parsing, rendering, host
 capabilities, and the compiled binary remain in `tests/cli-conformance/`.
 
