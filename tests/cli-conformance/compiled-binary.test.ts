@@ -65,7 +65,7 @@ afterAll(async () => {
   await Promise.all(homes.map((home) => rm(home, { recursive: true, force: true })));
 });
 
-test("compiled first-slice semantic commands return one JSON envelope", async () => {
+test("compiled first-slice semantic commands return one JSON envelope — @covers T50", async () => {
   const home = await freshHome();
   const initialized = json(await invoke(home, ["init", "work", "--json"]));
   expect(initialized.ok).toBe(true);
@@ -200,6 +200,8 @@ test("compiled binary maps stable execution categories — @covers T51", async (
   expect(missingStore.exitCode).toBe(3);
   const missingStoreEnvelope = json(missingStore);
   expect((missingStoreEnvelope.error as { code: string }).code).toBe("STORE_NOT_FOUND");
+  expect((missingStoreEnvelope.error as { message: string }).message).toBe("selected store was not found");
+  expect((missingStoreEnvelope.error as { message: string }).message).not.toContain(home);
   expect((missingStoreEnvelope.advice as { run: string }[])[0]?.run).toBe("lor init work");
 
   const missingMutationStore = await invoke(home, [
@@ -285,7 +287,7 @@ test("text mode renders primary results and semantic labels", async () => {
   const initialized = await invoke(home, ["init"]);
   expect(initialized.exitCode).toBe(0);
   expect(initialized.stdout).toContain("initialized store at");
-  expect(initialized.stdout).toContain("basis: stream_position=0");
+  expect(initialized.stdout).toContain('basis: {"stream_position":0');
 
   const added = await invoke(home, [
     "add",
@@ -297,9 +299,25 @@ test("text mode renders primary results and semantic labels", async () => {
   ]);
   expect(added.exitCode).toBe(0);
   expect(added.stdout).toMatch(/^ent_[0-9abcdefghjkmnpqrstvwxyz]{16}\n/);
-  expect(added.stdout).toContain("reconciliation: not-applicable");
+  expect(added.stdout).toContain("kind: entry");
+  expect(added.stdout).toContain("position: 1");
+  expect(added.stdout).toContain("handle: lor show");
+  expect(added.stdout).toContain('reconciliation: {"state":"not-applicable","related":[]}');
+  expect(added.stdout).toContain('basis: {"stream_position":1');
   const head = await invoke(home, ["head"]);
   expect(head.stdout).toStartWith("stream_position=1\n");
+});
+
+test("version spellings remain ordinary option values", async () => {
+  const home = await freshHome();
+  expect((await invoke(home, ["init", "--json"])).exitCode).toBe(0);
+  for (const body of ["-v", "--version"]) {
+    const added = json(
+      await invoke(home, ["add", "entry", "--actor", "agent:compiled-test", "--body", body, "--json"]),
+    );
+    const shown = json(await invoke(home, ["show", (added.result as { id: string }).id, "--json"]));
+    expect((shown.result as { record: { body: string } }).record.body).toBe(body);
+  }
 });
 
 test("stdin Entry body survives compiled storage and show byte-exact — @covers T52", async () => {

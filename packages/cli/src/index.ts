@@ -172,6 +172,15 @@ function detectsJson(argv: readonly string[]): boolean {
   return false;
 }
 
+function containsVersionOption(argv: readonly string[]): boolean {
+  for (let index = 0; index < argv.length; index += 1) {
+    const token = argv[index];
+    if (token === "--version" || token === "-v") return true;
+    if (token !== undefined && VALUE_OPTIONS.has(token)) index += 1;
+  }
+  return false;
+}
+
 function parseOptions(
   tokens: readonly string[],
   commandSpecs: Readonly<Record<string, OptionSpec>>,
@@ -357,10 +366,13 @@ function resolveRoot(selector: string | undefined): string {
       osHome: homedir(),
       cwd: process.cwd(),
     });
-  } catch {
-    throw new LoreduError("VALIDATION_FAILED", "store selector is invalid", [
-      Object.freeze({ code: "FORMAT", path: "/store", message: "must be a valid store name or path" }),
-    ]);
+  } catch (error) {
+    if (error instanceof TypeError) {
+      throw new LoreduError("VALIDATION_FAILED", "store selector is invalid", [
+        Object.freeze({ code: "FORMAT", path: "/store", message: "must be a valid store name or path" }),
+      ]);
+    }
+    throw new LoreduError("STORE_IO_FAILED", "store path could not be resolved");
   }
 }
 
@@ -725,19 +737,38 @@ function emitJson(io: CliIo, value: unknown): void {
 
 function emitText(io: CliIo, response: BaseResponse, selector: string | undefined): void {
   const result = response.result as Record<string, unknown>;
-  if (typeof result.id === "string") io.out(`${result.id}\n`);
-  else if (typeof result.stream_position === "number") io.out(`stream_position=${result.stream_position}\n`);
-  else if (result.record !== undefined) io.out(`record: ${JSON.stringify(result.record)}\n`);
-  else if (typeof result.root === "string") io.out(`initialized store at ${result.root}\n`);
-  else if (typeof result.healthy === "boolean") {
+  if (typeof result.id === "string") {
+    io.out(`${result.id}\nkind: ${String(result.kind)}\nposition: ${String(result.position)}\n`);
+    const resultHandle = result.handle as { readonly affordances?: readonly Affordance[] } | undefined;
+    for (const affordance of resultHandle?.affordances ?? []) {
+      io.out(`handle: ${runFor(affordance, selector)}\n`);
+    }
+  } else if (typeof result.stream_position === "number") {
+    io.out(`stream_position=${result.stream_position}\n`);
+  } else if (result.record !== undefined) {
+    io.out(`record: ${JSON.stringify(result.record)}\nposition: ${String(result.position)}\n`);
+    for (const resultHandle of (result.handles as readonly {
+      readonly affordances: readonly Affordance[];
+    }[]) ?? []) {
+      for (const affordance of resultHandle.affordances) io.out(`handle: ${runFor(affordance, selector)}\n`);
+    }
+  } else if (typeof result.root === "string") {
+    io.out(`initialized store at ${result.root}\nselector: ${String(result.selector)}\n`);
+  } else if (typeof result.healthy === "boolean") {
     const health = result.health as Record<string, number>;
     io.out(
       `healthy: ${result.healthy}\nopen exclusive groups: ${health.unresolved_exclusive_groups}    dangling record refs: ${health.dangling_record_references}\nadvisories: ${String(result.advisory_count)}\n`,
     );
-  } else io.out(`${JSON.stringify(result)}\n`);
-  io.out(`reconciliation: ${response.reconciliation.state}\n`);
+    for (const item of (result.attention as readonly unknown[]) ?? []) {
+      io.out(`attention: ${JSON.stringify(rendered(item, selector))}\n`);
+    }
+    for (const item of (result.advisories as readonly unknown[]) ?? []) {
+      io.out(`advisory: ${JSON.stringify(rendered(item, selector))}\n`);
+    }
+  } else io.out(`${JSON.stringify(rendered(result, selector))}\n`);
+  io.out(`reconciliation: ${JSON.stringify(rendered(response.reconciliation, selector))}\n`);
   for (const advice of response.advice) io.out(`advice: ${runFor(advice, selector)}\n`);
-  if (response.basis !== null) io.out(`basis: stream_position=${response.basis.stream_position}\n`);
+  if (response.basis !== null) io.out(`basis: ${JSON.stringify(response.basis)}\n`);
   if (response.page !== undefined) {
     io.out(`page: returned=${response.page.returned} total=${response.page.total}\n`);
   }
@@ -796,6 +827,18 @@ function cliFailure(
       why: "initialize the selected store",
     });
   }
+  const safeMessage: Readonly<Record<string, string>> = {
+    STORE_NOT_FOUND: "selected store was not found",
+    STORE_ALREADY_EXISTS: "selected store already exists",
+    STORE_LOCKED: "selected store is locked",
+    STORE_CORRUPT: "selected store is corrupt",
+    STORE_IO_FAILED: "store operation failed",
+    STORE_APPEND_FAILED: "store append failed",
+    DUPLICATE_RECORD_ID: "record id already exists",
+    RANDOM_SOURCE_FAILED: "cryptographic random source failed",
+    CLOCK_FAILED: "system clock failed",
+  };
+  message = safeMessage[code] ?? message;
   const envelope = {
     ok: false,
     result: null,
@@ -842,7 +885,7 @@ async function execute(
   if (argv.length === 1 && (argv[0] === "--version" || argv[0] === "-v")) {
     return { direct: `${versionLine()}\n`, exit: 0, json: false };
   }
-  if (argv.includes("--version") || argv.includes("-v")) usage("--version and -v must be used alone");
+  if (containsVersionOption(argv)) usage("--version and -v must be used alone");
 
   const global = extractGlobals(argv);
   const tokens = global.rest;
@@ -913,10 +956,17 @@ async function execute(
       global,
     );
     if (parsed.positionals.length > 0) usage("add entry accepts no positional arguments");
-    const common = commonDraft(parsed);
     const bodyOption = requiredOption(parsed, "--body");
-    let body = bodyOption;
+    const draftInput = {
+      kind: "entry",
+      ...commonDraft(parsed),
+      body: bodyOption === "-" ? "stdin-pending" : bodyOption,
+      ...(option(parsed, "--type") === undefined ? {} : { entry_type: option(parsed, "--type") }),
+      ...(option(parsed, "--title") === undefined ? {} : { title: option(parsed, "--title") }),
+    };
+    let draft = decodeRecordDraft(draftInput);
     if (bodyOption === "-") {
+      let body: string;
       try {
         body = new TextDecoder("utf-8", { fatal: true }).decode(await io.readStdin());
       } catch {
@@ -924,14 +974,8 @@ async function execute(
           Object.freeze({ code: "FORMAT", path: "/body", message: "stdin must be valid UTF-8" }),
         ]);
       }
+      draft = decodeRecordDraft({ ...draftInput, body });
     }
-    const draft = decodeRecordDraft({
-      kind: "entry",
-      ...common,
-      body,
-      ...(option(parsed, "--type") === undefined ? {} : { entry_type: option(parsed, "--type") }),
-      ...(option(parsed, "--title") === undefined ? {} : { title: option(parsed, "--title") }),
-    });
     return {
       response: await appendDraft(draft, parsed.store),
       exit: 0,
