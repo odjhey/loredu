@@ -352,6 +352,19 @@ test("stdin Entry body survives compiled storage and show byte-exact — @covers
   );
   const bomShown = json(await invoke(home, ["show", (bomAdded.result as { id: string }).id, "--json"]));
   expect((bomShown.result as { record: { body: string } }).record.body).toBe(`\uFEFF${body}`);
+
+  const largeBody = "large output line\n".repeat(32_768);
+  const largeAdded = json(
+    await invoke(
+      home,
+      ["add", "entry", "--actor", "agent:compiled-test", "--body", "-", "--json"],
+      largeBody,
+    ),
+  );
+  const largeShown = json(
+    await invoke(home, ["show", (largeAdded.result as { id: string }).id, "--json"]),
+  );
+  expect((largeShown.result as { record: { body: string } }).record.body).toBe(largeBody);
 });
 
 test("unknown options cannot hide JSON mode", async () => {

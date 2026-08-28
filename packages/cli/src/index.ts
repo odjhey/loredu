@@ -751,9 +751,10 @@ async function execute(
     };
     let draft = decodeRecordDraft(draftInput);
     if (bodyOption === "-") {
+      const stdin = await io.readStdin();
       let body: string;
       try {
-        body = new TextDecoder("utf-8", { fatal: true, ignoreBOM: true }).decode(await io.readStdin());
+        body = new TextDecoder("utf-8", { fatal: true, ignoreBOM: true }).decode(stdin);
       } catch {
         throw new LoreduError("VALIDATION_FAILED", "stdin is not valid UTF-8", [
           Object.freeze({ code: "FORMAT", path: "/body", message: "stdin must be valid UTF-8" }),

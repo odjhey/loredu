@@ -11,4 +11,4 @@ const code = await run(process.argv.slice(2), {
   readStdin: async () => new Uint8Array(await Bun.stdin.arrayBuffer()),
 });
 
-process.exit(code);
+process.exitCode = code;
