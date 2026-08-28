@@ -155,6 +155,50 @@ describe("M1.5 application mutations and overlap", () => {
     expect(Number(await failingStore.head())).toBe(1);
   });
 
+  test("policy callbacks and Basis identity share one captured policy snapshot", async () => {
+    const callbackCalls: string[] = [];
+    const first: ClaimPolicy = {
+      id: "test.first",
+      version: "1",
+      validateClaimKey() {
+        callbackCalls.push("first.validate");
+        return [];
+      },
+      semantics() {
+        callbackCalls.push("first.semantics");
+        return "exclusive";
+      },
+    };
+    const second: ClaimPolicy = {
+      id: "test.second",
+      version: "2",
+      validateClaimKey() {
+        callbackCalls.push("second.validate");
+        return [];
+      },
+      semantics() {
+        callbackCalls.push("second.semantics");
+        return "coexisting";
+      },
+    };
+    const descriptorReads = new Map<PropertyKey, number>();
+    const varyingPolicy = new Proxy(first, {
+      getOwnPropertyDescriptor(_target, property) {
+        const reads = (descriptorReads.get(property) ?? 0) + 1;
+        descriptorReads.set(property, reads);
+        const source = reads === 1 ? first : second;
+        const descriptor = Reflect.getOwnPropertyDescriptor(source, property);
+        return descriptor === undefined ? undefined : { ...descriptor, configurable: true };
+      },
+    });
+
+    const added = await application(new InMemoryStore(), varyingPolicy).add(claimDraft("captured"));
+
+    expect(callbackCalls).toEqual(["first.validate", "first.semantics"]);
+    expect(added.basis.ruleset.claim_policy).toEqual({ id: "test.first", version: "1" });
+    expect([...descriptorReads.values()]).toEqual([1, 1, 1, 1]);
+  });
+
   test("same-key values corroborate or conflict with bounded exact-key feedback — @covers T61, T62", async () => {
     const app = application();
     const first = await app.add(claimDraft({ path: "src/commands", stable: true }));

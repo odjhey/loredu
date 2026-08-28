@@ -18,7 +18,7 @@ import type {
   ShownRecordResult,
   StatusQuery,
 } from "./application-types";
-import { createRulesetIdentity } from "./domain/basis";
+import { rulesetIdentityFromValidatedPolicy } from "./domain/basis";
 import { claimKeyOf } from "./domain/claim-key";
 import {
   type PersistedRecord,
@@ -235,7 +235,7 @@ export function createLoreduApplication({
   claimPolicy = DEFAULT_CLAIM_POLICY,
 }: LoreduApplicationDependencies): LoreduApplication {
   const policy = validateClaimPolicy(claimPolicy);
-  const ruleset = createRulesetIdentity(policy.policy);
+  const ruleset = rulesetIdentityFromValidatedPolicy(policy);
   const reads = createApplicationReadServices(store, policy, ruleset);
 
   async function executeAppend<D extends RecordDraft>(
