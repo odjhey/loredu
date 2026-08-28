@@ -479,22 +479,69 @@ function adviceFailure(issues: readonly LoreduIssue[]): never {
 }
 
 function adviceArray(value: unknown): readonly unknown[] {
+  let array = false;
   let length: unknown;
   try {
-    if (!Array.isArray(value)) adviceFailure([makeIssue("TYPE", "", "must be an array")]);
-    const descriptor = Reflect.getOwnPropertyDescriptor(value as object, "length");
-    length = descriptor && "value" in descriptor ? descriptor.value : undefined;
+    array = Array.isArray(value);
+    if (array) {
+      const descriptor = Reflect.getOwnPropertyDescriptor(value as object, "length");
+      length = descriptor && "value" in descriptor ? descriptor.value : undefined;
+    }
   } catch {
     adviceFailure([makeIssue("TYPE", "", "could not inspect ClaimPolicy advice array")]);
   }
+  if (!array) adviceFailure([makeIssue("TYPE", "", "must be an array")]);
   if (typeof length !== "number" || !Number.isSafeInteger(length) || length < 0)
     adviceFailure([makeIssue("TYPE", "", "must have a valid own array length")]);
   if (length > ADVICE_LIMIT)
     adviceFailure([makeIssue("RANGE", "", "must contain at most 200 policy advisories")]);
+
+  let prototype: object | null;
+  let keys: readonly PropertyKey[];
+  let snapshotLength: PropertyDescriptor | undefined;
+  try {
+    prototype = Reflect.getPrototypeOf(value as object);
+    snapshotLength = Reflect.getOwnPropertyDescriptor(value as object, "length");
+    keys = Reflect.ownKeys(value as object);
+  } catch {
+    adviceFailure([makeIssue("TYPE", "", "could not inspect ClaimPolicy advice array")]);
+  }
+  if (!snapshotLength || !("value" in snapshotLength) || snapshotLength.value !== length)
+    adviceFailure([makeIssue("TYPE", "", "array length changed during inspection")]);
+
   const issues: LoreduIssue[] = [];
-  const inspected = inspectArray(value, "", issues);
-  if (!inspected || issues.length > 0) adviceFailure(issues);
-  return inspected;
+  if (prototype !== Array.prototype) issues.push(makeIssue("TYPE", "", "must have Array.prototype"));
+  const indexes = new Set<number>();
+  for (const key of keys) {
+    if (typeof key === "symbol") {
+      issues.push(makeIssue("UNKNOWN_FIELD", "", "must not have symbol fields"));
+      continue;
+    }
+    if (key === "length") continue;
+    const index = Number(key);
+    if (!Number.isSafeInteger(index) || index < 0 || index >= length || String(index) !== key)
+      issues.push(makeIssue("UNKNOWN_FIELD", `/${escapePointer(key)}`, "is an array extra property"));
+    else indexes.add(index);
+  }
+  for (let index = 0; index < length; index++)
+    if (!indexes.has(index)) issues.push(makeIssue("REQUIRED", `/${index}`, "array must be dense"));
+  if (issues.length > 0) adviceFailure(issues);
+
+  const result: unknown[] = [];
+  try {
+    for (let index = 0; index < length; index++) {
+      const descriptor = Reflect.getOwnPropertyDescriptor(value as object, String(index));
+      if (!descriptor) issues.push(makeIssue("REQUIRED", `/${index}`, "array must be dense"));
+      else if (!("value" in descriptor) || !descriptor.enumerable)
+        issues.push(makeIssue("TYPE", `/${index}`, "must be an enumerable own data element"));
+      else result[index] = descriptor.value;
+    }
+  } catch {
+    adviceFailure([makeIssue("TYPE", "", "could not inspect ClaimPolicy advice array")]);
+  }
+  if (issues.length > 0) adviceFailure(issues);
+  result.length = length;
+  return result;
 }
 
 function required(

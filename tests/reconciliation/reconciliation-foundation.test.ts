@@ -359,6 +359,46 @@ describe("ADR 0027 deterministic reconciliation foundation", () => {
       }),
     );
     expect(indexedReads).toBe(0);
+
+    let lengthDescriptorReads = 0;
+    let elementDescriptorReads = 0;
+    let elementValueReads = 0;
+    const inconsistentTarget = Array.from({ length: 201 }, () => ({ ignored: true }));
+    const inconsistent = new Proxy(inconsistentTarget, {
+      getOwnPropertyDescriptor(target, property) {
+        if (property === "length") {
+          lengthDescriptorReads++;
+          const descriptor = Reflect.getOwnPropertyDescriptor(target, property) as PropertyDescriptor;
+          return { ...descriptor, value: lengthDescriptorReads === 1 ? 200 : 201 };
+        }
+        if (typeof property === "string" && String(Number(property)) === property)
+          elementDescriptorReads++;
+        return Reflect.getOwnPropertyDescriptor(target, property);
+      },
+      get(target, property, receiver) {
+        if (typeof property === "string" && String(Number(property)) === property) elementValueReads++;
+        return Reflect.get(target, property, receiver);
+      },
+    });
+    const inconsistentPolicy = validateClaimPolicy({
+      ...policy,
+      advise: () => inconsistent as never,
+    });
+    expect(() => evaluateClaimPolicyAdvice(inconsistentPolicy, context)).toThrow(
+      expect.objectContaining({
+        code: "VALIDATION_FAILED",
+        issues: [
+          {
+            code: "TYPE",
+            path: "",
+            message: "array length changed during inspection",
+          },
+        ],
+      }),
+    );
+    expect(lengthDescriptorReads).toBe(2);
+    expect(elementDescriptorReads).toBe(0);
+    expect(elementValueReads).toBe(0);
   });
 
   test("advice validation rejects active, sparse, foreign, malformed, and duplicate output without partial data", () => {

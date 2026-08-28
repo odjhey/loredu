@@ -31,6 +31,7 @@ const ISSUE_CODES: ReadonlySet<LoreduIssueCode> = new Set([
 ]);
 const JSON_POINTER = /^(?:|(?:\/(?:[^~]|~[01])*)+)$/u;
 const intrinsicReflectApply = Reflect.apply;
+const POLICY_PROTOTYPE_LIMIT = 32;
 
 export type ClaimSemantics = "exclusive" | "coexisting";
 
@@ -95,12 +96,14 @@ function readDataProperty(value: object, key: string, path: string, issues: Lore
   try {
     let current: object | null = value;
     const visited = new Set<object>();
+    let inspected = 0;
     while (current !== null) {
-      if (visited.has(current)) {
+      if (visited.has(current) || inspected >= POLICY_PROTOTYPE_LIMIT) {
         issues.push(makeIssue("TYPE", path, "could not inspect ClaimPolicy field"));
         return Object.freeze({ present: false, readable: false });
       }
       visited.add(current);
+      inspected++;
       const descriptor = Reflect.getOwnPropertyDescriptor(current, key);
       if (descriptor) {
         if (!("value" in descriptor)) {

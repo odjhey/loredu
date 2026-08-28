@@ -546,6 +546,52 @@ describe("M0 ClaimPolicy seam", () => {
           ],
         }),
       );
+
+    let prototypeCalls = 0;
+    const freshPrototype = (): object =>
+      new Proxy(
+        {},
+        {
+          getPrototypeOf() {
+            prototypeCalls++;
+            if (prototypeCalls > 100) throw new Error("proxy-secret-unbounded-prototype");
+            return freshPrototype();
+          },
+        },
+      );
+    const freshPrototypePolicy = new Proxy(base, {
+      getPrototypeOf() {
+        prototypeCalls++;
+        if (prototypeCalls > 100) throw new Error("proxy-secret-unbounded-prototype");
+        return freshPrototype();
+      },
+    });
+    const callsBeforeFreshPrototype = { ...calls };
+    for (const assemble of [
+      () => createRulesetIdentity(freshPrototypePolicy),
+      () => createLoreduApplication({ ...dependencies, claimPolicy: freshPrototypePolicy }),
+    ]) {
+      let caught: unknown;
+      try {
+        assemble();
+      } catch (error) {
+        caught = error;
+      }
+      expect(caught).toMatchObject({
+        code: "VALIDATION_FAILED",
+        message: "ClaimPolicy validation failed",
+        issues: [
+          {
+            code: "TYPE",
+            path: "/advise",
+            message: "could not inspect ClaimPolicy field",
+          },
+        ],
+      });
+      expect(JSON.stringify(caught)).not.toContain("proxy-secret");
+    }
+    expect(prototypeCalls).toBeLessThan(100);
+    expect(calls).toEqual(callsBeforeFreshPrototype);
     expect(getterCalls).toBe(0);
     expect(calls).toEqual({ validate: 0, semantics: 0, advise: 1, clock: 0, random: 0, store: 0 });
   });
