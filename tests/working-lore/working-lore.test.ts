@@ -386,8 +386,14 @@ describe("M3 Working Lore public application", () => {
     const firstPage = await application.claims({ same_key_as: must(ids[0]), limit: 1 });
     expect(firstPage.result.map(({ id }) => id)).toEqual([must(ids[0])]);
     expect(firstPage.page).toMatchObject({ returned: 1, total: 3 });
-    await expect(application.lore({ cursor: must(firstPage.page.cursor) })).rejects.toMatchObject({
+    const claimsCursor = must(firstPage.page.cursor);
+    await expect(application.lore({ cursor: claimsCursor })).rejects.toMatchObject({
       code: "CURSOR_MISMATCH",
+    });
+    const malformedClaimsCursor = cursorPayload(claimsCursor);
+    delete malformedClaimsCursor.anchor;
+    await expect(application.lore({ cursor: encodeCursor(malformedClaimsCursor) })).rejects.toMatchObject({
+      code: "INVALID_CURSOR",
     });
     const secondPage = await application.claims({ cursor: must(firstPage.page.cursor), limit: 2 });
     expect(secondPage.result.map(({ id }) => id)).toEqual(ids.slice(1));
@@ -470,6 +476,18 @@ describe("M3 Working Lore public application", () => {
       resume: { kind: "before-first" },
     });
     expect(patternPayload.rank.permutation_digest).toBe(currentPayload.rank.permutation_digest);
+    for (const read of [
+      () => application.claims({ cursor: currentCursor }),
+      () => application.history({ cursor: currentCursor }),
+      () => application.status({ cursor: currentCursor }),
+      () => application.current({ cursor: currentCursor }),
+    ])
+      await expect(read()).rejects.toMatchObject({ code: "CURSOR_MISMATCH" });
+    const malformedLoreCursor = cursorPayload(currentCursor);
+    malformedLoreCursor.rank.algorithm = "md5";
+    await expect(application.claims({ cursor: encodeCursor(malformedLoreCursor) })).rejects.toMatchObject({
+      code: "INVALID_CURSOR",
+    });
     const continued = await application.lore({ cursor: currentCursor, max_items: 200, max_chars: 1_000_000 });
     expect(continued.result.packet.sections).toHaveLength(1);
     const continuedSection = must(continued.result.packet.sections[0]);

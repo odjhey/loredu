@@ -1,4 +1,11 @@
-import { affordance, deduplicateAdvice, page, readSnapshot, type Snapshot } from "./application-read";
+import {
+  affordance,
+  decodeCursor,
+  deduplicateAdvice,
+  page,
+  readSnapshot,
+  type Snapshot,
+} from "./application-read";
 import type {
   Affordance,
   RecordHandle,
@@ -16,11 +23,10 @@ import type {
   WorkingLoreSectionName,
 } from "./application-types";
 import { computeLoreKnowledge, type LoreKnowledgeProjection } from "./current-projection";
-import {
-  CORE_RULESET_ID,
-  type RulesetIdentity,
-  type WorkingLoreBasis,
-  type WorkingLoreRulesetIdentity,
+import type {
+  RulesetIdentity,
+  WorkingLoreBasis,
+  WorkingLoreRulesetIdentity,
 } from "./domain/basis";
 import type { ClaimId, JsonObject, JsonValue, Scope, SourceRef } from "./domain/entry";
 import {
@@ -43,13 +49,15 @@ import { createInstant } from "./ports/capabilities";
 import type { ValidatedClaimPolicy } from "./ports/claim-policy";
 import { invokeRanker, type ValidatedRanker } from "./ranker";
 import { permutationDigest } from "./sha256";
+import {
+  encodeWorkingLoreCursor,
+  type WorkingLoreCursor,
+  type WorkingLoreResume,
+} from "./working-lore-cursor";
 
 const DEFAULT_MAX_ITEMS = 40;
 const DEFAULT_MAX_CHARS = 12_000;
-const CURSOR_PREFIX = "loredu.cursor.v1.";
 const TOKEN = /^[a-z0-9](?:[a-z0-9._:/-]*[a-z0-9])?$/;
-const RECORD_ID = /^(ent|clm|rel|res|ver)_[0-9abcdefghjkmnpqrstvwxyz]{16}$/;
-const DIGEST = /^[A-Za-z0-9_-]{43}$/;
 const DISPLAY_ORDER: readonly WorkingLoreSectionName[] = Object.freeze([
   "current",
   "patterns",
@@ -65,25 +73,6 @@ const CORE_ORDER: readonly WorkingLoreSectionName[] = Object.freeze([
   "patterns",
 ]);
 
-type Resume =
-  | { readonly kind: "before-first" }
-  | { readonly kind: "after"; readonly section_ordinal: number; readonly occurrence_index: number };
-type RankBinding = {
-  readonly algorithm: "sha256";
-  readonly candidate_count: number;
-  readonly permutation_digest: string;
-  readonly section: WorkingLoreSectionName;
-  readonly resume: Resume;
-};
-type LoreCursor = {
-  readonly version: 1;
-  readonly operation: "lore";
-  readonly query: JsonObject;
-  readonly basis: WorkingLoreBasis;
-  readonly anchor: string;
-  readonly computed_at: string;
-  readonly rank: RankBinding;
-};
 type ParsedLore = {
   readonly maxItems: number;
   readonly maxChars: number;
@@ -91,7 +80,7 @@ type ParsedLore = {
   readonly scope?: Scope;
   readonly corpus?: SourceRef;
   readonly validAt?: string;
-  readonly cursor?: LoreCursor;
+  readonly cursor?: WorkingLoreCursor;
 };
 type Occurrence = {
   readonly index: number;
@@ -107,9 +96,6 @@ function validationFailed(
   message = "Working Lore query validation failed",
 ): never {
   throw new LoreduError("VALIDATION_FAILED", message, Object.freeze([...issues]));
-}
-function cursorInvalid(message = "Cursor is invalid"): never {
-  throw new LoreduError("INVALID_CURSOR", message);
 }
 function cursorMismatch(message = "Cursor does not match this operation or snapshot"): never {
   throw new LoreduError("CURSOR_MISMATCH", message);
@@ -255,7 +241,8 @@ function parseInitial(input: unknown): ParsedLore {
     const raw = own(data, "cursor");
     if (typeof raw !== "string") issues.push(makeIssue("TYPE", "/cursor", "must be a string"));
     if (issues.length > 0) validationFailed(issues);
-    const cursor = decodeLoreCursor(raw as string);
+    const cursor = decodeCursor(raw as string);
+    if (cursor.operation !== "lore") cursorMismatch("Cursor belongs to another operation");
     const parsed = filtersFromNormalizedQuery(cursor.query);
     return Object.freeze({ maxItems, maxChars, ...parsed, cursor });
   }
@@ -536,236 +523,6 @@ function selectPrefix(
   return Object.freeze(selected);
 }
 
-function utf8(value: string): readonly number[] {
-  const bytes: number[] = [];
-  for (const scalar of value) {
-    const code = scalar.codePointAt(0) as number;
-    if (code <= 0x7f) bytes.push(code);
-    else if (code <= 0x7ff) bytes.push(0xc0 | (code >> 6), 0x80 | (code & 63));
-    else if (code <= 0xffff) bytes.push(0xe0 | (code >> 12), 0x80 | ((code >> 6) & 63), 0x80 | (code & 63));
-    else
-      bytes.push(
-        0xf0 | (code >> 18),
-        0x80 | ((code >> 12) & 63),
-        0x80 | ((code >> 6) & 63),
-        0x80 | (code & 63),
-      );
-  }
-  return bytes;
-}
-const BASE64 = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_";
-function base64Encode(bytes: readonly number[]): string {
-  let output = "";
-  for (let index = 0; index < bytes.length; index += 3) {
-    const first = bytes[index] as number;
-    const second = bytes[index + 1];
-    const third = bytes[index + 2];
-    const packed = (first << 16) | ((second ?? 0) << 8) | (third ?? 0);
-    output += BASE64[(packed >> 18) & 63] as string;
-    output += BASE64[(packed >> 12) & 63] as string;
-    if (second !== undefined) output += BASE64[(packed >> 6) & 63] as string;
-    if (third !== undefined) output += BASE64[packed & 63] as string;
-  }
-  return output;
-}
-function base64Decode(value: string): readonly number[] {
-  if (!/^[A-Za-z0-9_-]+$/.test(value) || value.length % 4 === 1) cursorInvalid();
-  const bytes: number[] = [];
-  for (let index = 0; index < value.length; index += 4) {
-    const chars = [value[index], value[index + 1], value[index + 2], value[index + 3]];
-    const values = chars.map((char) => (char === undefined ? 0 : BASE64.indexOf(char)));
-    if (values.some((item, itemIndex) => chars[itemIndex] !== undefined && item < 0)) cursorInvalid();
-    const packed =
-      ((values[0] as number) << 18) |
-      ((values[1] as number) << 12) |
-      ((values[2] as number) << 6) |
-      (values[3] as number);
-    bytes.push((packed >> 16) & 255);
-    if (chars[2] !== undefined) bytes.push((packed >> 8) & 255);
-    if (chars[3] !== undefined) bytes.push(packed & 255);
-  }
-  if (base64Encode(bytes) !== value) cursorInvalid();
-  return bytes;
-}
-function decodeUtf8(bytes: readonly number[]): string {
-  let output = "";
-  for (let index = 0; index < bytes.length; ) {
-    const first = bytes[index] as number;
-    let code: number;
-    let length: number;
-    if (first <= 0x7f) {
-      code = first;
-      length = 1;
-    } else if (first >= 0xc2 && first <= 0xdf) {
-      code = first & 31;
-      length = 2;
-    } else if (first >= 0xe0 && first <= 0xef) {
-      code = first & 15;
-      length = 3;
-    } else if (first >= 0xf0 && first <= 0xf4) {
-      code = first & 7;
-      length = 4;
-    } else cursorInvalid();
-    if (index + length > bytes.length) cursorInvalid();
-    for (let offset = 1; offset < length; offset++) {
-      const byte = bytes[index + offset] as number;
-      if ((byte & 0xc0) !== 0x80) cursorInvalid();
-      code = (code << 6) | (byte & 63);
-    }
-    if (
-      (length === 3 && code < 0x800) ||
-      (length === 4 && code < 0x10000) ||
-      (code >= 0xd800 && code <= 0xdfff) ||
-      code > 0x10ffff
-    )
-      cursorInvalid();
-    output += String.fromCodePoint(code);
-    index += length;
-  }
-  return output;
-}
-function encodeLoreCursor(cursor: LoreCursor): string {
-  return `${CURSOR_PREFIX}${base64Encode(utf8(JSON.stringify(cursor)))}`;
-}
-function integer(value: unknown): value is number {
-  return typeof value === "number" && Number.isSafeInteger(value) && value >= 0;
-}
-function parseRuleset(value: unknown): WorkingLoreRulesetIdentity {
-  const object = value as Record<string, unknown>;
-  if (
-    !object ||
-    typeof object !== "object" ||
-    Array.isArray(object) ||
-    Object.keys(object).sort().join(",") !== "claim_policy,core,ranker"
-  )
-    cursorInvalid();
-  const policy = object.claim_policy as Record<string, unknown>;
-  const ranker = object.ranker as Record<string, unknown>;
-  if (
-    object.core !== CORE_RULESET_ID ||
-    !policy ||
-    !ranker ||
-    Object.keys(policy).sort().join(",") !== "id,version" ||
-    Object.keys(ranker).sort().join(",") !== "id,version"
-  )
-    cursorInvalid();
-  if (
-    typeof policy.id !== "string" ||
-    typeof policy.version !== "string" ||
-    typeof ranker.id !== "string" ||
-    typeof ranker.version !== "string"
-  )
-    cursorInvalid();
-  return Object.freeze({
-    core: CORE_RULESET_ID,
-    claim_policy: Object.freeze({ id: policy.id, version: policy.version }),
-    ranker: Object.freeze({ id: ranker.id, version: ranker.version }),
-  });
-}
-function decodeLoreCursor(token: string): LoreCursor {
-  try {
-    if (!token.startsWith(CURSOR_PREFIX)) cursorInvalid();
-    const parsed = JSON.parse(decodeUtf8(base64Decode(token.slice(CURSOR_PREFIX.length)))) as Record<
-      string,
-      unknown
-    >;
-    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) cursorInvalid();
-    if (parsed.version !== 1 || typeof parsed.operation !== "string") cursorInvalid();
-    if (parsed.operation !== "lore") cursorMismatch("Cursor belongs to another operation");
-    if (Object.keys(parsed).sort().join(",") !== "anchor,basis,computed_at,operation,query,rank,version")
-      cursorInvalid();
-    if (typeof parsed.anchor !== "string" || (!RECORD_ID.test(parsed.anchor) && parsed.anchor !== "empty"))
-      cursorInvalid();
-    const issues: LoreduIssue[] = [];
-    const query = copyJsonObject(parsed.query, "/query", issues);
-    if (!query || issues.length > 0) cursorInvalid();
-    const basisObject = parsed.basis as Record<string, unknown>;
-    if (
-      !basisObject ||
-      typeof basisObject !== "object" ||
-      Array.isArray(basisObject) ||
-      Object.keys(basisObject).sort().join(",") !== "query,ruleset,stream_position" ||
-      !integer(basisObject.stream_position)
-    )
-      cursorInvalid();
-    const basisQueryIssues: LoreduIssue[] = [];
-    const basisQuery = copyJsonObject(basisObject.query, "/basis/query", basisQueryIssues);
-    if (!basisQuery || basisQueryIssues.length > 0) cursorInvalid();
-    if (!jsonValuesEqual(query, basisQuery)) cursorMismatch("Cursor Basis query does not match cursor query");
-    const basis: WorkingLoreBasis = Object.freeze({
-      stream_position: basisObject.stream_position as StreamPosition,
-      ruleset: parseRuleset(basisObject.ruleset),
-      query: basisQuery,
-    });
-    const timestampIssues: LoreduIssue[] = [];
-    const computedAt = normalizeTimestamp(parsed.computed_at, "/computed_at", timestampIssues);
-    if (
-      !computedAt ||
-      computedAt !== parsed.computed_at ||
-      timestampIssues.length > 0 ||
-      query.valid_at !== computedAt
-    )
-      cursorInvalid();
-    const rank = parsed.rank as Record<string, unknown>;
-    if (
-      !rank ||
-      typeof rank !== "object" ||
-      Array.isArray(rank) ||
-      Object.keys(rank).sort().join(",") !== "algorithm,candidate_count,permutation_digest,resume,section"
-    )
-      cursorInvalid();
-    if (
-      rank.algorithm !== "sha256" ||
-      !integer(rank.candidate_count) ||
-      typeof rank.permutation_digest !== "string" ||
-      !DIGEST.test(rank.permutation_digest) ||
-      !DISPLAY_ORDER.includes(rank.section as WorkingLoreSectionName)
-    )
-      cursorInvalid();
-    const resumeObject = rank.resume as Record<string, unknown>;
-    let resume: Resume;
-    if (!resumeObject || typeof resumeObject !== "object" || Array.isArray(resumeObject)) cursorInvalid();
-    if (resumeObject.kind === "before-first" && Object.keys(resumeObject).join(",") === "kind")
-      resume = Object.freeze({ kind: "before-first" });
-    else if (
-      resumeObject.kind === "after" &&
-      Object.keys(resumeObject).sort().join(",") === "kind,occurrence_index,section_ordinal" &&
-      integer(resumeObject.section_ordinal) &&
-      integer(resumeObject.occurrence_index) &&
-      resumeObject.occurrence_index < rank.candidate_count
-    )
-      resume = Object.freeze({
-        kind: "after",
-        section_ordinal: resumeObject.section_ordinal,
-        occurrence_index: resumeObject.occurrence_index,
-      });
-    else cursorInvalid();
-    if (
-      (basis.stream_position === 0 && parsed.anchor !== "empty") ||
-      (basis.stream_position > 0 && !RECORD_ID.test(parsed.anchor))
-    )
-      cursorInvalid();
-    return Object.freeze({
-      version: 1,
-      operation: "lore",
-      query,
-      basis,
-      anchor: parsed.anchor,
-      computed_at: computedAt,
-      rank: Object.freeze({
-        algorithm: "sha256",
-        candidate_count: rank.candidate_count,
-        permutation_digest: rank.permutation_digest,
-        section: rank.section as WorkingLoreSectionName,
-        resume,
-      }),
-    });
-  } catch (error) {
-    if (error instanceof LoreduError && (error.code === "INVALID_CURSOR" || error.code === "CURSOR_MISMATCH"))
-      throw error;
-    cursorInvalid();
-  }
-}
 function makeBasis(
   head: StreamPosition,
   ruleset: WorkingLoreRulesetIdentity,
@@ -782,7 +539,11 @@ function sameRuleset(left: WorkingLoreRulesetIdentity, right: WorkingLoreRuleset
     left.ranker.version === right.ranker.version
   );
 }
-function pinSnapshot(current: Snapshot, cursor: LoreCursor, ruleset: WorkingLoreRulesetIdentity): Snapshot {
+function pinSnapshot(
+  current: Snapshot,
+  cursor: WorkingLoreCursor,
+  ruleset: WorkingLoreRulesetIdentity,
+): Snapshot {
   if (!sameRuleset(cursor.basis.ruleset, ruleset)) cursorMismatch("Cursor ruleset does not match");
   if (current.head < cursor.basis.stream_position) cursorMismatch("Cursor snapshot is no longer present");
   if (cursor.basis.stream_position === 0) {
@@ -799,14 +560,14 @@ function cursorFor(
   snapshot: Snapshot,
   computedAt: string,
   section: WorkingLoreSectionName,
-  resume: Resume,
+  resume: WorkingLoreResume,
   count: number,
   digest: string,
 ): string {
   const anchor =
     basis.stream_position === 0 ? "empty" : snapshot.records[Number(basis.stream_position) - 1]?.record.id;
   if (!anchor) throw new TypeError("snapshot has no cursor anchor");
-  return encodeLoreCursor(
+  return encodeWorkingLoreCursor(
     Object.freeze({
       version: 1,
       operation: "lore",
@@ -828,7 +589,7 @@ function sectionCursor(
   section: WorkingLoreSectionName,
   all: readonly Occurrence[],
   selected: readonly Occurrence[],
-  previousResume: Resume | undefined,
+  previousResume: WorkingLoreResume | undefined,
   basis: WorkingLoreBasis,
   snapshot: Snapshot,
   computedAt: string,
@@ -838,7 +599,7 @@ function sectionCursor(
   const stream = all.filter((item) => item.section === section);
   const returned = selected.filter((item) => item.section === section);
   const last = returned[returned.length - 1];
-  const resume: Resume =
+  const resume: WorkingLoreResume =
     last === undefined
       ? (previousResume ?? Object.freeze({ kind: "before-first" }))
       : Object.freeze({
@@ -854,7 +615,7 @@ function buildSections(
   names: readonly WorkingLoreSectionName[],
   all: readonly Occurrence[],
   selected: readonly Occurrence[],
-  previousResume: Resume | undefined,
+  previousResume: WorkingLoreResume | undefined,
   basis: WorkingLoreBasis,
   snapshot: Snapshot,
   computedAt: string,
