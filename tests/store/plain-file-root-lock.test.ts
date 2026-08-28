@@ -108,12 +108,9 @@ test("string root APIs, physical explicit paths, relocation, and cross-root isol
     expect(() => defaultLoreduHome({ LOREDU_HOME: "relative-home" }, osHome)).toThrow(TypeError);
     expect(() => defaultLoreduHome({}, "relative-os-home")).toThrow(TypeError);
     expect(() => storeRootForName("alpha", "relative-home")).toThrow(TypeError);
-    expect(() =>
-      resolveStoreRoot(
-        { kind: "default" },
-        { loreduHome: "relative-home", osHome, cwd },
-      ),
-    ).toThrow(TypeError);
+    expect(() => resolveStoreRoot({ kind: "default" }, { loreduHome: "relative-home", osHome, cwd })).toThrow(
+      TypeError,
+    );
     const named = resolveStoreRoot({ kind: "name", name: "alpha" }, { loreduHome: home, osHome, cwd });
     const defaultRoot = resolveStoreRoot({ kind: "default" }, { loreduHome: home, osHome, cwd });
     const explicitMissing = resolveStoreRoot(
