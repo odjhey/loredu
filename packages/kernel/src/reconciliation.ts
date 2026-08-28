@@ -598,9 +598,7 @@ function adviceClaimTuple(
     if (key === "length") continue;
     const index = Number(key);
     if (!Number.isSafeInteger(index) || index < 0 || index >= length || String(index) !== key)
-      issues.push(
-        makeIssue("UNKNOWN_FIELD", `${path}/${escapePointer(key)}`, "is an array extra property"),
-      );
+      issues.push(makeIssue("UNKNOWN_FIELD", `${path}/${escapePointer(key)}`, "is an array extra property"));
     else indexes.add(index);
   }
   for (let index = 0; index < length; index++)
