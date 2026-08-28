@@ -12,5 +12,9 @@ with the store has failed even when every assertion about its content passes.
 Row **T75** is application-owned here: every globally truncated section states its
 full count and carries a permutation-digest/exact-occurrence-bound continuation.
 M3-E later adds unannotated compiled-CLI reinforcement without reclaiming the row.
+The shared-cursor parity suite obtains genuine cursors for all five application read
+operations, proves every foreign endpoint pair, independently validates both duplicated
+query copies, and rejects malformed transport/schema plus impossible terminal lore
+resumes before callbacks or partial output.
 
 Contract: [working lore](../../docs/architecture/contracts/working-lore.md).
