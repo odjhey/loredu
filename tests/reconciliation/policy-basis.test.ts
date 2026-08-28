@@ -6,6 +6,7 @@ import {
   type ClaimDraft,
   type ClaimKey,
   type ClaimPolicy,
+  type ClaimPolicyAdviceContext,
   claimKeyOf,
   createBasis,
   createInstant,
@@ -19,6 +20,8 @@ import {
 } from "@loredu/kernel";
 import * as testing from "@loredu/kernel/testing";
 import { FixedClock, InMemoryStore, SeededRandomSource } from "@loredu/kernel/testing";
+import { validateClaimPolicy } from "../../packages/kernel/src/ports/claim-policy";
+import { evaluateClaimPolicyAdvice } from "../../packages/kernel/src/reconciliation";
 
 const actor = { type: "agent" as const, id: "test.agent" };
 const claim: ClaimDraft = {
@@ -305,6 +308,222 @@ describe("M0 ClaimPolicy seam", () => {
       { ...custom, advisories: () => [] },
     ])
       expect(() => createRulesetIdentity(malformed as ClaimPolicy)).toThrow(LoreduError);
+  });
+
+  test("optional advice tracks descriptor presence exactly without invocation or downstream mutation", () => {
+    const calls = { validate: 0, semantics: 0, advise: 0, clock: 0, random: 0, store: 0 };
+    const base = {
+      id: "consumer.optional-advice",
+      version: "1",
+      validateClaimKey() {
+        calls.validate++;
+        return Object.freeze([]);
+      },
+      semantics() {
+        calls.semantics++;
+        return "exclusive" as const;
+      },
+    };
+    const context = Object.freeze({
+      query: Object.freeze({}),
+      claims: Object.freeze([]),
+      relations: Object.freeze([]),
+      resolutions: Object.freeze([]),
+    }) as ClaimPolicyAdviceContext;
+    const absent = validateClaimPolicy(base);
+    expect(Object.hasOwn(absent, "advise")).toBe(false);
+    expect(createRulesetIdentity(base)).toEqual({
+      core: "loredu.reconciliation/v1",
+      claim_policy: { id: base.id, version: base.version },
+    });
+    const empty = evaluateClaimPolicyAdvice(absent, context);
+    expect(empty).toEqual([]);
+    expect(Object.isFrozen(empty)).toBe(true);
+    expect(calls).toEqual({ validate: 0, semantics: 0, advise: 0, clock: 0, random: 0, store: 0 });
+
+    let receiver: unknown;
+    const callableTarget = {
+      ...base,
+      advise(this: unknown, received: ClaimPolicyAdviceContext) {
+        receiver = this;
+        calls.advise++;
+        expect(received).toBe(context);
+        return Object.freeze([]);
+      },
+    };
+    const callable = new Proxy(callableTarget, {
+      ownKeys: (target) => Reflect.ownKeys(target),
+      getOwnPropertyDescriptor: (target, property) => Reflect.getOwnPropertyDescriptor(target, property),
+      getPrototypeOf: (target) => Reflect.getPrototypeOf(target),
+    });
+    const validatedCallable = validateClaimPolicy(callable);
+    expect(Object.hasOwn(validatedCallable, "advise")).toBe(true);
+    expect(createRulesetIdentity(callable)).toEqual({
+      core: "loredu.reconciliation/v1",
+      claim_policy: { id: base.id, version: base.version },
+    });
+    expect(calls.advise).toBe(0);
+    expect(evaluateClaimPolicyAdvice(validatedCallable, context)).toEqual([]);
+    expect(calls.advise).toBe(1);
+    expect(receiver).toBe(callable);
+
+    const store = {
+      async append() {
+        calls.store++;
+        return createStreamPosition(1);
+      },
+      async get() {
+        calls.store++;
+        return undefined;
+      },
+      async scan() {
+        calls.store++;
+        return { head: createStreamPosition(0), records: Object.freeze([]) };
+      },
+      stream() {
+        calls.store++;
+        return {
+          [Symbol.asyncIterator]() {
+            return this;
+          },
+          async next() {
+            return { done: true as const, value: undefined };
+          },
+        };
+      },
+      async head() {
+        calls.store++;
+        return createStreamPosition(0);
+      },
+    };
+    const dependencies = {
+      store,
+      clock: {
+        now() {
+          calls.clock++;
+          return createInstant(0);
+        },
+      },
+      randomSource: {
+        nextBytes() {
+          calls.random++;
+          return new Uint8Array(10);
+        },
+      },
+    };
+    const exactIssue = {
+      code: "TYPE",
+      path: "/advise",
+      message: "must be a function when present",
+    };
+    const presentNonFunctions: unknown[] = [
+      { ...base, advise: undefined },
+      { ...base, advise: null },
+      { ...base, advise: false },
+      { ...base, advise: 0 },
+      { ...base, advise: "callback" },
+      { ...base, advise: [] },
+      { ...base, advise: {} },
+      new Proxy(
+        { ...base, advise: undefined },
+        {
+          ownKeys: (target) => Reflect.ownKeys(target),
+          getOwnPropertyDescriptor: (target, property) => Reflect.getOwnPropertyDescriptor(target, property),
+          getPrototypeOf: (target) => Reflect.getPrototypeOf(target),
+        },
+      ),
+    ];
+    for (const policy of presentNonFunctions)
+      for (const assemble of [
+        () => createRulesetIdentity(policy as ClaimPolicy),
+        () => createLoreduApplication({ ...dependencies, claimPolicy: policy as ClaimPolicy }),
+      ])
+        expect(assemble).toThrow(
+          expect.objectContaining({
+            code: "VALIDATION_FAILED",
+            message: "ClaimPolicy validation failed",
+            issues: [exactIssue],
+          }),
+        );
+
+    let getterCalls = 0;
+    const accessor = { ...base } as Record<string, unknown>;
+    Object.defineProperty(accessor, "advise", {
+      enumerable: true,
+      get() {
+        getterCalls++;
+        return () => [];
+      },
+    });
+    expect(() => createRulesetIdentity(accessor as unknown as ClaimPolicy)).toThrow(
+      expect.objectContaining({
+        code: "VALIDATION_FAILED",
+        message: "ClaimPolicy validation failed",
+        issues: [{ code: "TYPE", path: "/advise", message: "must be a data property" }],
+      }),
+    );
+    expect(getterCalls).toBe(0);
+
+    const inheritedCalls = { advise: 0 };
+    const inherited = Object.assign(
+      Object.create({
+        validateClaimKey: base.validateClaimKey,
+        semantics: base.semantics,
+        advise(this: unknown) {
+          receiver = this;
+          inheritedCalls.advise++;
+          return Object.freeze([]);
+        },
+      }),
+      { id: "consumer.inherited-advice", version: "1" },
+    ) as ClaimPolicy;
+    const validatedInherited = validateClaimPolicy(inherited);
+    expect(Object.hasOwn(validatedInherited, "advise")).toBe(true);
+    expect(evaluateClaimPolicyAdvice(validatedInherited, context)).toEqual([]);
+    expect(inheritedCalls.advise).toBe(1);
+    expect(receiver).toBe(inherited);
+    const inheritedUndefined = Object.assign(
+      Object.create({
+        validateClaimKey: base.validateClaimKey,
+        semantics: base.semantics,
+        advise: undefined,
+      }),
+      { id: "consumer.inherited-invalid", version: "1" },
+    ) as ClaimPolicy;
+    expect(() => createRulesetIdentity(inheritedUndefined)).toThrow(
+      expect.objectContaining({ issues: [exactIssue] }),
+    );
+
+    const hostile = [
+      new Proxy(base, {
+        ownKeys() {
+          throw new Error("proxy-secret-own-keys");
+        },
+      }),
+      new Proxy(base, {
+        getOwnPropertyDescriptor(target, property) {
+          if (property === "advise") throw new Error("proxy-secret-descriptor");
+          return Reflect.getOwnPropertyDescriptor(target, property);
+        },
+      }),
+      new Proxy(base, {
+        getPrototypeOf() {
+          throw new Error("proxy-secret-prototype");
+        },
+      }),
+    ];
+    for (const policy of hostile) {
+      let caught: unknown;
+      try {
+        createLoreduApplication({ ...dependencies, claimPolicy: policy });
+      } catch (error) {
+        caught = error;
+      }
+      expect(caught).toMatchObject({ code: "VALIDATION_FAILED", message: "ClaimPolicy validation failed" });
+      expect(JSON.stringify(caught)).not.toContain("proxy-secret");
+    }
+    expect(getterCalls).toBe(0);
+    expect(calls).toEqual({ validate: 0, semantics: 0, advise: 1, clock: 0, random: 0, store: 0 });
   });
 
   test("custom policy shape validation rejects accessors without invoking them", () => {
