@@ -5,9 +5,9 @@ T50–T53 also prove that the CLI adapts and renders the surface-neutral semanti
 covered by **T60–T64**, **T66–T68**, and **T70–T72** in
 [`tests/application`](../application/README.md). The
 [behavioral catalog](../../docs/v0.x/execution/first-user-journey.md) owns the
-exact assertions, and
-[`catalog-status.json`](../../docs/v0.x/execution/catalog-status.json) owns their
-staged M1.5/M2/M3 implementation milestones. The
+exact assertions. Executable `@covers` annotations here and
+[`catalog-status.json`](../../docs/v0.x/execution/catalog-status.json) together own
+current implementation/deferment accounting. The
 [application and CLI contract](../../docs/architecture/contracts/application-cli.md)
 owns the protocol those rows exercise.
 

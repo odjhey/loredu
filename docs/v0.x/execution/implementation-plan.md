@@ -74,7 +74,7 @@ Pulled ahead of full reconciliation ([decision 0008](../../decisions/0008-cli-fi
 
 During this phase the agent performs judgment manually: it records explicit Relations and Resolutions through the CLI. Those canonical records become the fixture corpus that M2's deterministic ruleset is validated against.
 
-T50–T75 are protocol-ready under this contract, but implementation remains staged: M1.5 owns its record/query/chain rows, M2 owns scenario/Current Knowledge rows, and M3 owns packet-started disclosure and Working Lore budget continuation. Contract closure changes no catalog claim.
+The M1.5 exit is implemented. Executable `@covers` annotations and [`catalog-status.json`](./catalog-status.json) own current row-level accounting; M2 retains scenario/Current Knowledge work, and M3 retains packet-started disclosure and Working Lore budget continuation.
 
 Exit: an agent given only the binary and `lor skill` completes the M1.5 portions of journeys 0, 1, 2, 3, 3b, 7, 8, and 9 on a fresh store, follows pagination/disclosure commands, records manual judgment, and ends with `lor status --check` passing. Acceptance scenario A's records and manual relations are executable; its Current Knowledge and Working Lore assertions remain M2/M3 exits.
 

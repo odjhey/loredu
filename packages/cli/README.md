@@ -24,10 +24,11 @@ recursive runnable rendering, and process exit selection remain here. M2/M3
 still own `current` and `lore`.
 
 Compiled-binary evidence lives in
-[`../../tests/cli-conformance/`](../../tests/cli-conformance/README.md). The M1.5
-CLI rows T50–T53, T57–T58, T65, T73, and T74 are complete. T56 remains deferred
-until the M2/M3 commands complete its staged journey. The exported runner accepts explicit
-application policy and host-capability ports for embedded composition and conformance while
-the shipped `lor` entry keeps the default policy and production Clock/RandomSource. Surface-neutral
-application semantics are covered separately in
+[`../../tests/cli-conformance/`](../../tests/cli-conformance/README.md); executable
+`@covers` annotations and
+[`catalog-status.json`](../../docs/v0.x/execution/catalog-status.json) own current
+row-level implementation accounting. The exported runner accepts explicit application
+policy and host-capability ports for embedded composition and conformance, while the
+shipped `lor` entry keeps the default policy and production Clock/RandomSource.
+Surface-neutral application semantics are covered separately in
 [`../../tests/application/`](../../tests/application/README.md).

@@ -9,7 +9,7 @@ created_at: 2026-08-28T06:00:00+08:00
 
 # M1.5 application and CLI contract
 
-[Decision 0026](../../decisions/0026-m15-application-cli-contract.md) closes this contract before M1.5 command implementation. It is agreed but remains pre-`current` until implementation and the two-consumer stabilization bar. M1.5 exposes records, exact-key overlap, health, and disclosure; it does **not** expose Current Knowledge or Working Lore, which remain M2 and M3.
+[Decision 0026](../../decisions/0026-m15-application-cli-contract.md) closed this contract before M1.5 command implementation. This agreed contract remains pre-`current` until the two-consumer stabilization bar. M1.5 exposes records, exact-key overlap, health, and disclosure; it does **not** expose Current Knowledge or Working Lore, which remain M2 and M3.
 
 ## Boundary and application surface
 
