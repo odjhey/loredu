@@ -597,6 +597,20 @@ describe("M3 Working Lore public application", () => {
     });
   });
 
+  test("corpus SourceRef fields require canonical text", async () => {
+    const { application } = app();
+    for (const [field, corpus] of [
+      ["ref", { ref: " doc" }],
+      ["locator", { ref: "doc", locator: "policy " }],
+      ["snapshot", { ref: "doc", snapshot: " v1" }],
+    ] as const) {
+      await expect(application.lore({ activity: "canonical-corpus", corpus })).rejects.toMatchObject({
+        code: "VALIDATION_FAILED",
+        issues: [{ code: "FORMAT", path: `/corpus/${field}` }],
+      });
+    }
+  });
+
   test("hostile queries and every malformed Ranker container fail without accessors or partial output", async () => {
     const store = new InMemoryStore();
     const seeded = app({ store }).application;

@@ -195,12 +195,15 @@ function scalarString(
     issues.push(makeIssue("FORMAT", path, "must contain only Unicode scalar values"));
     return undefined;
   }
-  const trimmed = value.trim();
-  if (scalarLength(trimmed) < 1 || scalarLength(trimmed) > maximum) {
-    issues.push(makeIssue("RANGE", path, `must contain 1 through ${maximum} scalars after trimming`));
+  if (value !== value.trim()) {
+    issues.push(makeIssue("FORMAT", path, "must not contain leading or trailing whitespace"));
     return undefined;
   }
-  return trimmed;
+  if (scalarLength(value) < 1 || scalarLength(value) > maximum) {
+    issues.push(makeIssue("RANGE", path, `must contain 1 through ${maximum} scalars`));
+    return undefined;
+  }
+  return value;
 }
 function parseSourceRef(value: unknown, path: string, issues: LoreduIssue[]): SourceRef | undefined {
   const data = inspectObject(value, path, issues);
