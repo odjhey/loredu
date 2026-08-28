@@ -21,6 +21,8 @@ const ids = {
   claim3: "clm_0000000000000003",
   claim4: "clm_0000000000000004",
   claim5: "clm_0000000000000005",
+  claim6: "clm_0000000000000006",
+  claim7: "clm_0000000000000007",
   relation1: "rel_0000000000000001",
   resolution1: "res_0000000000000001",
 } as const;
@@ -113,6 +115,20 @@ async function followClaims(
     cursor = response.page.cursor;
   }
   return ids;
+}
+
+function cursorWithDeepQuery(cursor: string, depth: number): string {
+  const prefix = "loredu.cursor.v1.";
+  const payload = JSON.parse(Buffer.from(cursor.slice(prefix.length), "base64url").toString("utf8")) as Record<
+    string,
+    unknown
+  >;
+  const shallow = JSON.stringify({ ...payload, query: null });
+  const marker = '"query":null';
+  if (shallow === undefined || !shallow.includes(marker)) throw new TypeError("cursor query is absent");
+  const nested = `${'{"next":'.repeat(depth)}null${"}".repeat(depth)}`;
+  const malformed = shallow.replace(marker, `"query":${nested}`);
+  return `${prefix}${Buffer.from(malformed).toString("base64url")}`;
 }
 
 describe("M1.5 application mutations and overlap", () => {
@@ -452,6 +468,78 @@ describe("M1.5 application filters, health, and disclosure", () => {
     expect(suppressed.result).toMatchObject({ healthy: true, advisory_count: 0, advisories: [] });
   });
 
+  test("status indexes preserve policy, group, component, and advice order", async () => {
+    const store = new InMemoryStore();
+    await appendDirect(store, [
+      claim(ids.claim1, { predicate: "location", value: "old" }),
+      claim(ids.claim2, { predicate: "owner", value: { shared: true } }),
+      claim(ids.claim3, { predicate: "reviewer", value: { shared: true } }),
+      claim(ids.claim4, { predicate: "location", value: "new" }),
+      claim(ids.claim5, { predicate: "status", value: { shared: true } }),
+      decodePersistedRecord({
+        schema: "loredu.record/v1",
+        kind: "relation",
+        id: ids.relation1,
+        recorded_at: "2026-01-01T00:00:00.000Z",
+        actor,
+        relation_type: "duplicates",
+        from: ids.claim2,
+        to: ids.claim5,
+        scope: {},
+        metadata: {},
+        sources: [],
+      }),
+      claim(ids.claim6, { predicate: "lifecycle", value: "inactive" }),
+      claim(ids.claim7, { predicate: "lifecycle", value: "active" }),
+    ]);
+    const policyCalls: string[] = [];
+    const policy: ClaimPolicy = {
+      id: "test.status-order",
+      version: "1",
+      validateClaimKey(key) {
+        policyCalls.push(`validate:${key.predicate}`);
+        return [];
+      },
+      semantics(key) {
+        policyCalls.push(`semantics:${key.predicate}`);
+        return "exclusive";
+      },
+    };
+
+    const status = await application(store, policy).status();
+
+    expect(policyCalls).toEqual([
+      "validate:location",
+      "semantics:location",
+      "validate:owner",
+      "semantics:owner",
+      "validate:reviewer",
+      "semantics:reviewer",
+      "validate:status",
+      "semantics:status",
+      "validate:lifecycle",
+      "semantics:lifecycle",
+    ]);
+    expect(
+      status.result.attention.map((item) =>
+        item.kind === "unresolved-exclusive-group" ? String(item.representative.id) : item.kind,
+      ),
+    ).toEqual([ids.claim1, ids.claim6]);
+    expect(status.result.advisories).toMatchObject([
+      {
+        component_count: 2,
+        representatives: [{ id: ids.claim2 }, { id: ids.claim3 }],
+      },
+    ]);
+    expect(status.advice.map(({ action }) => action)).toEqual([
+      "claims.list",
+      "record.show",
+      "claims.list",
+      "record.show",
+    ]);
+    expect(status.page).toEqual({ returned: 3, total: 3 });
+  });
+
   test("show discloses only valid backward record references and history stays position ordered", async () => {
     const store = new InMemoryStore();
     await appendDirect(store, [
@@ -587,6 +675,9 @@ describe("M1.5 basis-pinned opaque pagination", () => {
     });
 
     const claimsCursor = (await app.claims({ limit: 1 })).page.cursor as string;
+    await expect(app.claims({ cursor: cursorWithDeepQuery(claimsCursor, 20_000) })).rejects.toMatchObject({
+      code: "INVALID_CURSOR",
+    });
     await expect(app.history({ cursor: claimsCursor })).rejects.toMatchObject({ code: "CURSOR_MISMATCH" });
 
     const policy: ClaimPolicy = {

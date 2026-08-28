@@ -98,6 +98,26 @@ type ClaimGroup = {
   readonly members: readonly PositionedRecord[];
   readonly semantics: ClaimSemantics;
 };
+type CohortNode = {
+  readonly claims: PositionedRecord[];
+  parent: number;
+  rank: number;
+};
+type Cohort = {
+  readonly scope: Scope;
+  readonly value: JsonValue;
+  readonly nodes: CohortNode[];
+  readonly nodeByClaimKey: Map<string, number>;
+};
+type IndexedResolution = {
+  readonly targets: ReadonlySet<RecordId>;
+};
+type StatusIndex = {
+  readonly byId: ReadonlyMap<RecordId, PositionedRecord>;
+  readonly groups: readonly ClaimGroup[];
+  readonly cohorts: readonly Cohort[];
+  readonly resolutionsByTarget: ReadonlyMap<RecordId, readonly IndexedResolution[]>;
+};
 
 function validationFailed(
   issues: readonly LoreduIssue[],
@@ -476,7 +496,7 @@ function encodeCursor(payload: CursorPayload): string {
   return `${CURSOR_PREFIX}${base64Encode(encodeUtf8(JSON.stringify(payload)))}`;
 }
 
-function decodeCursor(token: string): CursorPayload {
+function decodeCursorPayload(token: string): CursorPayload {
   if (!token.startsWith(CURSOR_PREFIX)) cursorInvalid();
   const encoded = token.slice(CURSOR_PREFIX.length);
   let parsed: unknown;
@@ -531,6 +551,19 @@ function decodeCursor(token: string): CursorPayload {
     anchor: object.anchor,
     resume,
   });
+}
+
+function decodeCursor(token: string): CursorPayload {
+  try {
+    return decodeCursorPayload(token);
+  } catch (error) {
+    if (
+      error instanceof LoreduError &&
+      (error.code === "INVALID_CURSOR" || error.code === "CURSOR_MISMATCH")
+    )
+      throw error;
+    cursorInvalid();
+  }
 }
 
 function createCursor(
@@ -784,17 +817,99 @@ function policySemantics(policy: ValidatedClaimPolicy, key: ClaimKey): ClaimSema
   return evaluated.semantics;
 }
 
-function groupedClaims(snapshot: Snapshot, policy: ValidatedClaimPolicy): readonly ClaimGroup[] {
-  const groups: { key: ClaimKey; members: PositionedRecord[] }[] = [];
+function jsonIdentity(parts: readonly unknown[]): string {
+  const encoded = JSON.stringify(parts);
+  if (encoded === undefined) throw new TypeError("could not encode canonical identity");
+  return encoded;
+}
+
+function claimKeyIdentity(key: ClaimKey): string {
+  return jsonIdentity([
+    key.scope,
+    key.subject.type,
+    key.subject.id,
+    key.predicate,
+    key.perspective ?? null,
+  ]);
+}
+
+function cohortIdentity(scope: Scope, value: JsonValue): string {
+  return jsonIdentity([scope, value]);
+}
+
+function cohortNode(cohort: Cohort, index: number): CohortNode {
+  const node = cohort.nodes[index];
+  if (!node) throw new TypeError("missing cohort node");
+  return node;
+}
+
+function findCohortNode(cohort: Cohort, index: number): number {
+  let root = index;
+  while (cohortNode(cohort, root).parent !== root) root = cohortNode(cohort, root).parent;
+  let current = index;
+  while (cohortNode(cohort, current).parent !== current) {
+    const next = cohortNode(cohort, current).parent;
+    cohortNode(cohort, current).parent = root;
+    current = next;
+  }
+  return root;
+}
+
+function uniteCohortNodes(cohort: Cohort, left: number, right: number): void {
+  let leftRoot = findCohortNode(cohort, left);
+  let rightRoot = findCohortNode(cohort, right);
+  if (leftRoot === rightRoot) return;
+  if (cohortNode(cohort, leftRoot).rank < cohortNode(cohort, rightRoot).rank)
+    [leftRoot, rightRoot] = [rightRoot, leftRoot];
+  cohortNode(cohort, rightRoot).parent = leftRoot;
+  if (cohortNode(cohort, leftRoot).rank === cohortNode(cohort, rightRoot).rank)
+    cohortNode(cohort, leftRoot).rank += 1;
+}
+
+function earlierRecordById(snapshot: Snapshot): ReadonlyMap<RecordId, PositionedRecord> {
+  return new Map(snapshot.records.map((item) => [item.record.id, item]));
+}
+
+function buildStatusIndex(snapshot: Snapshot, policy: ValidatedClaimPolicy): StatusIndex {
+  const byId = earlierRecordById(snapshot);
+  const groupBuilders = new Map<string, { key: ClaimKey; members: PositionedRecord[] }>();
+  const cohortByIdentity = new Map<string, Cohort>();
+  const claimLocations = new Map<
+    RecordId,
+    { readonly cohort: Cohort; readonly node: number; readonly position: StreamPosition }
+  >();
+
   for (const item of snapshot.records) {
     if (item.record.kind !== "claim") continue;
     const key = claimKeyOf(item.record);
-    const group = groups.find((candidate) => claimKeysEqual(candidate.key, key));
+    const keyIdentity = claimKeyIdentity(key);
+    const group = groupBuilders.get(keyIdentity);
     if (group) group.members.push(item);
-    else groups.push({ key, members: [item] });
+    else groupBuilders.set(keyIdentity, { key, members: [item] });
+
+    const identity = cohortIdentity(item.record.scope, item.record.value);
+    let cohort = cohortByIdentity.get(identity);
+    if (!cohort) {
+      cohort = {
+        scope: item.record.scope,
+        value: item.record.value,
+        nodes: [],
+        nodeByClaimKey: new Map(),
+      };
+      cohortByIdentity.set(identity, cohort);
+    }
+    let nodeIndex = cohort.nodeByClaimKey.get(keyIdentity);
+    if (nodeIndex === undefined) {
+      nodeIndex = cohort.nodes.length;
+      cohort.nodeByClaimKey.set(keyIdentity, nodeIndex);
+      cohort.nodes.push({ claims: [], parent: nodeIndex, rank: 0 });
+    }
+    cohortNode(cohort, nodeIndex).claims.push(item);
+    claimLocations.set(item.record.id, { cohort, node: nodeIndex, position: item.position });
   }
-  return Object.freeze(
-    groups.map((group) =>
+
+  const groups = Object.freeze(
+    [...groupBuilders.values()].map((group) =>
       Object.freeze({
         key: group.key,
         members: Object.freeze(group.members),
@@ -802,6 +917,41 @@ function groupedClaims(snapshot: Snapshot, policy: ValidatedClaimPolicy): readon
       }),
     ),
   );
+  const resolutionsByTarget = new Map<RecordId, IndexedResolution[]>();
+  for (const item of snapshot.records) {
+    if (item.record.kind !== "resolution") continue;
+    const allReferencesBackward = references(item.record).every((reference) => {
+      const target = byId.get(reference.id);
+      return target !== undefined && target.position < item.position;
+    });
+    if (!allReferencesBackward) continue;
+    const resolution = Object.freeze({ targets: new Set<RecordId>(item.record.targets) });
+    for (const target of resolution.targets) {
+      const resolutions = resolutionsByTarget.get(target) ?? [];
+      resolutions.push(resolution);
+      resolutionsByTarget.set(target, resolutions);
+    }
+  }
+  for (const item of snapshot.records) {
+    if (item.record.kind !== "relation" || item.record.relation_type !== "duplicates") continue;
+    const from = claimLocations.get(item.record.from);
+    const to = claimLocations.get(item.record.to);
+    if (
+      !from ||
+      !to ||
+      from.position >= item.position ||
+      to.position >= item.position ||
+      from.cohort !== to.cohort
+    )
+      continue;
+    uniteCohortNodes(from.cohort, from.node, to.node);
+  }
+  return Object.freeze({
+    byId,
+    groups,
+    cohorts: Object.freeze([...cohortByIdentity.values()]),
+    resolutionsByTarget,
+  });
 }
 
 function hasDifferentValues(members: readonly PositionedRecord[]): boolean {
@@ -809,37 +959,18 @@ function hasDifferentValues(members: readonly PositionedRecord[]): boolean {
   return first !== undefined && members.some((item) => !jsonValuesEqual((item.record as Claim).value, first));
 }
 
-function earlierRecordById(snapshot: Snapshot): ReadonlyMap<RecordId, PositionedRecord> {
-  return new Map(snapshot.records.map((item) => [item.record.id, item]));
-}
-
-function eligibleResolution(
-  record: PositionedRecord,
-  group: ClaimGroup,
-  byId: ReadonlyMap<RecordId, PositionedRecord>,
-): boolean {
-  if (record.record.kind !== "resolution") return false;
-  const allReferencesBackward = references(record.record).every((reference) => {
-    const target = byId.get(reference.id);
-    return target !== undefined && target.position < record.position;
-  });
-  if (!allReferencesBackward) return false;
-  return group.members.every(
-    (claim) =>
-      record.record.kind === "resolution" && record.record.targets.includes(claim.record.id as never),
-  );
-}
-
-function unresolvedGroups(
-  snapshot: Snapshot,
-  policy: ValidatedClaimPolicy,
-): readonly { item: UnresolvedExclusiveGroup; position: number }[] {
-  const byId = earlierRecordById(snapshot);
+function unresolvedGroups(index: StatusIndex): readonly { item: UnresolvedExclusiveGroup; position: number }[] {
   const output: { item: UnresolvedExclusiveGroup; position: number }[] = [];
-  for (const group of groupedClaims(snapshot, policy)) {
+  for (const group of index.groups) {
     if (group.semantics !== "exclusive" || !hasDifferentValues(group.members)) continue;
-    if (snapshot.records.some((record) => eligibleResolution(record, group, byId))) continue;
     const representative = group.members[0] as PositionedRecord;
+    const resolutions = index.resolutionsByTarget.get(representative.record.id) ?? [];
+    if (
+      resolutions.some((resolution) =>
+        group.members.every((claim) => resolution.targets.has(claim.record.id)),
+      )
+    )
+      continue;
     output.push({
       position: Number(representative.position),
       item: Object.freeze({
@@ -856,8 +987,8 @@ function unresolvedGroups(
 
 function danglingReferences(
   snapshot: Snapshot,
+  byId: ReadonlyMap<RecordId, PositionedRecord>,
 ): readonly { item: DanglingRecordReference; position: number }[] {
-  const byId = earlierRecordById(snapshot);
   const output: { item: DanglingRecordReference; position: number }[] = [];
   for (const record of snapshot.records) {
     for (const reference of references(record.record)) {
@@ -877,74 +1008,22 @@ function danglingReferences(
   return Object.freeze(output);
 }
 
-type Cohort = { scope: Scope; value: JsonValue; claims: PositionedRecord[] };
 function divergenceAdvisories(
-  snapshot: Snapshot,
+  index: StatusIndex,
 ): readonly { item: KeyDivergenceAdvisory; position: number }[] {
-  const cohorts: Cohort[] = [];
-  for (const item of snapshot.records) {
-    if (item.record.kind !== "claim") continue;
-    const claim = item.record;
-    const cohort = cohorts.find(
-      (candidate) => sameScope(candidate.scope, claim.scope) && jsonValuesEqual(candidate.value, claim.value),
-    );
-    if (cohort) cohort.claims.push(item);
-    else cohorts.push({ scope: claim.scope, value: claim.value, claims: [item] });
-  }
-  const byId = earlierRecordById(snapshot);
   const output: { item: KeyDivergenceAdvisory; position: number }[] = [];
-  for (const cohort of cohorts) {
-    const nodes: { key: ClaimKey; claims: PositionedRecord[]; parent: number }[] = [];
-    for (const claim of cohort.claims) {
-      const key = claimKeyOf(claim.record as Claim);
-      const node = nodes.find((candidate) => claimKeysEqual(candidate.key, key));
-      if (node) node.claims.push(claim);
-      else nodes.push({ key, claims: [claim], parent: nodes.length });
-    }
-    if (nodes.length < 2) continue;
-    const find = (index: number): number => {
-      let root = index;
-      while ((nodes[root] as { parent: number }).parent !== root)
-        root = (nodes[root] as { parent: number }).parent;
-      return root;
-    };
-    const unite = (left: number, right: number): void => {
-      const leftRoot = find(left);
-      const rightRoot = find(right);
-      if (leftRoot !== rightRoot) (nodes[rightRoot] as { parent: number }).parent = leftRoot;
-    };
-    for (const relation of snapshot.records) {
-      if (relation.record.kind !== "relation" || relation.record.relation_type !== "duplicates") continue;
-      const from = byId.get(relation.record.from);
-      const to = byId.get(relation.record.to);
-      if (
-        from === undefined ||
-        to === undefined ||
-        from.position >= relation.position ||
-        to.position >= relation.position ||
-        from.record.kind !== "claim" ||
-        to.record.kind !== "claim" ||
-        !cohort.claims.some((claim) => claim.position === from.position) ||
-        !cohort.claims.some((claim) => claim.position === to.position)
-      )
-        continue;
-      const fromNode = nodes.findIndex((node) => claimKeysEqual(node.key, claimKeyOf(from.record as Claim)));
-      const toNode = nodes.findIndex((node) => claimKeysEqual(node.key, claimKeyOf(to.record as Claim)));
-      if (fromNode >= 0 && toNode >= 0) unite(fromNode, toNode);
-    }
-    const components = new Map<number, PositionedRecord[]>();
-    nodes.forEach((node, index) => {
-      const root = find(index);
-      const claims = components.get(root) ?? [];
-      claims.push(...node.claims);
-      components.set(root, claims);
+  for (const cohort of index.cohorts) {
+    if (cohort.nodes.length < 2) continue;
+    const representativesByRoot = new Map<number, PositionedRecord>();
+    cohort.nodes.forEach((node, nodeIndex) => {
+      const root = findCohortNode(cohort, nodeIndex);
+      const candidate = node.claims[0] as PositionedRecord;
+      const current = representativesByRoot.get(root);
+      if (!current || candidate.position < current.position) representativesByRoot.set(root, candidate);
     });
-    const representatives = [...components.values()]
-      .map(
-        (claims) =>
-          claims.sort((left, right) => Number(left.position) - Number(right.position))[0] as PositionedRecord,
-      )
-      .sort((left, right) => Number(left.position) - Number(right.position));
+    const representatives = [...representativesByRoot.values()].sort(
+      (left, right) => Number(left.position) - Number(right.position),
+    );
     if (representatives.length < 2) continue;
     output.push({
       position: Number((representatives[0] as PositionedRecord).position),
@@ -974,9 +1053,10 @@ function statusItems(
   readonly danglingCount: number;
   readonly advisoryCount: number;
 } {
-  const groups = unresolvedGroups(snapshot, policy);
-  const dangling = danglingReferences(snapshot);
-  const advisories = divergenceAdvisories(snapshot);
+  const index = buildStatusIndex(snapshot, policy);
+  const groups = unresolvedGroups(index);
+  const dangling = danglingReferences(snapshot, index.byId);
+  const advisories = divergenceAdvisories(index);
   const output: StatusComputedItem[] = [];
   const appendClass = (
     classRank: number,
