@@ -15,7 +15,7 @@ import {
 } from "./domain/portable-json";
 import { decodePersistedRecord } from "./domain/records";
 import { LoreduError, type LoreduIssue } from "./errors";
-import type { StreamPosition } from "./ports/capabilities";
+import type { PositionedRecord, StreamPosition } from "./ports/capabilities";
 import type { ClaimSemantics, ValidatedClaimPolicy } from "./ports/claim-policy";
 
 const TOKEN = /^[a-z0-9](?:[a-z0-9._:/-]*[a-z0-9])?$/;
@@ -192,18 +192,22 @@ function valueGroups(
 
 function backwardResolution(
   resolution: PositionedResolution,
-  visibleClaimsById: ReadonlyMap<string, PositionedClaim>,
-  relationsById: ReadonlyMap<string, PositionedRelation>,
+  visibleById: ReadonlyMap<string, PositionedRecord>,
 ): boolean {
+  const replacement =
+    resolution.record.replacement === undefined
+      ? undefined
+      : visibleById.get(resolution.record.replacement);
   return (
     resolution.record.targets.length > 0 &&
     resolution.record.targets.every((id) => {
-      const target = visibleClaimsById.get(id) ?? relationsById.get(id);
+      const target = visibleById.get(id);
       return target !== undefined && target.position < resolution.position;
     }) &&
     (resolution.record.replacement === undefined ||
-      (visibleClaimsById.get(resolution.record.replacement)?.position ?? resolution.position) <
-        resolution.position)
+      (replacement !== undefined &&
+        replacement.record.kind === "claim" &&
+        replacement.position < resolution.position))
   );
 }
 
@@ -284,12 +288,12 @@ function directedCycleMembers(edges: readonly (readonly [ClaimId, ClaimId])[]): 
 }
 
 /**
- * Reconciles selected applicable Claims while using a separate full recorded-visible Claim index only
+ * Reconciles selected applicable Claims while using a separate full recorded-visible record index only
  * for Resolution reference eligibility. Public `current` composes selection and summaries around it.
  */
 export function reconcileApplicableClaimGroup(input: {
   readonly claims: readonly PositionedClaim[];
-  readonly visibleClaims: readonly PositionedClaim[];
+  readonly visibleRecords: readonly PositionedRecord[];
   readonly relations?: readonly PositionedRelation[];
   readonly resolutions?: readonly PositionedResolution[];
   readonly semantics: ClaimSemantics;
@@ -300,17 +304,16 @@ export function reconcileApplicableClaimGroup(input: {
   if (claims.some((claim) => !claimKeysEqual(key, claimKeyOf(claim.record))))
     throw new TypeError("reconciliation cannot cross an exact ClaimKey");
   const claimsById = new Map(claims.map((claim) => [claim.record.id, claim]));
-  const visibleClaimsById = new Map(input.visibleClaims.map((claim) => [claim.record.id, claim] as const));
+  const visibleById = new Map(input.visibleRecords.map((item) => [item.record.id, item] as const));
   for (const claim of claims)
-    if (!visibleClaimsById.has(claim.record.id))
-      throw new TypeError("applicable Claims must belong to the visible Claim index");
+    if (visibleById.get(claim.record.id)?.record.kind !== "claim")
+      throw new TypeError("applicable Claims must belong to the visible record index");
   const relations = Object.freeze(
     [...(input.relations ?? [])].sort((a, b) => Number(a.position) - Number(b.position)),
   );
-  const relationsById = new Map(relations.map((relation) => [relation.record.id, relation]));
   const resolutions = Object.freeze(
     [...(input.resolutions ?? [])]
-      .filter((resolution) => backwardResolution(resolution, visibleClaimsById, relationsById))
+      .filter((resolution) => backwardResolution(resolution, visibleById))
       .sort((a, b) => Number(a.position) - Number(b.position)),
   );
   const derived: ClassifiedClaimPair[] = [];

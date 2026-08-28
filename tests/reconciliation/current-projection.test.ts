@@ -10,6 +10,7 @@ import {
   type JsonObject,
   type PersistedRecord,
   type RecordId,
+  type RelationId,
   type Resolution,
 } from "@loredu/kernel";
 import { FixedClock, InMemoryStore, SeededRandomSource } from "@loredu/kernel/testing";
@@ -22,7 +23,7 @@ const ids = {
   amendment: "clm_0000000000000002" as ClaimId,
   later: "clm_0000000000000003" as ClaimId,
   outside: "clm_0000000000000004" as ClaimId,
-  relation: "rel_0000000000000001" as RecordId,
+  relation: "rel_0000000000000001" as RelationId,
   resolution: "res_0000000000000001" as RecordId,
   verification: "ver_0000000000000001" as RecordId,
 } as const;
@@ -94,7 +95,7 @@ function relation(from: ClaimId, to: ClaimId): PersistedRecord {
 }
 
 function resolution(
-  targets: readonly ClaimId[],
+  targets: readonly (ClaimId | RelationId)[],
   replacement: ClaimId | undefined,
   recordedAt = "2026-03-06T00:00:00.000Z",
   options: {
@@ -304,6 +305,66 @@ describe("public M2 Current Knowledge projection", () => {
       history: { claim_count: 2, resolution_count: 0 },
     });
     expect(JSON.stringify(forward.result.items)).not.toContain(ids.outside);
+
+    const missingStore = new InMemoryStore();
+    await append(
+      missingStore,
+      selectedOld,
+      selectedNew,
+      resolution([ids.old, ids.amendment, ids.outside], ids.amendment),
+    );
+    const missing = await application(missingStore).current({
+      scope: selectedScope,
+      valid_at: "2026-03-10T00:00:00Z",
+    });
+    expect(knowledge(missing)[0]).toMatchObject({
+      state: "disputed",
+      value_count: 2,
+      history: { resolution_count: 0 },
+    });
+
+    const asOfStore = new InMemoryStore();
+    const excludedAtAsOf = claim(ids.outside, "outside", "2026-04-01T00:00:00.000Z", {
+      scope: outsideScope,
+      subjectId: "outside-policy",
+      predicate: "state",
+    });
+    await append(
+      asOfStore,
+      excludedAtAsOf,
+      selectedOld,
+      selectedNew,
+      resolution([ids.old, ids.amendment, ids.outside], ids.amendment),
+    );
+    const excluded = await application(asOfStore).current({
+      scope: selectedScope,
+      as_of: "2026-03-10T00:00:00Z",
+      valid_at: "2026-03-10T00:00:00Z",
+    });
+    expect(knowledge(excluded)[0]).toMatchObject({
+      state: "disputed",
+      value_count: 2,
+      history: { resolution_count: 0 },
+    });
+
+    const relationStore = new InMemoryStore();
+    await append(
+      relationStore,
+      selectedOld,
+      selectedNew,
+      relation(ids.amendment, ids.outside),
+      resolution([ids.old, ids.amendment, ids.relation], ids.amendment),
+      outside,
+    );
+    const relationTarget = await application(relationStore).current({
+      scope: selectedScope,
+      valid_at: "2026-03-10T00:00:00Z",
+    });
+    expect(knowledge(relationTarget)[0]).toMatchObject({
+      state: "preferred",
+      values: [{ value: "60 days", representative: { id: ids.amendment } }],
+      history: { explicit_relation_count: 0, resolution_count: 1 },
+    });
   });
 
   test("incomplete Resolutions and future replacements cannot select Current Knowledge", async () => {

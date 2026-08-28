@@ -565,7 +565,7 @@ function computeProjection(
     if (applicable.length === 0) continue;
     const reconciled = reconcileApplicableClaimGroup({
       claims: applicable,
-      visibleClaims,
+      visibleRecords: visible,
       relations,
       resolutions,
       semantics: group.semantics,
