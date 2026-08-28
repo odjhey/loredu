@@ -74,13 +74,13 @@ Pulled ahead of full reconciliation ([decision 0008](../../decisions/0008-cli-fi
 
 During this phase the agent performs judgment manually: it records explicit Relations and Resolutions through the CLI. Those canonical records become the fixture corpus that M2's deterministic ruleset is validated against.
 
-The M1.5 exit is implemented. Executable `@covers` annotations and [`catalog-status.json`](./catalog-status.json) own current row-level accounting; M2 retains scenario/Current Knowledge work, and M3 retains packet-started disclosure and Working Lore budget continuation.
+The M1.5 exit is implemented. Executable `@covers` annotations and [`catalog-status.json`](./catalog-status.json) own current row-level accounting; M2-P has delivered public Current Knowledge, M2-E retains compiled scenario work, and M3 retains packet-started disclosure and Working Lore budget continuation.
 
 Exit: an agent given only the binary and `lor skill` completes the M1.5 portions of journeys 0, 1, 2, 3, 3b, 7, 8, and 9 on a fresh store, follows pagination/disclosure commands, records manual judgment, and ends with `lor status --check` passing. Acceptance scenario A's records and manual relations are executable; its Current Knowledge and Working Lore assertions remain M2/M3 exits.
 
 ## M2 — Reconciliation and projection
 
-Implement [decision 0027](../../decisions/0027-m2-reconciliation-projection-contract.md) and the exact [projection contract](../../architecture/contracts/projection.md). Delivery is staged: M2-R has landed the bounded internal reconciliation foundation plus additive Claim feedback and overlap-aware status health; M2-P/E still owns public Current Knowledge, temporal projection, summaries/evidence, cursor, and rebuild/cache wiring.
+Implement [decision 0027](../../decisions/0027-m2-reconciliation-projection-contract.md) and the exact [projection contract](../../architecture/contracts/projection.md). Delivery is staged: M2-R landed the bounded internal reconciliation foundation plus additive Claim feedback and overlap-aware status health; M2-P has now added public Current Knowledge, temporal projection, summaries/evidence, cursor, and deterministic rebuild/invalidation wiring. Sequential M2-E retains the compiled end-to-end scenario exit.
 
 The complete M2 scope is:
 
@@ -96,7 +96,7 @@ The complete M2 scope is:
 - M2 status conflict sets as unions of overlapping-validity/different-value exclusive pair endpoints, with counts/Resolution coverage over that set, no Clock, and purely disjoint succession unable to block or reopen health;
 - structural Basis exactly `{stream_position,ruleset,query}`, separate `computed_at`, store-wide staleness, query/ruleset invalidation, and ADR 0027's narrow semantic-content replacement for ADR 0006 byte identity, excluding computed time/rendering/private cursor bytes.
 
-Deterministic derived-to-manual relation comparison uses the contract mapping and flags disagreements for review; it never silently appends, deletes, or prefers either side. M2-R provides executable T20–T23/T86 evidence for the internal foundation without publishing a reconciliation runtime function. T24–T30 remain deferred to M2-P/E; [`catalog-status.json`](./catalog-status.json) and executable `@covers` annotations own exact accounting.
+Deterministic derived-to-manual relation comparison uses the contract mapping and flags disagreements for review; it never silently appends, deletes, or prefers either side. M2-R provides executable T20–T23/T86 evidence for the internal foundation without publishing a reconciliation runtime function. M2-P provides public-API T24–T30 evidence; later compiled scenario rows remain deferred to M2-E. [`catalog-status.json`](./catalog-status.json) and executable `@covers` annotations own exact accounting.
 
 Exit: from public exports, T20–T30/T86 pass against both default semantics and a deterministic custom-policy fixture; all four temporal modes, January queries with future Resolution replacements or inapplicable `new → old` supersedes edges, one-value precedence cycles, overlapping-versus-disjoint status health, Resolution precedence/completeness, exact advice-context admission/calls, the 200/201 advisory boundary and validation order, bounded combined-stream cursor behavior, mutation temporal-succession feedback, history/evidence counts, stale/ruleset/query invalidation, and replay are exact; the compiled `current` command preserves the M1.5 protocol; deleting derived state and replaying canonical records reproduces semantic content for the same Basis.
 

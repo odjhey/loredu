@@ -7,17 +7,20 @@ import {
 } from "./application-read";
 import type {
   AddedRecordResult,
+  ApplicationCurrentResponse,
   ApplicationListResponse,
   ApplicationResponse,
   ApplicationStatusResponse,
   ClaimItem,
   ClaimQuery,
+  CurrentQuery,
   HeadResult,
   HistoryItem,
   HistoryQuery,
   ShownRecordResult,
   StatusQuery,
 } from "./application-types";
+import { createCurrentService } from "./current-projection";
 import { rulesetIdentityFromValidatedPolicy } from "./domain/basis";
 import { claimKeyOf } from "./domain/claim-key";
 import {
@@ -70,6 +73,7 @@ export interface LoreduApplication {
   history(query: HistoryQuery): Promise<ApplicationListResponse<HistoryItem>>;
   claims(query?: ClaimQuery): Promise<ApplicationListResponse<ClaimItem>>;
   status(query?: StatusQuery): Promise<ApplicationStatusResponse>;
+  current(query?: CurrentQuery): Promise<ApplicationCurrentResponse>;
   readHead(): Promise<ApplicationResponse<HeadResult>>;
 }
 
@@ -237,6 +241,7 @@ export function createLoreduApplication({
   const policy = validateClaimPolicy(claimPolicy);
   const ruleset = rulesetIdentityFromValidatedPolicy(policy);
   const reads = createApplicationReadServices(store, policy, ruleset);
+  const current = createCurrentService(store, clock, policy, ruleset);
 
   async function executeAppend<D extends RecordDraft>(
     input: D,
@@ -329,6 +334,7 @@ export function createLoreduApplication({
     history: reads.history,
     claims: reads.claims,
     status: reads.status,
+    current,
     readHead: reads.readHead,
   });
 }

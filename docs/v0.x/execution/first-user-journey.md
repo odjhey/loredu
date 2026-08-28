@@ -9,9 +9,9 @@ created_at: 2026-08-26T00:00:00+08:00
 
 # First user journey and behavioral test cases
 
-The first user is the project owner plus their agents, driving Loredu through the CLI ([decision 0007](../../decisions/0007-typescript-bun.md)). The binary is `lor` — short enough for agents to type constantly. This document describes usage step by step and derives the behavioral tests that must be automated. [Decision 0026](../../decisions/0026-m15-application-cli-contract.md) fixes the implemented M1.5 protocol; [decision 0027](../../decisions/0027-m2-reconciliation-projection-contract.md) fixes the additive M2 `current`/temporal projection protocol; [decision 0030](../../decisions/0030-working-lore-ranker-contract.md) fixes the additive M3 `lore`/Ranker/budget protocol. M2-R reconciliation mechanics are implemented, while public Current Knowledge and M3 implementation remain staged.
+The first user is the project owner plus their agents, driving Loredu through the CLI ([decision 0007](../../decisions/0007-typescript-bun.md)). The binary is `lor` — short enough for agents to type constantly. This document describes usage step by step and derives the behavioral tests that must be automated. [Decision 0026](../../decisions/0026-m15-application-cli-contract.md) fixes the implemented M1.5 protocol; [decision 0027](../../decisions/0027-m2-reconciliation-projection-contract.md) fixes the additive M2 `current`/temporal projection protocol; [decision 0030](../../decisions/0030-working-lore-ranker-contract.md) fixes the additive M3 `lore`/Ranker/budget protocol. M2 reconciliation and public Current Knowledge mechanics are implemented, while compiled end-to-end M2 exit work and M3 implementation remain staged.
 
-The CLI arrives right after M1, before full projection wiring, and its semantic responses are **agent-reactive** ([decision 0008](../../decisions/0008-cli-first-agent-reactive.md)): they expose mechanical feedback, health, and deterministic affordances when applicable so an agent can chain calls until health passes. M1.5 orientation is status plus filtered record queries, now with M2-R Claim feedback and overlap-aware health. Public Current Knowledge does not exist yet; Working Lore does not exist until M3.
+The CLI arrives right after M1, before full projection wiring, and its semantic responses are **agent-reactive** ([decision 0008](../../decisions/0008-cli-first-agent-reactive.md)): they expose mechanical feedback, health, and deterministic affordances when applicable so an agent can chain calls until health passes. M1.5 orientation remains status plus filtered record queries, with M2 Claim feedback and overlap-aware health. M2 adds bounded public Current Knowledge and temporal projection without replacing that protocol; Working Lore does not exist until M3.
 
 ## Response envelope
 
@@ -193,8 +193,12 @@ Journey 3b already recorded the complete-group judgment and proved M1.5 health. 
 
 ```text
 $ lor current --scope repo=rozoro
-(code-area command-registration) location = src/cli/commands  [preferred, clm_3333333333333333]
-reconciliation: preferred=1 disputed=0
+knowledge: {"scope":{"repo":"rozoro"},"subject":{"type":"code-area","id":"command-registration"},"predicate":"location"} state=preferred
+  value: "src/cli/commands" representative=clm_3333333333333333
+computed_at: <canonical timestamp>
+reconciliation: {"state":"projection","relations":{"duplicate":0,"corroboration":1,"support":0,"conflict":2,"coexistence":0,"temporal_succession":0},"knowledge":{"preferred":1,"coexisting":0,"disputed":0,"retracted":0},"policy_advisories":0,"related":[]}
+basis: {"stream_position":5,"ruleset":{"core":"loredu.reconciliation/v1","claim_policy":{"id":"loredu.default","version":"1"}},"query":{"operation":"current","scope":{"repo":"rozoro"},"valid_at":"<same canonical timestamp>"}}
+page: returned=1 total=1
 ```
 
 The winning `prefer` Resolution is recorded-visible, effective, directly covers all applicable Claims, and names its same-key replacement. Current Knowledge exposes at most two representatives, full history/evidence counts, an exact-key Claim affordance, Basis, separate `computed_at`, and a page. “Preferred” reports deterministic precedence, not a truth judgment.
@@ -203,12 +207,9 @@ The winning `prefer` Resolution is recorded-visible, effective, directly covers 
 
 ```text
 $ lor current --scope repo=rozoro --as-of 2026-08-26T12:00:00Z
-(code-area command-registration) location = src/commands  [preferred]
 $ lor current --scope repo=rozoro --valid-at 2026-07-15T00:00:00Z
-(code-area command-registration) location = src/cli/commands  [preferred]
 $ lor current --scope repo=rozoro \
     --as-of 2026-07-15T00:00:00Z --valid-at 2026-07-15T00:00:00Z
-(code-area command-registration) location = src/commands  [preferred]
 ```
 
 `as_of` is an inclusive recorded-time cutoff. Alone it also supplies the valid-time point. Explicit `valid_at` is the inclusive external-world point; the combination keeps both dimensions independent. Bare current captures one Clock instant as its resolved `valid_at`, records that semantic input in Basis query, and keeps the same sample separately as informational `computed_at`.
@@ -234,7 +235,7 @@ M1.5 can compare any response Basis to this store-wide head and can continue an 
 
 ## Journey 9 — teach the agents
 
-The skill ships **inside the binary**: build embeds [the one agent guide source](./agent-skill.md). Text `lor skill` strips only YAML frontmatter and prints the remaining Markdown bytes exactly without resolving a store; `--json` returns the same guide string. The M1.5 guide instructs agents to orient with status/claims, provide actor and provenance, follow embedded commands/cursors, and record rather than guess judgment. `current` and `lore` appear only in its M2/M3 revision triggers. A repo-level `.agents/skills` wrapper can simply defer to `lor skill`.
+The skill ships **inside the binary**: build embeds [the one agent guide source](./agent-skill.md). Text `lor skill` strips only YAML frontmatter and prints the remaining Markdown bytes exactly without resolving a store; `--json` returns the same guide string. The M2 guide instructs agents to orient with bounded `current`, check status, inspect canonical Claims, provide actor and provenance, follow embedded commands/cursors, and record rather than guess judgment. Only `lore` remains a future M3 revision trigger. A repo-level `.agents/skills` wrapper can simply defer to `lor skill`.
 
 ## Behavioral test catalog
 
@@ -278,7 +279,7 @@ Grouped by milestone; **AC n** = acceptance criterion in [goal and scope](../sco
 | T21 | overlapping same-key/different-value Claims under `exclusive` produce one `conflict` relation and disputed Current Knowledge; absent a complete Resolution, an active participating `supersedes` cycle is disputed even for one equal value and removes no cycle member | AC 3, S C, ADR 0027 |
 | T22 | different-perspective keys never conflict or merge; custom advice context admits exactly applicable Claims, Relations with both endpoints in that set, and Resolutions whose every target/replacement stays inside it; dense non-blocking output may name both keys, accepts 200, and rejects 201 before elements/sort/count/page with no partial result | S C guardrail, ADR 0027 |
 | T23 | Claims under different exact keys never auto-reconcile or share a derived relation, even when a policy advisory or explicit cross-key Relation names both | ADR 0004, ADR 0027 |
-| T24 | a latest effective backward-valid `prefer` Resolution directly covering every selected applicable same-key Claim selects only a targeted applicable replacement; an incomplete/later-uncovered Resolution or future replacement does not; every Claim/Resolution remains addressable and immutable | AC 4, invariant 6, ADR 0027 |
+| T24 | a latest effective `prefer` Resolution whose references are all lower-position recorded-visible and whose direct Claim targets cover every selected applicable same-key Claim selects only a targeted applicable replacement; extra visible out-of-scope/cross-key targets neither broaden output nor fill missing group coverage, while incomplete/later-uncovered coverage, a future replacement, or an extra target that is missing, forward, or not recorded-visible prevents selection; every Claim/Resolution remains addressable and immutable | AC 4, invariant 6, ADR 0027 |
 | T25 | `as_of=A` includes exactly records with `recorded_at <= A`, uses A as implicit valid point when `valid_at` is absent, and reproduces scenario A's earlier belief | AC 6, S A, ADR 0027 |
 | T26 | current `valid_at=V` uses all recorded-visible knowledge and inclusive Claim intervals/Resolution effectiveness; at a January point an old Claim remains selected when a targeted replacement starts in February, and an inapplicable `new → old` supersedes edge cannot remove it, while a late-recorded amendment can project once applicable | AC 7, S B, ADR 0027 |
 | T27 | `as_of=A, valid_at=V` independently limits recorded knowledge and external applicability, distinguishing the historical belief from a later-discovered correction | AC 7, S B, ADR 0027 |

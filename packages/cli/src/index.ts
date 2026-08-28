@@ -6,6 +6,7 @@ import {
   type ClaimPolicy,
   type ClaimQuery,
   type Clock,
+  type CurrentQuery,
   createBasis,
   createLoreduApplication,
   createStreamPosition,
@@ -97,6 +98,8 @@ const HELP: Readonly<Record<string, string>> = {
   show: "usage: lor show <record-id> [--json]",
   history: "usage: lor history [<record-id>] [--limit <n>] [--cursor <token>] [--json]",
   claims: "usage: lor claims [filters] [--limit <n>] [--cursor <token>] [--json]",
+  current:
+    "usage: lor current [--scope <key=value>]... [--as-of <rfc3339>] [--valid-at <rfc3339>] [--limit <n>] [--cursor <token>] [--json]",
   head: "usage: lor head [--json]",
   status: "usage: lor status [--check] [--limit <n>] [--cursor <token>] [--json]",
   skill: "usage: lor skill [--json]",
@@ -174,6 +177,7 @@ function recognizedValueOptions(argv: readonly string[]): ReadonlySet<string> {
     );
   }
   if (path === "status") add("--limit", "--cursor");
+  if (path === "current") add("--scope", "--as-of", "--valid-at", "--limit", "--cursor");
   return values;
 }
 
@@ -456,6 +460,18 @@ function runFor(affordance: Affordance, selector: string | undefined): string {
     if (params.limit !== undefined) command += ` --limit ${String(params.limit)}`;
     return command;
   }
+  if (affordance.action === "current.read") {
+    let command = `${prefix} current`;
+    const query = params.query as Record<string, JsonValue> | undefined;
+    const scope = query?.scope as Record<string, string> | undefined;
+    if (scope !== undefined)
+      for (const key of Object.keys(scope).sort()) command += ` --scope ${shellWord(`${key}=${scope[key]}`)}`;
+    if (query?.as_of !== undefined) command += ` --as-of ${shellWord(String(query.as_of))}`;
+    if (query?.valid_at !== undefined) command += ` --valid-at ${shellWord(String(query.valid_at))}`;
+    if (params.cursor !== undefined) command += ` --cursor ${shellWord(String(params.cursor))}`;
+    if (params.limit !== undefined) command += ` --limit ${String(params.limit)}`;
+    return command;
+  }
   if (affordance.action === "store.init") {
     const target = shellWord(String(params.selector));
     return String(params.selector).startsWith("-") ? `lor init --store ${target}` : `lor init ${target}`;
@@ -530,30 +546,52 @@ function renderSemanticNode(value: unknown, selector: string | undefined): unkno
   const semantic = value as Record<string, unknown>;
   const output = cloneProtocolValue(value) as Record<string, unknown>;
   if (semantic.handle !== undefined) output.handle = renderHandle(semantic.handle, selector);
-  if (Array.isArray(semantic.handles)) {
+  if (Array.isArray(semantic.handles))
     output.handles = semantic.handles.map((item) => renderHandle(item, selector));
-  }
-  if (Array.isArray(semantic.related)) {
+  if (Array.isArray(semantic.related))
     output.related = semantic.related.map((item) => renderHandle(item, selector));
-  }
-  if (semantic.representative !== undefined) {
+  if (semantic.representative !== undefined)
     output.representative = renderHandle(semantic.representative, selector);
-  }
-  if (Array.isArray(semantic.representatives)) {
+  if (Array.isArray(semantic.representatives))
     output.representatives = semantic.representatives.map((item) => renderHandle(item, selector));
-  }
-  if (semantic.kind === "dangling-record-reference" && semantic.record !== undefined) {
+  if (semantic.kind === "dangling-record-reference" && semantic.record !== undefined)
     output.record = renderHandle(semantic.record, selector);
-  }
-  if (semantic.claims !== undefined) {
+  if (Array.isArray(semantic.claims))
+    output.claims = semantic.claims.map((item) => renderHandle(item, selector));
+  else if (semantic.claims !== undefined)
     output.claims = renderAffordance(semantic.claims as Affordance, selector);
+  if (Array.isArray(semantic.values)) {
+    output.values = semantic.values.map((item) => {
+      const renderedValue = cloneProtocolValue(item) as Record<string, unknown>;
+      const currentValue = item as Record<string, unknown>;
+      if (currentValue.representative !== undefined)
+        renderedValue.representative = renderHandle(currentValue.representative, selector);
+      return renderedValue;
+    });
   }
-  if (Array.isArray(semantic.attention)) {
+  if (semantic.history !== undefined && typeof semantic.history === "object") {
+    const history = semantic.history as Record<string, unknown>;
+    const renderedHistory = cloneProtocolValue(history) as Record<string, unknown>;
+    if (Array.isArray(history.relations)) {
+      renderedHistory.relations = history.relations.map((item) => {
+        const relation = item as Record<string, unknown>;
+        return {
+          ...(cloneProtocolValue(item) as Record<string, unknown>),
+          from: renderHandle(relation.from, selector),
+          to: renderHandle(relation.to, selector),
+        };
+      });
+    }
+    if (history.latest_resolution !== undefined)
+      renderedHistory.latest_resolution = renderHandle(history.latest_resolution, selector);
+    output.history = renderedHistory;
+  }
+  if (Array.isArray(semantic.items))
+    output.items = semantic.items.map((item) => renderSemanticNode(item, selector));
+  if (Array.isArray(semantic.attention))
     output.attention = semantic.attention.map((item) => renderSemanticNode(item, selector));
-  }
-  if (Array.isArray(semantic.advisories)) {
+  if (Array.isArray(semantic.advisories))
     output.advisories = semantic.advisories.map((item) => renderSemanticNode(item, selector));
-  }
   return output;
 }
 
@@ -594,6 +632,18 @@ function emitText(io: CliIo, response: BaseResponse, selector: string | undefine
     }
   } else if (typeof result.root === "string") {
     io.out(`initialized store at ${result.root}\nselector: ${String(result.selector)}\n`);
+  } else if (Array.isArray(result.items) && typeof result.computed_at === "string") {
+    for (const item of result.items as readonly Record<string, unknown>[]) {
+      if (item.kind === "knowledge") {
+        const key = item.key as Record<string, unknown>;
+        io.out(`knowledge: ${JSON.stringify(key)} state=${String(item.state)}\n`);
+        for (const value of (item.values as readonly Record<string, unknown>[]) ?? [])
+          io.out(
+            `  value: ${JSON.stringify(value.value)} representative=${String((value.representative as Record<string, unknown>).id)}\n`,
+          );
+      } else io.out(`policy-advisory: ${JSON.stringify(renderSemanticNode(item, selector))}\n`);
+    }
+    io.out(`computed_at: ${result.computed_at}\n`);
   } else if (typeof result.healthy === "boolean") {
     const health = result.health as Record<string, number>;
     io.out(
@@ -735,7 +785,9 @@ async function execute(
     path = `add ${tokens[1]}`;
     optionTokens = tokens.slice(2);
   } else if (
-    ["init", "relate", "resolve", "show", "history", "claims", "head", "status", "skill"].includes(first)
+    ["init", "relate", "resolve", "show", "history", "claims", "current", "head", "status", "skill"].includes(
+      first,
+    )
   ) {
     path = first;
     optionTokens = tokens.slice(1);
@@ -1077,6 +1129,43 @@ async function execute(
     }
     return {
       response: await composeApplication(parsed.store, runOptions).application.claims(query),
+      exit: 0,
+      json: parsed.json,
+      ...(parsed.store === undefined ? {} : { selector: parsed.store }),
+    };
+  }
+
+  if (path === "current") {
+    const parsed = parseOptions(
+      optionTokens,
+      {
+        "--scope": { value: true, repeat: true },
+        "--as-of": { value: true },
+        "--valid-at": { value: true },
+        "--limit": { value: true },
+        "--cursor": { value: true },
+      },
+      global,
+    );
+    if (parsed.positionals.length > 0) usage("current accepts no positional arguments");
+    const cursor = option(parsed, "--cursor");
+    const limit = limitOption(parsed);
+    if (cursor !== undefined && hasAnyOption(parsed, ["--scope", "--as-of", "--valid-at"]))
+      usage("current filters cannot accompany --cursor");
+    const scope = parseScope(options(parsed, "--scope"));
+    const asOf = option(parsed, "--as-of");
+    const validAt = option(parsed, "--valid-at");
+    const query: CurrentQuery =
+      cursor === undefined
+        ? {
+            ...(scope === undefined ? {} : { scope }),
+            ...(asOf === undefined ? {} : { as_of: asOf }),
+            ...(validAt === undefined ? {} : { valid_at: validAt }),
+            ...(limit === undefined ? {} : { limit }),
+          }
+        : { cursor, ...(limit === undefined ? {} : { limit }) };
+    return {
+      response: await composeApplication(parsed.store, runOptions).application.current(query),
       exit: 0,
       json: parsed.json,
       ...(parsed.store === undefined ? {} : { selector: parsed.store }),

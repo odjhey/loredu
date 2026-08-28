@@ -143,7 +143,7 @@ function deeplyFrozen(value: unknown): boolean {
 }
 
 // This bounded M2-R suite executes the internal deterministic engine foundation.
-// Public `current`/temporal query wiring and full projection shapes remain M2-P/E scope.
+// Published `current` behavior and full projection shapes are covered in current-projection.test.ts.
 describe("ADR 0027 deterministic reconciliation foundation", () => {
   test("different actors corroborate into one preferred value without appending a Relation — @covers T20", async () => {
     const first = positionedClaim(1, persistedClaim(ids.c1, { actor: agent }));
@@ -153,7 +153,7 @@ describe("ADR 0027 deterministic reconciliation foundation", () => {
     );
     const reconciled = reconcileApplicableClaimGroup({
       claims: [first, second],
-      visibleClaims: [first, second],
+      visibleRecords: [first, second],
       semantics: "exclusive",
     });
     expect(reconciled).toMatchObject({
@@ -181,7 +181,7 @@ describe("ADR 0027 deterministic reconciliation foundation", () => {
     const newer = positionedClaim(2, persistedClaim(ids.c2, { value: "new" }));
     const disputed = reconcileApplicableClaimGroup({
       claims: [old, newer],
-      visibleClaims: [old, newer],
+      visibleRecords: [old, newer],
       semantics: "exclusive",
     });
     expect(disputed.state).toBe("disputed");
@@ -194,7 +194,7 @@ describe("ADR 0027 deterministic reconciliation foundation", () => {
     const backward = positionedRelation(4, relation(ids.r2, ids.c1, ids.c2));
     const cycle = reconcileApplicableClaimGroup({
       claims: [equalOld, equalNew],
-      visibleClaims: [equalOld, equalNew],
+      visibleRecords: [equalOld, equalNew],
       relations: [forward, backward],
       semantics: "exclusive",
     });
@@ -204,7 +204,7 @@ describe("ADR 0027 deterministic reconciliation foundation", () => {
     expect(
       reconcileApplicableClaimGroup({
         claims: [equalOld, equalNew],
-        visibleClaims: [equalOld, equalNew],
+        visibleRecords: [equalOld, equalNew],
         relations: [forward, backward],
         semantics: "coexisting",
       }).state,
@@ -216,7 +216,7 @@ describe("ADR 0027 deterministic reconciliation foundation", () => {
     const d = positionedClaim(4, persistedClaim(ids.c4, { value: "d" }));
     const cycleWithAcyclicEdge = reconcileApplicableClaimGroup({
       claims: [a, b, c, d],
-      visibleClaims: [a, b, c, d],
+      visibleRecords: [a, b, c, d],
       relations: [
         positionedRelation(5, relation(ids.r1, ids.c1, ids.c2)),
         positionedRelation(6, relation(ids.r2, ids.c2, ids.c1)),
@@ -239,7 +239,7 @@ describe("ADR 0027 deterministic reconciliation foundation", () => {
     const deactivation = positionedResolution(5, resolution(ids.s1, [ids.r2], { decision: "retract" }));
     const noCycle = reconcileApplicableClaimGroup({
       claims: [equalOld, equalNew],
-      visibleClaims: [equalOld, equalNew],
+      visibleRecords: [equalOld, equalNew, forward, backward],
       relations: [forward, backward],
       resolutions: [deactivation],
       semantics: "exclusive",
@@ -248,7 +248,7 @@ describe("ADR 0027 deterministic reconciliation foundation", () => {
     expect(noCycle.claims.map(({ record }) => String(record.id))).toEqual([ids.c2]);
   });
 
-  test("complete latest Resolution outranks Relations while incomplete judgment has no partial effect", () => {
+  test("full-visible Resolution eligibility stays separate from group-local coverage and rejects nonvisible targets", () => {
     const irrelevant = positionedClaim(1, persistedClaim(ids.c3, { predicate: "owner", value: "elsewhere" }));
     const first = positionedClaim(2, persistedClaim(ids.c1, { value: "old" }));
     const second = positionedClaim(3, persistedClaim(ids.c2, { value: "new" }));
@@ -263,7 +263,7 @@ describe("ADR 0027 deterministic reconciliation foundation", () => {
     const explicitOpposite = positionedRelation(6, relation(ids.r1, ids.c1, ids.c2));
     const resolved = reconcileApplicableClaimGroup({
       claims: [first, second],
-      visibleClaims: [irrelevant, first, second],
+      visibleRecords: [irrelevant, first, second],
       relations: [explicitOpposite],
       resolutions: [complete, incompleteLater],
       semantics: "exclusive",
@@ -271,12 +271,34 @@ describe("ADR 0027 deterministic reconciliation foundation", () => {
     expect(resolved).toMatchObject({ state: "preferred", resolution: complete, cycle: false });
     expect(resolved.claims.map(({ record }) => String(record.id))).toEqual([ids.c2]);
 
+    const incompleteOnly = reconcileApplicableClaimGroup({
+      claims: [first, second],
+      visibleRecords: [irrelevant, first, second],
+      resolutions: [incompleteLater],
+      semantics: "exclusive",
+    });
+    expect(incompleteOnly).toMatchObject({ state: "disputed", cycle: false });
+    expect(incompleteOnly.resolution).toBeUndefined();
+
+    const nonvisibleExtra = positionedResolution(
+      4,
+      resolution(ids.s2, [ids.c1, ids.c2, ids.c4], { decision: "prefer", replacement: ids.c2 }),
+    );
+    const nonvisibleRejected = reconcileApplicableClaimGroup({
+      claims: [first, second],
+      visibleRecords: [irrelevant, first, second],
+      resolutions: [nonvisibleExtra],
+      semantics: "exclusive",
+    });
+    expect(nonvisibleRejected).toMatchObject({ state: "disputed", cycle: false });
+    expect(nonvisibleRejected.resolution).toBeUndefined();
+
     const equalFirst = positionedClaim(1, persistedClaim(ids.c1, { value: "same" }));
     const equalSecond = positionedClaim(2, persistedClaim(ids.c2, { value: "same" }));
     const edge = positionedRelation(3, relation(ids.r1, ids.c2, ids.c1));
     const relationSelected = reconcileApplicableClaimGroup({
       claims: [equalFirst, equalSecond],
-      visibleClaims: [equalFirst, equalSecond],
+      visibleRecords: [equalFirst, equalSecond],
       relations: [edge],
       semantics: "exclusive",
     });
@@ -597,7 +619,7 @@ describe("ADR 0027 deterministic reconciliation foundation", () => {
     expect(() =>
       reconcileApplicableClaimGroup({
         claims: [documented, observed],
-        visibleClaims: [documented, observed],
+        visibleRecords: [documented, observed],
         relations: [crossKey],
         semantics: "exclusive",
       }),

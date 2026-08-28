@@ -6,7 +6,7 @@ directories ([ADR 0011](../docs/decisions/0011-repo-package-architecture.md)).
 Tests here normally exercise **published package exports** or the compiled `lor`
 binary. Package-local tests own implementation details; the
 [reconciliation group](./reconciliation/README.md) documents M2-R's bounded temporary
-internal seam pending public Current Knowledge wiring.
+internal seam while M2-P exercises public Current Knowledge through package exports.
 
 ```sh
 bun test                       # whole tree
@@ -20,7 +20,7 @@ bun test tests/store           # one group
 | [`records/`](./records/README.md) | M0 records/application (T01–T08, T19, T80, T83–T85, T87) |
 | [`store/`](./store/README.md) | M1 durable plain-file conformance (T10–T18) |
 | [`application/`](./application/README.md) | M1.5 surface-neutral responses, reads, feedback, health, and cursors (T60–T64, T66–T68, and T70–T72; T65 remains CLI-owned) |
-| [`reconciliation/`](./reconciliation/README.md) | M0 identity primitives (T81–T82); M2-R foundation (T20–T23, T86) and staged projections (T24–T30) |
+| [`reconciliation/`](./reconciliation/README.md) | M0 identity primitives (T81–T82); M2 reconciliation and public projections (T20–T30, T86) |
 | [`working-lore/`](./working-lore/README.md) | M3 — Working Lore (T40–T45) |
 | [`cli-conformance/`](./cli-conformance/README.md) | Compiled CLI conformance (T50–T58, T65, T73–T75) plus adapter/rendering checks over application semantics |
 | [`scenarios/`](./scenarios/README.md) | acceptance scenarios A/B/C, end to end |

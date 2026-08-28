@@ -15,15 +15,18 @@ import type {
   VerificationResult,
 } from "./domain/entry";
 import type { StreamPosition } from "./ports/capabilities";
+import type { ClaimSemantics } from "./ports/claim-policy";
+import type { CurrentKnowledgeState, DerivedRelation, PolicyAdvisory } from "./reconciliation";
 
 export interface Affordance {
-  readonly rel: "show" | "history" | "list" | "status" | "continue" | "init";
+  readonly rel: "show" | "history" | "list" | "status" | "current" | "continue" | "init";
   readonly action:
     | "record.show"
     | "record.history"
     | "claims.list"
     | "history.list"
     | "status.read"
+    | "current.read"
     | "store.init";
   readonly params: JsonObject;
   readonly why: string;
@@ -79,6 +82,81 @@ export interface ApplicationListResponse<I> extends ApplicationResponse<readonly
 export interface ApplicationStatusResponse extends ApplicationResponse<StatusResult> {
   readonly page: Page;
 }
+
+export type ProjectionFilters = {
+  readonly scope?: Scope;
+  readonly as_of?: string;
+  readonly valid_at?: string;
+};
+export type CurrentQuery =
+  | (ProjectionFilters & { readonly limit?: number; readonly cursor?: never })
+  | { readonly cursor: string; readonly limit?: number };
+
+export interface CurrentValue {
+  readonly value: JsonValue;
+  readonly representative: RecordHandle;
+  readonly claim_count: number;
+}
+export interface ProjectionHistorySummary {
+  readonly claim_count: number;
+  readonly derived_relation_count: number;
+  readonly explicit_relation_count: number;
+  readonly resolution_count: number;
+  readonly relations: readonly [] | readonly [DerivedRelation] | readonly [DerivedRelation, DerivedRelation];
+  readonly latest_resolution?: RecordHandle;
+}
+export interface ProjectionEvidenceSummary {
+  readonly entry_count: number;
+  readonly source_count: number;
+  readonly verification: {
+    readonly confirmed: number;
+    readonly contradicted: number;
+    readonly unchanged: number;
+    readonly needs_revalidation: number;
+  };
+}
+export interface CurrentKnowledgeItem {
+  readonly kind: "knowledge";
+  readonly key: ClaimKey;
+  readonly semantics: ClaimSemantics;
+  readonly state: CurrentKnowledgeState;
+  readonly value_count: number;
+  readonly values: readonly [] | readonly [CurrentValue] | readonly [CurrentValue, CurrentValue];
+  readonly history: ProjectionHistorySummary;
+  readonly evidence: ProjectionEvidenceSummary;
+  readonly claims: Affordance;
+}
+export type CurrentProjectionItem = CurrentKnowledgeItem | PolicyAdvisory;
+export interface CurrentProjectionResult {
+  readonly computed_at: string;
+  readonly items: readonly CurrentProjectionItem[];
+}
+export interface ProjectionReconciliationSummary {
+  readonly state: "projection";
+  readonly relations: {
+    readonly duplicate: number;
+    readonly corroboration: number;
+    readonly support: number;
+    readonly conflict: number;
+    readonly coexistence: number;
+    readonly temporal_succession: number;
+  };
+  readonly knowledge: {
+    readonly preferred: number;
+    readonly coexisting: number;
+    readonly disputed: number;
+    readonly retracted: number;
+  };
+  readonly policy_advisories: number;
+  readonly related: readonly [];
+}
+export type ApplicationCurrentResponse = Omit<
+  ApplicationResponse<CurrentProjectionResult>,
+  "reconciliation"
+> & {
+  readonly reconciliation: ProjectionReconciliationSummary;
+  readonly page: Page;
+};
 
 export interface AddedRecordResult<R extends PersistedRecord = PersistedRecord> {
   readonly id: R["id"];

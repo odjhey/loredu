@@ -69,20 +69,22 @@ const EMPTY_RECONCILIATION = Object.freeze({
   related: Object.freeze([]) as readonly [],
 });
 
-type Snapshot = {
+export type Snapshot = {
   readonly head: StreamPosition;
   readonly records: readonly PositionedRecord[];
 };
-type CursorOperation = "claims" | "history" | "status";
-type StatusKey = readonly [number, number, number];
-type CursorPayload = {
+export type CursorOperation = "claims" | "history" | "status" | "current";
+export type OrderedResumeKey = readonly [number, number, number];
+export type CursorPayload = {
   readonly version: 1;
   readonly operation: CursorOperation;
   readonly query: JsonObject;
   readonly basis: ReturnType<typeof createBasis>;
   readonly anchor: string;
-  readonly resume: number | StatusKey;
+  readonly resume: number | OrderedResumeKey;
+  readonly computed_at?: string;
 };
+type StatusKey = OrderedResumeKey;
 type ParsedClaimRequest = {
   readonly limit: number;
   readonly filters: ClaimFilters;
@@ -237,7 +239,7 @@ function sameScope(left: Scope, right: Scope): boolean {
   );
 }
 
-function scopeContains(actual: Scope, requested: Scope): boolean {
+export function scopeContains(actual: Scope, requested: Scope): boolean {
   return Object.keys(requested).every((key) => actual[key] === requested[key]);
 }
 
@@ -510,10 +512,19 @@ function decodeCursorPayload(token: string): CursorPayload {
   if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) cursorInvalid();
   const object = parsed as Record<string, unknown>;
   const keys = Object.keys(object).sort();
-  if (keys.join(",") !== "anchor,basis,operation,query,resume,version") cursorInvalid();
   if (object.version !== 1) cursorInvalid();
-  if (object.operation !== "claims" && object.operation !== "history" && object.operation !== "status")
+  if (
+    object.operation !== "claims" &&
+    object.operation !== "history" &&
+    object.operation !== "status" &&
+    object.operation !== "current"
+  )
     cursorInvalid();
+  const expectedKeys =
+    object.operation === "current"
+      ? "anchor,basis,computed_at,operation,query,resume,version"
+      : "anchor,basis,operation,query,resume,version";
+  if (keys.join(",") !== expectedKeys) cursorInvalid();
   if (typeof object.anchor !== "string") cursorInvalid();
   const queryIssues: LoreduIssue[] = [];
   const query = copyJsonObject(object.query, "/query", queryIssues);
@@ -525,8 +536,8 @@ function decodeCursorPayload(token: string): CursorPayload {
     cursorInvalid();
   }
   if (!jsonValuesEqual(basis.query, query)) cursorMismatch("Cursor Basis query does not match cursor query");
-  let resume: number | StatusKey;
-  if (object.operation === "status") {
+  let resume: number | OrderedResumeKey;
+  if (object.operation === "status" || object.operation === "current") {
     if (
       !Array.isArray(object.resume) ||
       object.resume.length !== 3 ||
@@ -540,10 +551,20 @@ function decodeCursorPayload(token: string): CursorPayload {
   }
   if (basis.stream_position === 0 ? object.anchor !== "empty" : !RECORD_ID.test(object.anchor))
     cursorInvalid();
-  if (object.operation === "status") {
-    const statusResume = resume as StatusKey;
-    if (statusResume[0] > 2 || statusResume[1] > basis.stream_position) cursorInvalid();
+  if (object.operation === "status" || object.operation === "current") {
+    const orderedResume = resume as OrderedResumeKey;
+    if (
+      orderedResume[0] > (object.operation === "status" ? 2 : 1) ||
+      orderedResume[1] > basis.stream_position
+    )
+      cursorInvalid();
   } else if ((resume as number) < 1 || (resume as number) > basis.stream_position) cursorInvalid();
+  let computedAt: string | undefined;
+  if (object.operation === "current") {
+    const timestampIssues: LoreduIssue[] = [];
+    computedAt = normalizeTimestamp(object.computed_at, "/computed_at", timestampIssues);
+    if (timestampIssues.length > 0 || computedAt !== object.computed_at) cursorInvalid();
+  }
   return Object.freeze({
     version: 1,
     operation: object.operation,
@@ -551,10 +572,11 @@ function decodeCursorPayload(token: string): CursorPayload {
     basis,
     anchor: object.anchor,
     resume,
+    ...(computedAt === undefined ? {} : { computed_at: computedAt }),
   });
 }
 
-function decodeCursor(token: string): CursorPayload {
+export function decodeCursor(token: string): CursorPayload {
   try {
     return decodeCursorPayload(token);
   } catch (error) {
@@ -564,19 +586,32 @@ function decodeCursor(token: string): CursorPayload {
   }
 }
 
-function createCursor(
+export function createCursor(
   operation: CursorOperation,
   query: JsonObject,
   basis: ReturnType<typeof createBasis>,
   snapshot: Snapshot,
-  resume: number | StatusKey,
+  resume: number | OrderedResumeKey,
+  computedAt?: string,
 ): string {
   const anchor =
     basis.stream_position === 0
       ? "empty"
       : (snapshot.records[Number(basis.stream_position) - 1]?.record.id as string);
   if (basis.stream_position > 0 && !anchor) throw new TypeError("snapshot has no cursor anchor");
-  return encodeCursor(Object.freeze({ version: 1, operation, query, basis, anchor, resume }));
+  if ((operation === "current") !== (computedAt !== undefined))
+    throw new TypeError("current cursors require computed time and other cursors forbid it");
+  return encodeCursor(
+    Object.freeze({
+      version: 1,
+      operation,
+      query,
+      basis,
+      anchor,
+      resume,
+      ...(computedAt === undefined ? {} : { computed_at: computedAt }),
+    }),
+  );
 }
 
 function sameRuleset(left: RulesetIdentity, right: RulesetIdentity): boolean {
@@ -587,7 +622,7 @@ function sameRuleset(left: RulesetIdentity, right: RulesetIdentity): boolean {
   );
 }
 
-async function readSnapshot(store: RecordStore): Promise<Snapshot> {
+export async function readSnapshot(store: RecordStore): Promise<Snapshot> {
   let scan: RecordScan;
   try {
     scan = await store.scan();
@@ -613,7 +648,7 @@ async function readSnapshot(store: RecordStore): Promise<Snapshot> {
   }
 }
 
-function pinnedSnapshot(current: Snapshot, cursor: CursorPayload, ruleset: RulesetIdentity): Snapshot {
+export function pinnedSnapshot(current: Snapshot, cursor: CursorPayload, ruleset: RulesetIdentity): Snapshot {
   if (!sameRuleset(cursor.basis.ruleset, ruleset)) cursorMismatch("Cursor ruleset does not match");
   if (current.head < cursor.basis.stream_position) cursorMismatch("Cursor snapshot is no longer present");
   if (cursor.basis.stream_position === 0) {
@@ -685,7 +720,7 @@ function divergenceClaimsAffordance(scope: Scope, value: JsonValue): Affordance 
   );
 }
 
-function deduplicateAdvice(items: readonly Affordance[]): readonly Affordance[] {
+export function deduplicateAdvice(items: readonly Affordance[]): readonly Affordance[] {
   const seen = new Set<string>();
   const output: Affordance[] = [];
   for (const item of items) {
@@ -698,7 +733,7 @@ function deduplicateAdvice(items: readonly Affordance[]): readonly Affordance[] 
   return Object.freeze(output);
 }
 
-function page(returned: number, total: number, cursor?: string): Page {
+export function page(returned: number, total: number, cursor?: string): Page {
   return Object.freeze({ returned, total, ...(cursor === undefined ? {} : { cursor }) });
 }
 
