@@ -3,7 +3,7 @@ name: v0x_implementation_plan
 description: "M0–M4 implementation sequence (including the M1.5 CLI milestone) for the Loredu domain kernel, plain-file store, projections, Working Lore, and the first real consumer."
 type: plan
 tags: [v0.x, execution]
-generated: "ChatGPT GPT-5.6 Sol, 2026-08-28"
+generated: "ChatGPT GPT-5.6 Sol and OpenAI coding agent, 2026-08-28"
 created_at: 2026-08-26T12:10:00+08:00
 ---
 
@@ -80,20 +80,23 @@ Exit: an agent given only the binary and `lor skill` completes the M1.5 portions
 
 ## M2 — Reconciliation and projection
 
-Implement deterministic baseline rules, mediated by the active versioned ClaimPolicy:
+Implement [decision 0027](../../decisions/0027-m2-reconciliation-projection-contract.md) and the exact [projection contract](../../architecture/contracts/projection.md):
 
-- exact-key duplicate detection where identity/value/source makes it unambiguous;
-- same-value corroboration/support;
-- differing-value handling according to policy semantics (`exclusive` → candidate conflict, `coexisting` → coexist without conflict);
-- optional policy-produced deterministic advisories across related claims without crossing exact-key reconciliation boundaries;
-- mechanical temporal precedence where inputs are sufficient;
-- explicit Resolution application;
-- current, `as_of`, `valid_at`, and combined temporal projections;
-- derived content under the M0 structural ruleset/Basis identity, with `computed_at` separate from Basis.
+- one bounded surface-neutral `current(query?)` operation over an atomic RecordStore scan, plus CLI `current` with scope, `--as-of`, `--valid-at`, pagination, and unchanged envelope/error/exit conventions;
+- an always-explicit resolved valid-time point in Basis query: bare current uses its one Clock sample, `as_of=A` alone uses A, explicit `valid_at=V` wins, and combined queries independently apply recorded and valid time;
+- exact same-key pair relations `duplicate|corroboration|support|conflict|coexistence|temporal-succession`, using canonical JSON equality, inclusive intervals, the closed duplicate fingerprint, and `exclusive|coexisting` policy mediation;
+- exact Current Knowledge states `preferred|coexisting|disputed|retracted`, with at most two representatives per bounded item, complete counts, exact-key Claim drill-down, and no confidence/actor/latest-record tie-breaking;
+- build the nonempty selected valid-time-applicable same-key Claim set before applying complete latest Resolution > active endpoint-applicable same-key persisted `supersedes` > temporal mechanics; future/nonapplicable targets remain history but cannot cover, replace, select, or remove, incomplete Resolutions never choose, and any active participating cycle forces disputed even for one equal value while cyclic edges remove no member;
+- an additive optional versioned `ClaimPolicy.advise` over exact context C: admit Relations only when both endpoints are in C and Resolutions only when every target/replacement stays inside C/admitted Relations; invoke once per admitted first page and continuation (including empty), zero when omitted or pre-admission cursor-invalid, and recompute rather than cursor-store output with no continuation Clock;
+- at most 200 non-blocking policy advisories per call that cannot cross identity for reconciliation, choose values, close health, or suppress core divergence; descriptor-check Array/own length first, reject over-limit output before density/elements/sort/count/page with fresh validation and no partial result, then require density, without adding a public constant;
+- bounded projection history/evidence summaries: full Claim/derived Relation/explicit Relation/Resolution and Entry/SourceRef/Verification counts, two derived-relation previews, and existing `claims`/`show`/`history` as complete canonical disclosure;
+- M2 Claim-add feedback that selects conflict-candidate > duplicate > corroboration > support > coexisting > temporal-succession, reports only the selected class through one representative and its full related count, reserves `new-key` for no earlier same-key Claim, treats succession as non-blocking, and performs no derived append;
+- M2 status conflict sets as unions of overlapping-validity/different-value exclusive pair endpoints, with counts/Resolution coverage over that set, no Clock, and purely disjoint succession unable to block or reopen health;
+- structural Basis exactly `{stream_position,ruleset,query}`, separate `computed_at`, store-wide staleness, query/ruleset invalidation, and ADR 0027's narrow semantic-content replacement for ADR 0006 byte identity, excluding computed time/rendering/private cursor bytes.
 
-The CLI's feedback upgrades in place: the envelope shape is unchanged, but `reconciliation` is now filled by the full deterministic ruleset instead of the early key-overlap slice, and `current` with temporal query flags appears.
+Deterministic derived-to-manual relation comparison uses the contract mapping and flags disagreements for review; it never silently appends, deletes, or prefers either side. T20–T30/T86 are contract-ready but remain deferred until executable coverage exists. M2-C changes no code or catalog row.
 
-Exit: projections are deterministic and rebuildable from canonical records using the same core-ruleset + ClaimPolicy version; a stale cached projection is detectable by comparing its store-wide `basis.stream_position` to `head()`; deterministic reconciliation is diffed against the manual-phase relation corpus and disagreements are reviewed, not silently overridden.
+Exit: from public exports, T20–T30/T86 pass against both default semantics and a deterministic custom-policy fixture; all four temporal modes, January queries with future Resolution replacements or inapplicable `new → old` supersedes edges, one-value precedence cycles, overlapping-versus-disjoint status health, Resolution precedence/completeness, exact advice-context admission/calls, the 200/201 advisory boundary and validation order, bounded combined-stream cursor behavior, mutation temporal-succession feedback, history/evidence counts, stale/ruleset/query invalidation, and replay are exact; the compiled `current` command preserves the M1.5 protocol; deleting derived state and replaying canonical records reproduces semantic content for the same Basis.
 
 ## M3 — Working Lore
 
