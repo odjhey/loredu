@@ -1,22 +1,20 @@
 ---
-name: agent_skill_draft
-description: "Draft of the agent guide shipped inside the lor binary (printed by `lor skill`), v1 for the manual-reconciliation era."
+name: agent_skill
+description: "Agent guide shipped inside the lor binary (printed by `lor skill`), v1 for the manual-reconciliation era."
 type: plan
 tags: [v0.x, execution, agents, skill]
-status: draft
-generated: "Claude Fable 5 (Claude Code), 2026-08-26"
+status: current
+generated: "Claude Fable 5 (Claude Code) and OpenAI coding agent gpt-5.6-sol, 2026-08-28"
 created_at: 2026-08-26T00:00:00+08:00
 ---
 
-# Agent skill (draft v1)
+# Agent skill (M1.5 v1)
 
-This is the source draft of the guide embedded in the `lor` binary and printed by `lor skill`. Version 1 targets the M1.5 manual-reconciliation era; it is revised when M2 (computed reconciliation) and M3 (`lor lore`) land. A repo-level `.agents/skills` wrapper should defer to `lor skill` rather than duplicating this text.
-
-The first compiled slice embeds this guide before query integration is complete.
-Its record mutations and Claim feedback, `show`, `head`, `status`, and
-`status --check` are live; `history`, `claims`, list pagination, and the complete
-advice chain land with M15-Q. Until then, a rendered `history` or `claims` action
-is a staged forward reference rather than an executable command.
+This is the source guide embedded in the `lor` binary and printed by `lor skill`.
+Version 1 targets the M1.5 manual-reconciliation era; it is revised when M2
+(computed reconciliation) and M3 (`lor lore`) land. A repo-level `.agents/skills`
+wrapper should defer to `lor skill` rather than duplicating this text. Every M1.5
+command and rendered continuation or disclosure action named below is executable.
 
 ---
 
@@ -59,8 +57,11 @@ agent's) start from what you record now.
    its exact-key `lor claims` advice and every continuation command. Inspect
    every Claim in the complete current group and verify against the source.
    A Resolution closes health only when it repeats `--target <claim-id>` for
-   every listed Claim, including same-value corroborations. Then record your
-   judgment:
+   every listed Claim, including same-value corroborations. Record the evidence
+   you actually checked with one or more repeatable targets:
+   `lor add verification --actor agent:<agent-id> --target <claim-id>... --verified-against-json '{"ref":"<source>","snapshot":"<version>"}' --result confirmed`
+   A Verification records the snapshotted evidence and result; it does not by
+   itself settle the conflict or make health pass. Then record your judgment:
    `lor resolve --actor agent:<agent-id> --target <claim-id>... --decision prefer --replacement <preferred-target> --reason "<what you checked>"`
    If you cannot verify, use `--decision leave_disputed` — a recorded open
    question beats a guessed answer. Never try to delete the losing claim. A

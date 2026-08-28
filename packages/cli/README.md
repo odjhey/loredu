@@ -14,20 +14,21 @@ bun bin/lor.ts --version
 
 ## State
 
-The first compiled-binary slice is implemented: exact store selection and `init`,
-all five record mutation forms, `show`, `head`, stdin Entry bodies, JSON/text
-rendering, bare empty-store orientation, direct version/help, stable failure
-categories, production host capabilities, and the build-time embedded `lor skill`.
-Mutations, `show`, `head`, and status delegate to the surface-neutral application
-operations landed in M15-K; only argv, store composition, rendering, and process
-exit selection remain here. The query integration crew supplies `history`,
-`claims`, list pagination, and the complete agent chain. M2/M3 still own
-`current` and `lore`.
+The complete M1.5 binary is implemented: exact store selection and `init`, all
+five record mutation forms, `show`, `history`, filtered/paginated `claims`,
+paginated `status --check`, `head`, stdin Entry bodies, JSON/text rendering, bare
+orientation, direct version/help, stable failure categories, production host
+capabilities, and the build-time embedded `lor skill`. Store-backed operations
+delegate to the surface-neutral application API; only argv, store composition,
+recursive runnable rendering, and process exit selection remain here. M2/M3
+still own `current` and `lore`.
 
 Compiled-binary evidence lives in
-[`../../tests/cli-conformance/`](../../tests/cli-conformance/README.md). T51, T52,
-and T58 are complete; literal T50 and T65 remain catalog-deferred until M15-Q
-makes every M1.5 semantic command and the complete query chain executable. The
-surface-neutral application semantics, including T60, are
-covered separately in
+[`../../tests/cli-conformance/`](../../tests/cli-conformance/README.md); executable
+`@covers` annotations and
+[`catalog-status.json`](../../docs/v0.x/execution/catalog-status.json) own current
+row-level implementation accounting. The exported runner accepts explicit application
+policy and host-capability ports for embedded composition and conformance, while the
+shipped `lor` entry keeps the default policy and production Clock/RandomSource.
+Surface-neutral application semantics are covered separately in
 [`../../tests/application/`](../../tests/application/README.md).

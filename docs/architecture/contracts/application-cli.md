@@ -9,7 +9,7 @@ created_at: 2026-08-28T06:00:00+08:00
 
 # M1.5 application and CLI contract
 
-[Decision 0026](../../decisions/0026-m15-application-cli-contract.md) closes this contract before M1.5 command implementation. It is agreed but remains pre-`current` until implementation and the two-consumer stabilization bar. M1.5 exposes records, exact-key overlap, health, and disclosure; it does **not** expose Current Knowledge or Working Lore, which remain M2 and M3.
+[Decision 0026](../../decisions/0026-m15-application-cli-contract.md) closed this contract before M1.5 command implementation. This agreed contract remains pre-`current` until the two-consumer stabilization bar. M1.5 exposes records, exact-key overlap, health, and disclosure; it does **not** expose Current Knowledge or Working Lore, which remain M2 and M3.
 
 ## Boundary and application surface
 
@@ -363,6 +363,14 @@ Stable process exits are:
 The CLI package is the production composition root. It creates one host `Clock` whose `now()` obtains current epoch milliseconds and validates them through `createInstant`, and one secure `RandomSource` whose `nextBytes(count)` returns a newly allocated `Uint8Array` filled by the host cryptographic random generator. There is no fallback to `Math.random`, time-derived bytes, seeded entropy, partial output, or retry in the adapter. Host capability failures flow through the application's existing `CLOCK_FAILED` or `RANDOM_SOURCE_FAILED` mapping. These host implementations are CLI-internal, are not exported by kernel or adapter packages, and no clock/random package is introduced.
 
 Read-only commands may assemble the application with these capabilities but cannot call them. `init`, version, skill, and help require neither capability.
+
+[Decision 0029](../../decisions/0029-cli-composition-seam.md) exposes the same CLI
+parser/composer/renderer through `run(argv, io, options?)`. An embedding composition
+root may explicitly supply an existing `ClaimPolicy`, `Clock`, and `RandomSource`;
+the runner passes them unchanged into `createLoreduApplication`. Omitted options use
+`DEFAULT_CLAIM_POLICY`, `SystemClock`, and `CryptographicRandomSource`, and the shipped
+`lor` entry omits the options object. This seam adds no argv or environment grammar,
+no CLI-owned policy semantics, and no alternate renderer.
 
 ## Embedded skill
 
