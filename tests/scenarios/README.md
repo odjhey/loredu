@@ -4,8 +4,9 @@ The [implementation plan](../../docs/v0.x/execution/implementation-plan.md) owns
 three acceptance scenarios. Their cross-layer narrative coverage is:
 
 - **S A** — the compiled M2 portion covers three investigation runs, `as_of` replay,
-  and derived/manual reconciliation review without canonical mutation; Working Lore,
-  revalidation, and bounded-growth assertions remain deferred under **T54/T41**;
+  and derived/manual reconciliation review without canonical mutation; application-level
+  bounded-growth assertions now live under **T41**, while compiled Working Lore and
+  revalidation remain deferred under **T54**;
 - **S B** — a 30→60-day amendment recorded late answers all four temporal query
   combinations and discloses both evidence chains (**T55**);
 - **S C** — cross-actor corroboration and conflict remain mechanical, process

@@ -9,9 +9,9 @@ created_at: 2026-08-26T00:00:00+08:00
 
 # First user journey and behavioral test cases
 
-The first user is the project owner plus their agents, driving Loredu through the CLI ([decision 0007](../../decisions/0007-typescript-bun.md)). The binary is `lor` — short enough for agents to type constantly. This document describes usage step by step and derives the behavioral tests that must be automated. [Decision 0026](../../decisions/0026-m15-application-cli-contract.md) fixes the implemented M1.5 protocol; [decision 0027](../../decisions/0027-m2-reconciliation-projection-contract.md) fixes the additive M2 `current`/temporal projection protocol; [decision 0030](../../decisions/0030-working-lore-ranker-contract.md) fixes the additive M3 `lore`/Ranker/budget protocol. M2 reconciliation, public Current Knowledge, and deterministic compiled M2 exit scenarios are implemented; M3 remains staged.
+The first user is the project owner plus their agents, driving Loredu through the CLI ([decision 0007](../../decisions/0007-typescript-bun.md)). The binary is `lor` — short enough for agents to type constantly. This document describes usage step by step and derives the behavioral tests that must be automated. [Decision 0026](../../decisions/0026-m15-application-cli-contract.md) fixes the implemented M1.5 protocol; [decision 0027](../../decisions/0027-m2-reconciliation-projection-contract.md) fixes the additive M2 `current`/temporal projection protocol; [decision 0030](../../decisions/0030-working-lore-ranker-contract.md) fixes the additive M3 `lore`/Ranker/budget protocol. M2 and the M3-L Working Lore application/Ranker slice are implemented; M3-E CLI journeys remain staged.
 
-The CLI arrives right after M1, before full projection wiring, and its semantic responses are **agent-reactive** ([decision 0008](../../decisions/0008-cli-first-agent-reactive.md)): they expose mechanical feedback, health, and deterministic affordances when applicable so an agent can chain calls until health passes. M1.5 orientation remains status plus filtered record queries, with M2 Claim feedback and overlap-aware health. M2 adds bounded public Current Knowledge and temporal projection without replacing that protocol; Working Lore does not exist until M3.
+The CLI arrives right after M1, before full projection wiring, and its semantic responses are **agent-reactive** ([decision 0008](../../decisions/0008-cli-first-agent-reactive.md)): they expose mechanical feedback, health, and deterministic affordances when applicable so an agent can chain calls until health passes. M1.5 orientation remains status plus filtered record queries, with M2 Claim feedback and overlap-aware health. M2 adds bounded public Current Knowledge and temporal projection without replacing that protocol; M3-L adds Working Lore to the application API, while `lor lore` remains M3-E.
 
 ## Response envelope
 
@@ -74,7 +74,7 @@ no claims
 page: returned=0 total=0
 ```
 
-Both are definitive empty successes with Basis position zero. Bare `lor` is exactly the first status view. This is the M1.5 orientation promised by ADR 0008; the empty Working Lore packet is deferred to M3 and appears in journey 4.
+Both are definitive empty successes with Basis position zero. Bare `lor` is exactly the first status view. This is the M1.5 orientation promised by ADR 0008; the compiled empty Working Lore packet is deferred to M3-E and appears in journey 4.
 
 ## Journey 2 — record what was learned
 
@@ -167,7 +167,7 @@ The shell is the rest of the query engine; lor does not need to grow one.
 
 ## Journey 4 — M3 Working Lore reflects it
 
-This journey begins only when M3 lands. On an empty matching scope, the same command returns a definitive packet with five zero-count sections, Basis, `computed_at`, zero budget use, and exit 0. After the complete Resolution in journey 3b, the current packet reflects that judgment:
+This CLI journey begins only when M3-E lands; M3-L already exposes the underlying application operation. On an empty matching scope, the same command returns a definitive packet with five zero-count sections, Basis, `computed_at`, zero budget use, and exit 0. After the complete Resolution in journey 3b, the current packet reflects that judgment:
 
 ```text
 $ lor lore --activity investigate --scope repo=rozoro
@@ -235,7 +235,7 @@ M1.5 can compare any response Basis to this store-wide head and can continue an 
 
 ## Journey 9 — teach the agents
 
-The skill ships **inside the binary**: build embeds [the one agent guide source](./agent-skill.md). Text `lor skill` strips only YAML frontmatter and prints the remaining Markdown bytes exactly without resolving a store; `--json` returns the same guide string. The M2 guide instructs agents to orient with bounded `current`, check status, inspect canonical Claims, provide actor and provenance, follow embedded commands/cursors, and record rather than guess judgment. Only `lore` remains a future M3 revision trigger. A repo-level `.agents/skills` wrapper can simply defer to `lor skill`.
+The skill ships **inside the binary**: build embeds [the one agent guide source](./agent-skill.md). Text `lor skill` strips only YAML frontmatter and prints the remaining Markdown bytes exactly without resolving a store; `--json` returns the same guide string. The M2 guide instructs agents to orient with bounded `current`, check status, inspect canonical Claims, provide actor and provenance, follow embedded commands/cursors, and record rather than guess judgment. The M3-E `lor lore` delivery remains its next revision trigger. A repo-level `.agents/skills` wrapper can simply defer to `lor skill`.
 
 ## Behavioral test catalog
 
@@ -307,9 +307,9 @@ Grouped by milestone; **AC n** = acceptance criterion in [goal and scope](../sco
 | T51 | exits are exact: 0 executed, 2 usage/validation/reference/cursor, 3 not-found, 4 store/provider, 5 unhealthy `--check`, 6 capability/internal | agent ergonomics, ADR 0026 |
 | T52 | `add entry --body -` reads stdin; body round-trips byte-exact through store and `show` | journey 2 |
 | T53 | `add claim` prints new/conflict/coexisting feedback plus M2-R's exact duplicate/corroboration/support/temporal-succession classes with related fields limited to the selected class; a post-commit read failure prints committed-but-feedback-unavailable with status advice and still exits 0 | journey 2–3, ADR 0026/0027 |
-| T54 | after M3 Working Lore exists, end-to-end scenario A combines the implemented three-run M2 narrative with revalidation surfaced through the binary | S A, staged M3 |
+| T54 | after M3-E exposes Working Lore through the binary, end-to-end scenario A combines the implemented three-run M2 narrative with revalidation surfaced through the binary | S A, staged M3-E |
 | T55 | after M2 temporal projection exists, end-to-end scenario B (30→60-day amendment, all four temporal queries) through the binary | S B, M2 |
-| T56 | staged end-to-end journey 0→8 as one scripted fresh-store session: implemented M1.5 record/query/health and M2 current/time, then M3 lore when it lands | AC 12 (ergonomics), ADR 0026, staged M3 |
+| T56 | staged end-to-end journey 0→8 as one scripted fresh-store session: implemented M1.5 record/query/health and M2 current/time, then M3-E CLI lore when it lands | AC 12 (ergonomics), ADR 0026, staged M3-E |
 | T57 | AC 12 measured at M1.5: journey 2 (entry + claim) is ≤ 2 commands; empty orientation is one bare `lor` status command (a scoped claims query is optional follow-up) | AC 12, ADR 0026 |
 | T58 | content first: bare `lor` prints the orientation/status view (live data, exit 0), not help; `lor <command> --help` prints a concise per-command reference; an unknown flag fails with an actionable error, never ignored | agent ergonomics, journey 3b |
 
@@ -336,7 +336,7 @@ Grouped by milestone; **AC n** = acceptance criterion in [goal and scope](../sco
 | T72 | malformed, wrong-operation/query/ruleset, or foreign-snapshot application cursor → `INVALID_CURSOR`/`CURSOR_MISMATCH`, never restart | ADR 0009/0026 |
 | T73 | M1.5 link-following starts from status/query/add responses and reaches record/history/entry/source using only affordances | ADR 0009/0026, journey 7 |
 | T74 | no dead ends: automatic add/list items expose only their own recursively rendered handle, `show` explicitly discloses complete valid references, store selection is preserved, and invalid-reference diagnostics/SourceRefs are terminal | ADR 0009/0026 |
-| T75 | each globally truncated Working Lore section, including one with no returned item, states returned/full total and carries a Basis-pinned cursor with one shared pure-SHA-256/base64url global permutation digest/count plus exact `(section,occurrence_index)`/ordinal or `before-first`; unchanged order succeeds, budget changes preserve digest and representative tuples, alternating same-version order mismatches before partial output, malformed Ranker output remains validation failure, duplicate cross-section occurrences retain identical tuples, and pinned append continuation never adds, skips, or independently selects again | working-lore contract, ADR 0030, staged M3 |
+| T75 | each globally truncated Working Lore section, including one with no returned item, states returned/full total and carries a Basis-pinned cursor with one shared pure-SHA-256/base64url global permutation digest/count plus exact `(section,occurrence_index)`/ordinal or `before-first`; unchanged order succeeds, budget changes preserve digest and representative tuples, alternating same-version order mismatches before partial output, malformed Ranker output remains validation failure, duplicate cross-section occurrences retain identical tuples, and pinned append continuation never adds, skips, or independently selects again | working-lore contract, ADR 0030, implemented M3-L application |
 
 Representative vectors for T42/T44/T45/T75 are exact: retracted omission; preferred A and one-value disputed cycle as `[A]`; coexisting/disputed A/B as `[A,B]`; coexisting/disputed A/B/C with full `value_count:3` but exactly `[A,B]`; disputed advice `claims, show A, show B` while coexisting emits none; selected Resolution replacement copied even when distinct from anchor/earliest Claim; equal-value duplicate/corroborating Claims exposing one handle; identical tuples when one group occurs in multiple sections under custom ranking; and representative replay invariant under budgets and continuation.
 
