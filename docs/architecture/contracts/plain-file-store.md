@@ -127,7 +127,7 @@ Readers do not take the writer lock. They enumerate a snapshot of canonical name
 
 Every append acquires `.loredu/write.lock/` by one atomic exclusive directory creation and never waits. If another writer owns it, append fails `STORE_LOCKED` before replay/allocation/mutation. Under the lock, append replays the current prefix, checks duplicate id, and chooses exactly `head + 1`; no instance-cached head allocates positions.
 
-Lock metadata is diagnostic. A lock may be reclaimed only when the same host can prove its owning process is dead and atomically quarantine the whole lock directory under `.loredu/tmp` before retry. Elapsed time alone never proves staleness. Alive, unverifiable, reused-pid, malformed, and quarantine-race cases remain `STORE_LOCKED`. The owner removes its lock in `finally`; a process crash can leave only non-canonical control state.
+Lock metadata is diagnostic. A lock may be reclaimed only when its boot/session identity and PID-namespace identity exactly match the current process and a local process probe proves the recorded PID absent. If either identity cannot be established, recovery is unavailable; hostname equality and elapsed time never prove staleness. The reclaimer atomically quarantines the whole lock directory under `.loredu/tmp` before retry. Alive, unverifiable, reused-pid, malformed, and quarantine-race cases remain `STORE_LOCKED`. A per-process incarnation protects owner-only release; a process crash can leave only non-canonical control state.
 
 External hand editing is a writer operation and must not overlap adapter append. The adapter guarantees contention safety among writers honoring this protocol; it does not pretend to make arbitrary filesystem mutation safe.
 
@@ -159,7 +159,7 @@ Home is a nonempty `LOREDU_HOME`, otherwise `<osHome>/.loredu`; empty `LOREDU_HO
 
 Missing resolved roots fail `STORE_NOT_FOUND` with an actionable `lor init` hint. A bad marker/layout is `STORE_CORRUPT`. No read or ordinary command silently creates a directory and there is no cwd-parent discovery.
 
-All canonical/control paths are joined beneath the selected root. Descendant symlinks and name traversal reject; a named store root itself may not be a symlink beneath home, while opening an explicit path establishes its physical root before containment checks. Named stores have disjoint roots, locks, position sequences, and reads. No operation follows a record/control symlink or accesses another named root.
+All canonical/control paths are joined beneath the selected root. Descendant symlinks and name traversal reject. For named/default selections, neither `<home>/stores` nor the named root may be a symlink, and an existing root's physical path must remain beneath the physical home; opening an explicit path instead establishes its physical root before containment checks. Named stores have disjoint roots, locks, position sequences, and reads. A store directory may be relocated and reopened by selecting its new explicit path; the layout stores no absolute-root identity. No operation follows a record/control symlink or accesses another named root.
 
 ## Stable adapter errors
 
