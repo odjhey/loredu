@@ -308,6 +308,16 @@ test("explicit path selection initializes and opens only that store", async () =
   expect(implicit.exitCode).toBe(3);
 });
 
+test("relative Loredu homes are rejected instead of drifting with cwd", async () => {
+  const cwd = await freshHome();
+  const invocation = await invoke("relative-home", ["init", "--json"], undefined, cwd);
+  const envelope = json(invocation);
+
+  expect(invocation.exitCode).toBe(2);
+  expect((envelope.error as { code: string }).code).toBe("VALIDATION_FAILED");
+  expect(await Bun.file(join(cwd, "relative-home", "stores", "default")).exists()).toBe(false);
+});
+
 test("missing leading-dash path advice remains executable", async () => {
   const home = await freshHome();
   const selector = "--missing/store";
