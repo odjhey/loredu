@@ -481,6 +481,7 @@ function decodeCursorPayload(object: Record<string, unknown>): CursorPayload {
     cursorInvalid();
   }
   validateOrdinaryCursorQuery(object.operation, query);
+  validateOrdinaryCursorQuery(object.operation, basis.query);
   if (!jsonValuesEqual(basis.query, query)) cursorInvalid("Cursor Basis query does not match cursor query");
   let resume: number | OrderedResumeKey;
   if (object.operation === "status" || object.operation === "current") {

@@ -152,6 +152,7 @@ export function decodeWorkingLoreCursorPayload(parsed: CursorTransportPayload): 
     const basisQuery = copyJsonObject(basisObject.query, "/basis/query", basisQueryIssues);
     if (!basisQuery || basisQueryIssues.length > 0) cursorInvalid();
     validateLoreQuery(query);
+    validateLoreQuery(basisQuery);
     if (!jsonValuesEqual(query, basisQuery)) cursorInvalid("Cursor Basis query does not match cursor query");
     const basis: WorkingLoreBasis = Object.freeze({
       stream_position: basisObject.stream_position as StreamPosition,

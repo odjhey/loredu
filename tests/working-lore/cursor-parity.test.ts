@@ -120,6 +120,8 @@ const OPERATIONS: readonly Operation[] = ["claims", "history", "status", "curren
 describe("shared cursor transport and declared-schema parity", () => {
   test("every genuine operation cursor mismatches every other endpoint after full schema validation", async () => {
     const { application, clock, rankCalls, cursors } = await fixture();
+    for (const operation of OPERATIONS)
+      await expect(receiver(application, operation, cursors[operation])).resolves.toMatchObject({ ok: true });
     const clockBefore = clock.calls;
     const rankBefore = rankCalls();
     for (const source of OPERATIONS) {
@@ -134,50 +136,32 @@ describe("shared cursor transport and declared-schema parity", () => {
     expect(rankCalls()).toBe(rankBefore);
   });
 
-  test("malformed declared-operation schemas are invalid at every endpoint", async () => {
+  test("both duplicated query copies are independently schema-valid before equality", async () => {
     const { application, clock, rankCalls, cursors } = await fixture();
-    const malformed: Record<Operation, string> = {
-      claims: encode(
-        (() => {
-          const value = clone(decode(cursors.claims));
-          delete value.query.filters;
-          return value;
-        })(),
-      ),
-      history: encode(
-        (() => {
-          const value = clone(decode(cursors.history));
-          delete value.query.id;
-          return value;
-        })(),
-      ),
-      status: encode(
-        (() => {
-          const value = clone(decode(cursors.status));
-          value.query.excess = true;
-          return value;
-        })(),
-      ),
-      current: encode(
-        (() => {
-          const value = clone(decode(cursors.current));
-          delete value.computed_at;
-          return value;
-        })(),
-      ),
-      lore: encode(
-        (() => {
-          const value = clone(decode(cursors.lore));
-          delete value.query.activity;
-          return value;
-        })(),
-      ),
+    const mutateQuery = (operation: Operation, copyName: "query" | "basis.query"): string => {
+      const value = clone(decode(cursors[operation]));
+      const query = copyName === "query" ? value.query : value.basis.query;
+      if (operation === "claims") delete query.filters;
+      else if (operation === "history") delete query.id;
+      else if (operation === "status") query.excess = true;
+      else if (operation === "current") delete query.valid_at;
+      else delete query.activity;
+      return encode(value);
     };
+    const malformed = OPERATIONS.flatMap((operation) => [
+      mutateQuery(operation, "query"),
+      mutateQuery(operation, "basis.query"),
+    ]);
+    const validButUnequal = clone(decode(cursors.claims));
+    validButUnequal.basis.query.filters = { predicate: "different-but-valid" };
+    malformed.push(encode(validButUnequal));
+    expect(malformed).toHaveLength(11);
+
     const clockBefore = clock.calls;
     const rankBefore = rankCalls();
-    for (const source of OPERATIONS)
+    for (const cursor of malformed)
       for (const target of OPERATIONS)
-        await expect(receiver(application, target, malformed[source])).rejects.toMatchObject({
+        await expect(receiver(application, target, cursor)).rejects.toMatchObject({
           code: "INVALID_CURSOR",
         });
     expect(clock.calls).toBe(clockBefore);
