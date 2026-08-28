@@ -17,8 +17,11 @@ import type {
   HeadResult,
   HistoryItem,
   HistoryQuery,
+  Ranker,
   ShownRecordResult,
   StatusQuery,
+  WorkingLoreApplicationResponse,
+  WorkingLoreQuery,
 } from "./application-types";
 import { createCurrentService } from "./current-projection";
 import { rulesetIdentityFromValidatedPolicy } from "./domain/basis";
@@ -51,6 +54,8 @@ import {
   type ValidatedClaimPolicy,
   validateClaimPolicy,
 } from "./ports/claim-policy";
+import { DEFAULT_RANKER, validateRanker } from "./ranker";
+import { createWorkingLoreService } from "./working-lore";
 
 export type { LoreduErrorCode, LoreduIssue, LoreduIssueCode } from "./errors";
 export { LoreduError } from "./errors";
@@ -63,6 +68,7 @@ export interface LoreduApplicationDependencies {
   readonly clock: Clock;
   readonly randomSource: RandomSource;
   readonly claimPolicy?: ClaimPolicy;
+  readonly ranker?: Ranker;
 }
 export interface LoreduApplication {
   append<D extends RecordDraft>(draft: D): Promise<AppendRecordResult<PersistedRecordFor<D>>>;
@@ -74,6 +80,7 @@ export interface LoreduApplication {
   claims(query?: ClaimQuery): Promise<ApplicationListResponse<ClaimItem>>;
   status(query?: StatusQuery): Promise<ApplicationStatusResponse>;
   current(query?: CurrentQuery): Promise<ApplicationCurrentResponse>;
+  lore(query: WorkingLoreQuery): Promise<WorkingLoreApplicationResponse>;
   readHead(): Promise<ApplicationResponse<HeadResult>>;
 }
 
@@ -237,11 +244,14 @@ export function createLoreduApplication({
   clock,
   randomSource,
   claimPolicy = DEFAULT_CLAIM_POLICY,
+  ranker = DEFAULT_RANKER,
 }: LoreduApplicationDependencies): LoreduApplication {
   const policy = validateClaimPolicy(claimPolicy);
+  const validatedRanker = validateRanker(ranker);
   const ruleset = rulesetIdentityFromValidatedPolicy(policy);
   const reads = createApplicationReadServices(store, policy, ruleset);
   const current = createCurrentService(store, clock, policy, ruleset);
+  const lore = createWorkingLoreService(store, clock, policy, ruleset, validatedRanker);
 
   async function executeAppend<D extends RecordDraft>(
     input: D,
@@ -335,6 +345,7 @@ export function createLoreduApplication({
     claims: reads.claims,
     status: reads.status,
     current,
+    lore,
     readHead: reads.readHead,
   });
 }

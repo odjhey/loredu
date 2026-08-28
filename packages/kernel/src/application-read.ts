@@ -21,11 +21,13 @@ import type {
   StatusResult,
   UnresolvedExclusiveGroup,
 } from "./application-types";
+import { decodeCursorTransport, encodeCursorTransport } from "./cursor-transport";
 import { basisEquals, createBasis, type RulesetIdentity } from "./domain/basis";
 import { claimKeyOf, claimKeysEqual } from "./domain/claim-key";
 import type {
   Actor,
   Claim,
+  ClaimId,
   ClaimKey,
   JsonObject,
   JsonValue,
@@ -57,13 +59,12 @@ import {
 } from "./ports/capabilities";
 import { type ClaimSemantics, evaluateClaimPolicy, type ValidatedClaimPolicy } from "./ports/claim-policy";
 import { classifyClaimPair, type PositionedClaim } from "./reconciliation";
+import { decodeWorkingLoreCursorPayload, type WorkingLoreCursor } from "./working-lore-cursor";
 
 const DEFAULT_LIMIT = 50;
 const MAX_LIMIT = 200;
-const CURSOR_PREFIX = "loredu.cursor.v1.";
 const TOKEN = /^[a-z0-9](?:[a-z0-9._:/-]*[a-z0-9])?$/;
 const RECORD_ID = /^(ent|clm|rel|res|ver)_[0-9abcdefghjkmnpqrstvwxyz]{16}$/;
-const BASE64URL = /^[A-Za-z0-9_-]+$/;
 const EMPTY_RECONCILIATION = Object.freeze({
   state: "not-applicable" as const,
   related: Object.freeze([]) as readonly [],
@@ -84,6 +85,7 @@ export type CursorPayload = {
   readonly resume: number | OrderedResumeKey;
   readonly computed_at?: string;
 };
+type DecodedCursor = CursorPayload | WorkingLoreCursor;
 type StatusKey = OrderedResumeKey;
 type ParsedClaimRequest = {
   readonly limit: number;
@@ -249,6 +251,7 @@ function parseClaimsQuery(input: unknown): ParsedClaimRequest {
   const data = inspectObject(value, "", issues);
   if (!data) validationFailed(issues);
   const allowed = new Set([
+    "same_key_as",
     "scope",
     "scope_match",
     "subject_type",
@@ -279,6 +282,16 @@ function parseClaimsQuery(input: unknown): ParsedClaimRequest {
   }
 
   const filters: Record<string, unknown> = {};
+  if (hasOwnDescriptor(data, "same_key_as")) {
+    const id = parseRecordId(ownValue(data, "same_key_as"), "/same_key_as", issues);
+    if (id !== undefined && !id.startsWith("clm_"))
+      issues.push(makeIssue("FORMAT", "/same_key_as", "must be a Claim id"));
+    else if (id !== undefined) filters.same_key_as = id as ClaimId;
+    for (const key of Object.keys(data)) {
+      if (key !== "same_key_as" && key !== "limit")
+        issues.push(makeIssue("UNKNOWN_FIELD", `/${escapePointer(key)}`, "cannot accompany same_key_as"));
+    }
+  }
   let scope: Scope | undefined;
   if (hasOwnDescriptor(data, "scope")) {
     scope = parseScope(ownValue(data, "scope"), "/scope", issues);
@@ -402,117 +415,49 @@ function parseStatusQuery(input: unknown): {
   return Object.freeze({ limit, query: frozenJsonObject({ operation: "status" }) });
 }
 
-function encodeUtf8(value: string): readonly number[] {
-  const bytes: number[] = [];
-  for (const scalar of value) {
-    const code = scalar.codePointAt(0) as number;
-    if (code <= 0x7f) bytes.push(code);
-    else if (code <= 0x7ff) bytes.push(0xc0 | (code >> 6), 0x80 | (code & 0x3f));
-    else if (code <= 0xffff)
-      bytes.push(0xe0 | (code >> 12), 0x80 | ((code >> 6) & 0x3f), 0x80 | (code & 0x3f));
-    else
-      bytes.push(
-        0xf0 | (code >> 18),
-        0x80 | ((code >> 12) & 0x3f),
-        0x80 | ((code >> 6) & 0x3f),
-        0x80 | (code & 0x3f),
-      );
+function validateCurrentCursorQuery(query: JsonObject): void {
+  const issues: LoreduIssue[] = [];
+  const data = inspectObject(query, "/query", issues);
+  if (!data) cursorInvalid();
+  rejectUnknown(data, new Set(["operation", "scope", "as_of", "valid_at"]), issues);
+  if (ownValue(data, "operation") !== "current")
+    issues.push(makeIssue("FORMAT", "/query/operation", "must equal current"));
+  let scope: Scope | undefined;
+  if (hasOwnDescriptor(data, "scope")) {
+    scope = parseScope(ownValue(data, "scope"), "/query/scope", issues);
+    if (scope && Object.keys(scope).length === 0)
+      issues.push(makeIssue("FORMAT", "/query/scope", "empty scope must be omitted"));
   }
-  return bytes;
+  const asOf = hasOwnDescriptor(data, "as_of")
+    ? normalizeTimestamp(ownValue(data, "as_of"), "/query/as_of", issues)
+    : undefined;
+  if (!hasOwnDescriptor(data, "valid_at"))
+    issues.push(makeIssue("REQUIRED", "/query/valid_at", "is required"));
+  const validAt = normalizeTimestamp(ownValue(data, "valid_at"), "/query/valid_at", issues);
+  if (issues.length > 0 || !validAt) cursorInvalid();
+  const normalized = frozenJsonObject({
+    operation: "current",
+    ...(scope === undefined ? {} : { scope }),
+    ...(asOf === undefined ? {} : { as_of: asOf }),
+    valid_at: validAt,
+  });
+  if (!jsonValuesEqual(normalized, query)) cursorInvalid("Cursor query is not normalized");
 }
 
-function decodeUtf8(bytes: readonly number[]): string {
-  let output = "";
-  for (let index = 0; index < bytes.length; ) {
-    const first = bytes[index] as number;
-    let code: number;
-    let length: number;
-    if (first <= 0x7f) {
-      code = first;
-      length = 1;
-    } else if (first >= 0xc2 && first <= 0xdf) {
-      code = first & 0x1f;
-      length = 2;
-    } else if (first >= 0xe0 && first <= 0xef) {
-      code = first & 0x0f;
-      length = 3;
-    } else if (first >= 0xf0 && first <= 0xf4) {
-      code = first & 0x07;
-      length = 4;
-    } else cursorInvalid();
-    if (index + length > bytes.length) cursorInvalid();
-    for (let offset = 1; offset < length; offset++) {
-      const byte = bytes[index + offset] as number;
-      if ((byte & 0xc0) !== 0x80) cursorInvalid();
-      code = (code << 6) | (byte & 0x3f);
-    }
-    if (
-      (length === 3 && code < 0x800) ||
-      (length === 4 && code < 0x10000) ||
-      (code >= 0xd800 && code <= 0xdfff) ||
-      code > 0x10ffff
-    )
-      cursorInvalid();
-    output += String.fromCodePoint(code);
-    index += length;
-  }
-  return output;
-}
-
-const BASE64 = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_";
-function base64Encode(bytes: readonly number[]): string {
-  let output = "";
-  for (let index = 0; index < bytes.length; index += 3) {
-    const first = bytes[index] as number;
-    const second = bytes[index + 1];
-    const third = bytes[index + 2];
-    const packed = (first << 16) | ((second ?? 0) << 8) | (third ?? 0);
-    output += BASE64[(packed >> 18) & 63] as string;
-    output += BASE64[(packed >> 12) & 63] as string;
-    if (second !== undefined) output += BASE64[(packed >> 6) & 63] as string;
-    if (third !== undefined) output += BASE64[packed & 63] as string;
-  }
-  return output;
-}
-
-function base64Decode(value: string): readonly number[] {
-  if (!BASE64URL.test(value) || value.length % 4 === 1) cursorInvalid();
-  const bytes: number[] = [];
-  for (let index = 0; index < value.length; index += 4) {
-    const chars = [value[index], value[index + 1], value[index + 2], value[index + 3]];
-    const values = chars.map((char) => (char === undefined ? 0 : BASE64.indexOf(char)));
-    if (values.some((item, itemIndex) => chars[itemIndex] !== undefined && item < 0)) cursorInvalid();
-    const packed =
-      ((values[0] as number) << 18) |
-      ((values[1] as number) << 12) |
-      ((values[2] as number) << 6) |
-      (values[3] as number);
-    bytes.push((packed >> 16) & 0xff);
-    if (chars[2] !== undefined) bytes.push((packed >> 8) & 0xff);
-    if (chars[3] !== undefined) bytes.push(packed & 0xff);
-  }
-  if (base64Encode(bytes) !== value) cursorInvalid();
-  return bytes;
-}
-
-function encodeCursor(payload: CursorPayload): string {
-  return `${CURSOR_PREFIX}${base64Encode(encodeUtf8(JSON.stringify(payload)))}`;
-}
-
-function decodeCursorPayload(token: string): CursorPayload {
-  if (!token.startsWith(CURSOR_PREFIX)) cursorInvalid();
-  const encoded = token.slice(CURSOR_PREFIX.length);
-  let parsed: unknown;
+function validateOrdinaryCursorQuery(operation: CursorOperation, query: JsonObject): void {
   try {
-    parsed = JSON.parse(decodeUtf8(base64Decode(encoded)));
-  } catch (error) {
-    if (error instanceof LoreduError) throw error;
-    cursorInvalid();
+    if (operation === "claims") claimFiltersFromBasisQuery(query);
+    else if (operation === "history") historyIdFromQuery(query);
+    else if (operation === "status") {
+      if (!jsonValuesEqual(query, frozenJsonObject({ operation: "status" }))) cursorInvalid();
+    } else validateCurrentCursorQuery(query);
+  } catch {
+    cursorInvalid("Cursor declared-operation query is invalid");
   }
-  if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) cursorInvalid();
-  const object = parsed as Record<string, unknown>;
+}
+
+function decodeCursorPayload(object: Record<string, unknown>): CursorPayload {
   const keys = Object.keys(object).sort();
-  if (object.version !== 1) cursorInvalid();
   if (
     object.operation !== "claims" &&
     object.operation !== "history" &&
@@ -535,7 +480,9 @@ function decodeCursorPayload(token: string): CursorPayload {
   } catch {
     cursorInvalid();
   }
-  if (!jsonValuesEqual(basis.query, query)) cursorMismatch("Cursor Basis query does not match cursor query");
+  validateOrdinaryCursorQuery(object.operation, query);
+  validateOrdinaryCursorQuery(object.operation, basis.query);
+  if (!jsonValuesEqual(basis.query, query)) cursorInvalid("Cursor Basis query does not match cursor query");
   let resume: number | OrderedResumeKey;
   if (object.operation === "status" || object.operation === "current") {
     if (
@@ -576,9 +523,12 @@ function decodeCursorPayload(token: string): CursorPayload {
   });
 }
 
-export function decodeCursor(token: string): CursorPayload {
+export function decodeCursor(token: string): DecodedCursor {
   try {
-    return decodeCursorPayload(token);
+    const payload = decodeCursorTransport(token);
+    return payload.operation === "lore"
+      ? decodeWorkingLoreCursorPayload(payload)
+      : decodeCursorPayload(payload);
   } catch (error) {
     if (error instanceof LoreduError && (error.code === "INVALID_CURSOR" || error.code === "CURSOR_MISMATCH"))
       throw error;
@@ -601,7 +551,7 @@ export function createCursor(
   if (basis.stream_position > 0 && !anchor) throw new TypeError("snapshot has no cursor anchor");
   if ((operation === "current") !== (computedAt !== undefined))
     throw new TypeError("current cursors require computed time and other cursors forbid it");
-  return encodeCursor(
+  return encodeCursorTransport(
     Object.freeze({
       version: 1,
       operation,
@@ -1246,9 +1196,22 @@ export function createApplicationReadServices(
       )
         cursorMismatch();
       const resume = parsed.cursor === undefined ? 0 : (parsed.cursor.resume as number);
+      let anchoredKey: ClaimKey | undefined;
+      if (parsed.filters.same_key_as !== undefined) {
+        const anchor = snapshot.records.find((item) => item.record.id === parsed.filters.same_key_as);
+        if (!anchor)
+          throw new LoreduError("RECORD_NOT_FOUND", `Record does not exist: ${parsed.filters.same_key_as}`);
+        if (anchor.record.kind !== "claim")
+          validationFailed(Object.freeze([makeIssue("FORMAT", "/same_key_as", "must identify a Claim")]));
+        anchoredKey = claimKeyOf(anchor.record as Claim);
+      }
       const matches = snapshot.records
         .filter((item): item is PositionedRecord & { record: Claim } => item.record.kind === "claim")
-        .filter((item) => claimsMatch(item.record, parsed.filters));
+        .filter((item) =>
+          anchoredKey === undefined
+            ? claimsMatch(item.record, parsed.filters)
+            : claimKeysEqual(claimKeyOf(item.record), anchoredKey as ClaimKey),
+        );
       if (parsed.cursor && !matches.some((item) => Number(item.position) === resume)) cursorInvalid();
       const remaining = matches.filter((item) => Number(item.position) > resume);
       const selected = remaining.slice(0, parsed.limit);

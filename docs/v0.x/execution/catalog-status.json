@@ -4,49 +4,19 @@
   "note": "Every catalog T-number is either claimed by an executable test under tests/ (via an @covers annotation) or listed here with the milestone that will implement it. Never both, never neither. See ADR 0015.",
   "deferred": {
     "T40": {
-      "milestone": "M3",
+      "milestone": "M3-E",
       "group": "M3 — Working Lore",
-      "reason": "Working Lore assembly not implemented yet"
-    },
-    "T41": {
-      "milestone": "M3",
-      "group": "M3 — Working Lore",
-      "reason": "Working Lore assembly not implemented yet"
-    },
-    "T42": {
-      "milestone": "M3",
-      "group": "M3 — Working Lore",
-      "reason": "Working Lore assembly not implemented yet"
-    },
-    "T43": {
-      "milestone": "M3",
-      "group": "M3 — Working Lore",
-      "reason": "Working Lore assembly not implemented yet"
-    },
-    "T44": {
-      "milestone": "M3",
-      "group": "M3 — Working Lore",
-      "reason": "Working Lore assembly not implemented yet"
-    },
-    "T45": {
-      "milestone": "M3",
-      "group": "M3 — Working Lore",
-      "reason": "Working Lore assembly not implemented yet"
+      "reason": "requires compiled five-line lore rendering and exit behavior; the M3-L application slice does not claim it"
     },
     "T54": {
-      "milestone": "M3",
+      "milestone": "M3-E",
       "group": "CLI conformance (compiled binary)",
-      "reason": "the M2 narrative is covered, but the full row awaits M3 Working Lore revalidation"
+      "reason": "the M2 narrative is covered, but the full row awaits M3-E compiled Working Lore revalidation"
     },
     "T56": {
-      "milestone": "M3",
+      "milestone": "M3-E",
       "group": "CLI conformance (compiled binary)",
-      "reason": "the M1.5 and M2 portions are implemented; the complete journey awaits M3 lore"
-    },
-    "T75": {
-      "milestone": "M3",
-      "group": "Pagination and link-following (ADR 0009)",
-      "reason": "Working Lore section continuation lands in M3"
+      "reason": "the M1.5 and M2 portions are implemented; the complete journey awaits M3-E compiled lore"
     }
   }
 }

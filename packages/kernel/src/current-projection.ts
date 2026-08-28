@@ -405,18 +405,22 @@ function resolutionTouchesGroup(
   return resolution.record.targets.some((id) => ids.has(id) || relationIds.has(id));
 }
 
-function sourceCount(sources: readonly SourceRef[]): number {
+function distinctSources(sources: readonly SourceRef[]): readonly SourceRef[] {
   const unique: SourceRef[] = [];
   for (const source of sources)
     if (!unique.some((existing) => jsonValuesEqual(existing as never, source as never))) unique.push(source);
-  return unique.length;
+  return Object.freeze(unique);
 }
 
-function evidenceSummary(
+function evidenceDetails(
   contributing: readonly PositionedClaim[],
   visible: readonly PositionedRecord[],
   byId: ReadonlyMap<RecordId, PositionedRecord>,
-): ProjectionEvidenceSummary {
+): {
+  readonly summary: ProjectionEvidenceSummary;
+  readonly sources: readonly SourceRef[];
+  readonly needs_revalidation_count: number;
+} {
   const claimIds = new Set(contributing.map((claim) => claim.record.id));
   const entries = new Map<RecordId, PersistedRecord>();
   const sources: SourceRef[] = [];
@@ -445,11 +449,24 @@ function evidenceSummary(
     counts[verification.result]++;
     sources.push(...verification.verified_against);
   }
+  const distinct = distinctSources(sources);
   return Object.freeze({
-    entry_count: entries.size,
-    source_count: sourceCount(sources),
-    verification: Object.freeze(counts),
+    summary: Object.freeze({
+      entry_count: entries.size,
+      source_count: distinct.length,
+      verification: Object.freeze(counts),
+    }),
+    sources: distinct,
+    needs_revalidation_count: counts.needs_revalidation,
   });
+}
+
+function evidenceSummary(
+  contributing: readonly PositionedClaim[],
+  visible: readonly PositionedRecord[],
+  byId: ReadonlyMap<RecordId, PositionedRecord>,
+): ProjectionEvidenceSummary {
+  return evidenceDetails(contributing, visible, byId).summary;
 }
 
 function valuesTuple(
@@ -629,6 +646,72 @@ function computeProjection(
       related: Object.freeze([]) as readonly [],
     }),
   });
+}
+
+export interface LoreKnowledgeProjection {
+  readonly item: CurrentKnowledgeItem;
+  readonly contributing: readonly PositionedClaim[];
+  readonly primary: number;
+  readonly values: readonly import("./domain/entry").JsonValue[];
+  readonly sources: readonly SourceRef[];
+  readonly needs_revalidation_count: number;
+}
+
+/** Internal M3 seam: complete M2 knowledge without invoking optional policy advice. */
+export function computeLoreKnowledge(
+  snapshot: Snapshot,
+  validAt: string,
+  requestedScope: Scope | undefined,
+  policy: ValidatedClaimPolicy,
+): readonly LoreKnowledgeProjection[] {
+  const visible = snapshot.records;
+  const byId = new Map<RecordId, PositionedRecord>(visible.map((item) => [item.record.id, item]));
+  const visibleClaims = positionedClaims(visible);
+  const claims =
+    requestedScope === undefined
+      ? visibleClaims
+      : Object.freeze(visibleClaims.filter((claim) => scopeContains(claim.record.scope, requestedScope)));
+  const groups = buildGroups(claims, policy);
+  const relations = backwardRelations(visible, byId);
+  const resolutions = effectiveResolutions(visible, byId, validAt);
+  const output: LoreKnowledgeProjection[] = [];
+  for (const group of groups) {
+    const applicable = group.members.filter((claim) => isApplicable(claim.record, validAt));
+    if (applicable.length === 0) continue;
+    const reconciled = reconcileApplicableClaimGroup({
+      claims: applicable,
+      visibleRecords: visible,
+      relations,
+      resolutions,
+      semantics: group.semantics,
+    });
+    const values = valuesTuple(reconciled.values);
+    const details = evidenceDetails(reconciled.claims, visible, byId);
+    const item: CurrentKnowledgeItem = Object.freeze({
+      kind: "knowledge",
+      key: group.key,
+      semantics: group.semantics,
+      state: reconciled.state,
+      value_count: reconciled.values.length,
+      values,
+      history: historySummary(group, allDerived(group), relations, resolutions),
+      evidence: details.summary,
+      claims: keyClaimsAffordance(group.key),
+    });
+    output.push(
+      Object.freeze({
+        item,
+        contributing: reconciled.claims,
+        primary: Math.min(...reconciled.claims.map((claim) => Number(claim.position))),
+        values: Object.freeze(
+          reconciled.values.map((value) => (value.claims[0] as PositionedClaim).record.value),
+        ),
+        sources: details.sources,
+        needs_revalidation_count: details.needs_revalidation_count,
+      }),
+    );
+  }
+  return Object.freeze(output);
 }
 
 function correctiveAdvice(items: readonly CurrentComputedItem[]): readonly Affordance[] {

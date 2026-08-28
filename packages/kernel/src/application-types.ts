@@ -1,4 +1,4 @@
-import type { Basis } from "./domain/basis";
+import type { Basis, WorkingLoreBasis } from "./domain/basis";
 import type {
   Actor,
   ClaimId,
@@ -12,6 +12,7 @@ import type {
   RelationType,
   ResolutionDecision,
   Scope,
+  SourceRef,
   VerificationResult,
 } from "./domain/entry";
 import type { StreamPosition } from "./ports/capabilities";
@@ -19,7 +20,7 @@ import type { ClaimSemantics } from "./ports/claim-policy";
 import type { CurrentKnowledgeState, DerivedRelation, PolicyAdvisory } from "./reconciliation";
 
 export interface Affordance {
-  readonly rel: "show" | "history" | "list" | "status" | "current" | "continue" | "init";
+  readonly rel: "show" | "history" | "list" | "status" | "current" | "lore" | "continue" | "init";
   readonly action:
     | "record.show"
     | "record.history"
@@ -27,6 +28,7 @@ export interface Affordance {
     | "history.list"
     | "status.read"
     | "current.read"
+    | "lore.read"
     | "store.init";
   readonly params: JsonObject;
   readonly why: string;
@@ -214,6 +216,7 @@ export interface HeadResult {
 }
 
 export interface ClaimFilters {
+  readonly same_key_as?: ClaimId;
   readonly scope?: Scope;
   readonly scope_match?: "subset" | "exact";
   readonly subject_type?: string;
@@ -270,4 +273,132 @@ export interface StatusResult {
   readonly advisory_count: number;
   readonly attention: readonly HealthItem[];
   readonly advisories: readonly KeyDivergenceAdvisory[];
+}
+
+export type WorkingLoreSectionName =
+  | "current"
+  | "patterns"
+  | "candidates"
+  | "conflicts"
+  | "needs_revalidation";
+export interface WorkingLoreFilters {
+  readonly activity: string;
+  readonly scope?: Scope;
+  readonly corpus?: SourceRef;
+}
+export type WorkingLoreQuery =
+  | (WorkingLoreFilters & {
+      readonly max_items?: number;
+      readonly max_chars?: number;
+      readonly cursor?: never;
+    })
+  | {
+      readonly cursor: string;
+      readonly max_items?: number;
+      readonly max_chars?: number;
+    };
+export interface WorkingLoreScopePair {
+  readonly key: string;
+  readonly value: string;
+}
+export interface WorkingLoreScopePreview {
+  readonly pair_count: number;
+  readonly pairs:
+    | readonly []
+    | readonly [WorkingLoreScopePair]
+    | readonly [WorkingLoreScopePair, WorkingLoreScopePair];
+}
+export interface WorkingLoreKeyDescriptor {
+  readonly anchor_claim: ClaimId;
+  readonly scope: WorkingLoreScopePreview;
+  readonly subject: { readonly type: string; readonly id: string };
+  readonly predicate: string;
+  readonly perspective?: string;
+}
+export interface WorkingLoreFilterDescriptor {
+  readonly scope: WorkingLoreScopePreview;
+  readonly corpus?: SourceRef;
+}
+export interface WorkingLoreKnowledgeSummary {
+  readonly key: WorkingLoreKeyDescriptor;
+  readonly semantics: ClaimSemantics;
+  readonly state: "preferred" | "coexisting" | "disputed";
+  readonly value_count: number;
+  readonly claim_count: number;
+  readonly representatives: readonly [RecordHandle] | readonly [RecordHandle, RecordHandle];
+  readonly history: ProjectionHistorySummary;
+  readonly evidence: ProjectionEvidenceSummary;
+  readonly claims: Affordance;
+}
+export type WorkingLoreKnowledgeItem =
+  | { readonly kind: "current"; readonly summary: string; readonly knowledge: WorkingLoreKnowledgeSummary }
+  | { readonly kind: "pattern"; readonly summary: string; readonly knowledge: WorkingLoreKnowledgeSummary }
+  | { readonly kind: "candidate"; readonly summary: string; readonly knowledge: WorkingLoreKnowledgeSummary }
+  | { readonly kind: "conflict"; readonly summary: string; readonly knowledge: WorkingLoreKnowledgeSummary }
+  | {
+      readonly kind: "needs-revalidation";
+      readonly summary: string;
+      readonly knowledge: WorkingLoreKnowledgeSummary;
+      readonly revalidation: {
+        readonly verification_count: number;
+        readonly snapshot_mismatch_count: number;
+      };
+    };
+export type WorkingLoreItem = WorkingLoreKnowledgeItem;
+export interface WorkingLoreSection {
+  readonly name: WorkingLoreSectionName;
+  readonly items: readonly WorkingLoreItem[];
+  readonly page: Page;
+}
+export interface WorkingLoreOrientation {
+  readonly current_count: number;
+  readonly pattern_count: number;
+  readonly candidate_count: number;
+  readonly conflict_count: number;
+  readonly needs_revalidation_count: number;
+  readonly attention_count: number;
+}
+export interface WorkingLoreBudget {
+  readonly max_items: number;
+  readonly max_chars: number;
+  readonly used_items: number;
+  readonly used_chars: number;
+}
+export interface WorkingLorePacket {
+  readonly activity: string;
+  readonly filters: WorkingLoreFilterDescriptor;
+  readonly orientation: WorkingLoreOrientation;
+  readonly sections: readonly WorkingLoreSection[];
+  readonly budget: WorkingLoreBudget;
+}
+export interface WorkingLoreResult {
+  readonly computed_at: string;
+  readonly packet: WorkingLorePacket;
+}
+export interface WorkingLoreApplicationResponse
+  extends Omit<ApplicationResponse<WorkingLoreResult>, "basis"> {
+  readonly basis: WorkingLoreBasis;
+}
+export interface WorkingLoreRankCandidate {
+  readonly index: number;
+  readonly section: WorkingLoreSectionName;
+  readonly primary_position: StreamPosition;
+  readonly key: WorkingLoreKeyDescriptor;
+  readonly state: "preferred" | "coexisting" | "disputed";
+  readonly summary: string;
+  readonly evidence: ProjectionEvidenceSummary;
+}
+export interface WorkingLoreRankContext {
+  readonly query: {
+    readonly operation: "lore";
+    readonly activity: string;
+    readonly valid_at: string;
+    readonly filters: WorkingLoreFilterDescriptor;
+  };
+  readonly candidates: readonly WorkingLoreRankCandidate[];
+}
+export interface Ranker {
+  readonly id: string;
+  readonly version: string;
+  rank(context: WorkingLoreRankContext): readonly number[];
 }

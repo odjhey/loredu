@@ -22,9 +22,9 @@ bun test tests/store           # one group
 | [`store/`](./store/README.md) | M1 durable plain-file conformance (T10–T18) |
 | [`application/`](./application/README.md) | M1.5 surface-neutral responses, reads, feedback, health, and cursors (T60–T64, T66–T68, and T70–T72; T65 remains CLI-owned) |
 | [`reconciliation/`](./reconciliation/README.md) | M0 identity primitives (T81–T82); M2 reconciliation and public projections (T20–T30, T86) |
-| [`working-lore/`](./working-lore/README.md) | M3 — Working Lore (T40–T45) |
-| [`cli-conformance/`](./cli-conformance/README.md) | Compiled CLI conformance (T50–T58, T65, T73–T75) plus adapter/rendering checks over application semantics |
-| [`scenarios/`](./scenarios/README.md) | M2 acceptance narratives A/B/C; scenario A completes under M3 |
+| [`working-lore/`](./working-lore/README.md) | M3 — Working Lore application (T41–T45, T75; T40 remains CLI-owned) |
+| [`cli-conformance/`](./cli-conformance/README.md) | Compiled CLI conformance (T40, T50–T58, T65, T73–T74) plus adapter/rendering checks over application semantics |
+| [`scenarios/`](./scenarios/README.md) | M2 acceptance narratives A/B/C; scenario A completes under M3-E |
 
 ## Claiming a catalog T-number
 

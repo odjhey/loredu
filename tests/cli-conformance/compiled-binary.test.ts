@@ -1668,7 +1668,7 @@ test("compiled cursors reject malformed and wrong operation/query/ruleset/store 
     "--json",
   ]);
   expect(wrongQuery.exitCode).toBe(2);
-  expect((json(wrongQuery).error as { code: string }).code).toBe("CURSOR_MISMATCH");
+  expect((json(wrongQuery).error as { code: string }).code).toBe("INVALID_CURSOR");
 
   const rulesetPayload = cursorPayload(cursor);
   const basis = rulesetPayload.basis as { ruleset: { claim_policy: { version: string } } };

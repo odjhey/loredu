@@ -29,14 +29,22 @@ function fixture(parent = tmpParent()): string {
   temporaryRoots.push(root);
   mkdirSync(join(root, "packages"));
   cpSync(join(REPO_ROOT, "tsconfig.base.json"), join(root, "tsconfig.base.json"));
-  const skillDirectory = join(root, "docs/v0.x/execution");
-  mkdirSync(skillDirectory, { recursive: true });
-  cpSync(join(REPO_ROOT, "docs/v0.x/execution/agent-skill.md"), join(skillDirectory, "agent-skill.md"));
-  for (const name of ["kernel", "store-plainfile", "cli"])
-    cpSync(join(REPO_ROOT, "packages", name), join(root, "packages", name), {
-      recursive: true,
-      filter: (path) => !path.includes("node_modules") && !path.includes("/dist"),
-    });
+  plant(root, "docs/v0.x/execution/agent-skill.md", "fixture\n");
+  // Keep mutation fixtures independent of growth in the production source corpus.
+  for (const name of ["kernel", "store-plainfile", "cli"] as const) {
+    const packageRoot = join(root, "packages", name);
+    mkdirSync(join(packageRoot, "src"), { recursive: true });
+    for (const file of ["package.json", "tsconfig.json"])
+      cpSync(join(REPO_ROOT, "packages", name, file), join(packageRoot, file));
+    plant(root, `packages/${name}/src/index.ts`, "export {};\n");
+  }
+  plant(root, "packages/kernel/testing/index.ts", "export {};\n");
+  plant(root, "packages/cli/bin/lor.ts", "export {};\n");
+  plant(
+    root,
+    "packages/cli/src/embedded-skill.ts",
+    'import source from "../../../docs/v0.x/execution/agent-skill.md" with { type: "text" };\n',
+  );
   return root;
 }
 function tmpParent(): string {

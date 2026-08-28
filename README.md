@@ -6,6 +6,6 @@ The kernel is strictly mechanical: it detects — duplicates, conflicts, diverge
 
 Vocabulary, namespacing, writers, and surfaces belong to consumers; Loredu owns the consistent record, detection, resolution, and disclosure semantics underneath — machine-readable at every boundary.
 
-The project is implementing its v0.x contracts milestone by milestone. M0, M1, and the [complete M1.5 application and CLI](packages/cli/README.md) provide record mutation, reads, pagination, and the bounded rendered command surface. M2 adds deterministic reconciliation, richer Claim feedback, overlap-aware health, and bounded bitemporal Current Knowledge through the public application and CLI surfaces. Its M2 exit includes deterministic compiled A/B/C narratives; M3 Working Lore and scenario-A revalidation remain staged in the [implementation plan](docs/v0.x/execution/implementation-plan.md).
+The project implements its v0.x contracts milestone by milestone. See the [implementation plan](docs/v0.x/execution/implementation-plan.md) for current delivery status and the [`lor` package](packages/cli/README.md) for shipped commands.
 
 Start with [`docs/README.md`](docs/README.md) and [`docs/v0.x/README.md`](docs/v0.x/README.md).

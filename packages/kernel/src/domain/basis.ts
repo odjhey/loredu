@@ -38,6 +38,19 @@ export interface Basis {
   readonly query: JsonObject;
 }
 
+export interface RankerIdentity {
+  readonly id: string;
+  readonly version: string;
+}
+export interface WorkingLoreRulesetIdentity extends RulesetIdentity {
+  readonly ranker: RankerIdentity;
+}
+export interface WorkingLoreBasis {
+  readonly stream_position: StreamPosition;
+  readonly ruleset: WorkingLoreRulesetIdentity;
+  readonly query: JsonObject;
+}
+
 function orderedIssues(issues: readonly LoreduIssue[]): readonly LoreduIssue[] {
   const unique = new Map<string, LoreduIssue>();
   for (const item of issues) unique.set(`${item.path}\u0000${item.code}`, item);
@@ -152,12 +165,19 @@ export function createBasis(input: Basis): Basis {
   return Object.freeze({ stream_position: position, ruleset, query });
 }
 
-export function basisEquals(left: Basis, right: Basis): boolean {
+export function basisEquals(left: Basis | WorkingLoreBasis, right: Basis | WorkingLoreBasis): boolean {
+  const leftRanker = "ranker" in left.ruleset ? left.ruleset.ranker : undefined;
+  const rightRanker = "ranker" in right.ruleset ? right.ruleset.ranker : undefined;
   return (
     left.stream_position === right.stream_position &&
     left.ruleset.core === right.ruleset.core &&
     left.ruleset.claim_policy.id === right.ruleset.claim_policy.id &&
     left.ruleset.claim_policy.version === right.ruleset.claim_policy.version &&
+    ((leftRanker === undefined && rightRanker === undefined) ||
+      (leftRanker !== undefined &&
+        rightRanker !== undefined &&
+        leftRanker.id === rightRanker.id &&
+        leftRanker.version === rightRanker.version)) &&
     jsonValuesEqual(left.query, right.query)
   );
 }
