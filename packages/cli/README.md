@@ -25,7 +25,8 @@ still own `current` and `lore`.
 
 Compiled-binary evidence lives in
 [`../../tests/cli-conformance/`](../../tests/cli-conformance/README.md). The M1.5
-CLI rows T50–T53, T57–T58, T65, T73, and T74 are complete. T56 remains deferred
-until the M2/M3 commands complete its staged journey. Surface-neutral application
-semantics are covered separately in
+CLI rows T50–T52, T57–T58, T65, T73, and T74 are complete. T53 remains deferred
+because the fixed binary composition root cannot exercise the application's custom-policy
+coexisting feedback; T56 remains deferred until the M2/M3 commands complete its staged
+journey. Surface-neutral application semantics are covered separately in
 [`../../tests/application/`](../../tests/application/README.md).

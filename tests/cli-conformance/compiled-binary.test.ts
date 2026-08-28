@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, expect, test } from "bun:test";
-import { mkdtemp, readFile, rm } from "node:fs/promises";
+import { mkdtemp, readFile, rename, rm } from "node:fs/promises";
 import { homedir, tmpdir } from "node:os";
 import { isAbsolute, join, resolve } from "node:path";
 import {
@@ -97,6 +97,49 @@ async function freshHome(): Promise<string> {
   const home = await mkdtemp(join(tmpdir(), "loredu-cli-"));
   homes.push(home);
   return home;
+}
+
+async function invokeWithFeedbackReadFailure(
+  home: string,
+  root: string,
+  args: readonly string[],
+): Promise<Invocation> {
+  const records = join(root, "records");
+  const displaced = join(root, "records-feedback-unavailable");
+  const saboteur = Bun.spawn(
+    [
+      "/bin/sh",
+      "-c",
+      'while [ ! -d "$LOREDU_TEST_ROOT/.loredu/write.lock" ]; do :; done\n' +
+        "i=0\n" +
+        'while [ "$i" -lt 10000 ]; do\n' +
+        '  : > "$LOREDU_TEST_ROOT/.loredu/write.lock/padding-$i" 2>/dev/null || break\n' +
+        '  i=$((i + 1))\n' +
+        "done\n" +
+        'while [ -d "$LOREDU_TEST_ROOT/.loredu/write.lock" ]; do :; done\n' +
+        'mv "$LOREDU_TEST_ROOT/records" "$LOREDU_TEST_ROOT/records-feedback-unavailable"',
+    ],
+    {
+      env: { ...Bun.env, LOREDU_TEST_ROOT: root },
+      stdin: "ignore",
+      stdout: "ignore",
+      stderr: "ignore",
+    },
+  );
+  await Bun.sleep(10);
+  const invocation = await invoke(home, args);
+  const sabotage = await Promise.race([
+    saboteur.exited.then((exitCode) => ({ exitCode })),
+    Bun.sleep(5_000).then(() => undefined),
+  ]);
+  if (sabotage === undefined) {
+    saboteur.kill();
+    await saboteur.exited;
+    throw new Error("feedback-read failure injection timed out");
+  }
+  expect(sabotage).toEqual({ exitCode: 0 });
+  await rename(displaced, records);
+  return invocation;
 }
 
 function withoutRuns(value: unknown): unknown {
@@ -321,7 +364,7 @@ test("every M1.5 semantic command returns one equivalent JSON envelope — @cove
   );
 });
 
-test("compiled Claim additions render M1.5 feedback and bounded committed ids — @covers T53", async () => {
+test("compiled Claim additions render default-policy feedback and committed fallback", async () => {
   const home = await freshHome();
   expect((await invoke(home, ["init", "feedback", "--json"])).exitCode).toBe(0);
   const claimArgs = [
@@ -374,6 +417,125 @@ test("compiled Claim additions render M1.5 feedback and bounded committed ids �
   expect(text.exitCode).toBe(0);
   expect(text.stdout).toContain('reconciliation: {"state":"conflict-candidate"');
   expect(text.stdout).toContain("advice: lor --store feedback claims");
+
+  const unavailable = json(
+    await invokeWithFeedbackReadFailure(home, join(home, "stores", "feedback"), [
+      ...claimArgs,
+      "--value",
+      "committed",
+      "--json",
+    ]),
+  );
+  const unavailableId = (unavailable.result as { id: string }).id;
+  expect(unavailable).toMatchObject({
+    ok: true,
+    result: { id: unavailableId, kind: "claim", position: 5 },
+    reconciliation: {
+      state: "unavailable",
+      reason: "post-commit-read-failed",
+      related: [],
+    },
+    advice: [{ rel: "status", action: "status.read", params: {}, run: "lor --store feedback status" }],
+    basis: { stream_position: 5, query: { operation: "add", id: unavailableId } },
+  });
+  expect((unavailable.reconciliation as { key: { subject: { id: string } } }).key.subject.id).toBe(
+    "cli-query",
+  );
+  expect(
+    (json(await invoke(home, ["head", "--store", "feedback", "--json"])).result as {
+      stream_position: number;
+    }).stream_position,
+  ).toBe(5);
+
+  const unavailableText = await invokeWithFeedbackReadFailure(home, join(home, "stores", "feedback"), [
+    ...claimArgs,
+    "--value",
+    "committed-text",
+  ]);
+  expect(unavailableText.exitCode).toBe(0);
+  expect(unavailableText.stdout).toContain('reconciliation: {"state":"unavailable"');
+  expect(unavailableText.stdout).toContain('"reason":"post-commit-read-failed"');
+  expect(unavailableText.stdout).toContain("advice: lor --store feedback status");
+  expect(unavailableText.stdout).not.toContain("add claim");
+});
+
+test("compiled key-divergence stays advisory until explicit duplicate judgment", async () => {
+  const home = await freshHome();
+  expect((await invoke(home, ["init", "divergence", "--json"])).exitCode).toBe(0);
+  const addClaim = async (predicate: string) =>
+    json(
+      await invoke(home, [
+        "add",
+        "claim",
+        "--store",
+        "divergence",
+        "--actor",
+        "agent:divergence-test",
+        "--scope",
+        "repo=loredu",
+        "--subject-type",
+        "code-area",
+        "--subject",
+        "query-chain",
+        "--predicate",
+        predicate,
+        "--value-json",
+        '{"path":"packages/cli"}',
+        "--confidence",
+        "observed",
+        "--json",
+      ]),
+    );
+
+  const first = await addClaim("location");
+  const second = await addClaim("location-path");
+  const firstId = (first.result as { id: string }).id;
+  const secondId = (second.result as { id: string }).id;
+  expect(first.reconciliation).toMatchObject({ state: "new-key" });
+  expect(second.reconciliation).toMatchObject({ state: "new-key" });
+
+  const divergent = await invoke(home, ["status", "--store", "divergence", "--check", "--json"]);
+  expect(divergent.exitCode).toBe(0);
+  const divergentEnvelope = json(divergent);
+  expect(divergentEnvelope.result).toMatchObject({
+    healthy: true,
+    advisory_count: 1,
+    advisories: [
+      {
+        kind: "key-divergence",
+        component_count: 2,
+        representatives: [{ id: firstId }, { id: secondId }],
+      },
+    ],
+  });
+  expect(divergentEnvelope.advice).toEqual([]);
+  expectRenderedAffordances(divergentEnvelope, "divergence");
+
+  const relation = json(
+    await invoke(home, [
+      "relate",
+      "--store",
+      "divergence",
+      "--actor",
+      "agent:divergence-test",
+      "--from",
+      firstId,
+      "--to",
+      secondId,
+      "--type",
+      "duplicates",
+      "--json",
+    ]),
+  );
+  expect((relation.result as { id: string }).id).toMatch(/^rel_/);
+
+  const suppressed = await invoke(home, ["status", "--store", "divergence", "--check", "--json"]);
+  expect(suppressed.exitCode).toBe(0);
+  expect(json(suppressed).result).toMatchObject({
+    healthy: true,
+    advisory_count: 0,
+    advisories: [],
+  });
 });
 
 test("compiled binary maps stable execution categories — @covers T51", async () => {
