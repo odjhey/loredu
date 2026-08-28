@@ -284,8 +284,8 @@ function directedCycleMembers(edges: readonly (readonly [ClaimId, ClaimId])[]): 
 }
 
 /**
- * Deterministic group primitive over an already selected, visible and valid-time-applicable Claim set.
- * Temporal selection, projection summaries and public `current` wiring remain outside this M2-R slice.
+ * Reconciles selected applicable Claims while using a separate full recorded-visible Claim index only
+ * for Resolution reference eligibility. Public `current` composes selection and summaries around it.
  */
 export function reconcileApplicableClaimGroup(input: {
   readonly claims: readonly PositionedClaim[];

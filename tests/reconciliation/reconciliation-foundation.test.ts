@@ -143,7 +143,7 @@ function deeplyFrozen(value: unknown): boolean {
 }
 
 // This bounded M2-R suite executes the internal deterministic engine foundation.
-// Public `current`/temporal query wiring and full projection shapes remain M2-P/E scope.
+// Published `current` behavior and full projection shapes are covered in current-projection.test.ts.
 describe("ADR 0027 deterministic reconciliation foundation", () => {
   test("different actors corroborate into one preferred value without appending a Relation — @covers T20", async () => {
     const first = positionedClaim(1, persistedClaim(ids.c1, { actor: agent }));
