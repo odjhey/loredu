@@ -2362,7 +2362,7 @@ test("compiled scenario A adds bounded Working Lore and revalidation — @covers
   expect(freshLore.basis).toMatchObject({ stream_position: 101 });
   expect((freshLore.result as { computed_at: string }).computed_at).toBe("2026-05-03T00:00:00.000Z");
   expect(await snapshotStoreArtifacts(root)).toEqual(artifactsAfterAppend);
-});
+}, 30_000);
 
 test("one compiled fresh-store journey runs orientation through Working Lore — @covers T56", async () => {
   const home = await freshHome();

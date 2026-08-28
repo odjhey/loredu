@@ -45,7 +45,7 @@ Claim/history lists and the combined status attention/advisory collection add `p
 
 Application advice contains surface-neutral `{rel,action,params,why}`; only CLI JSON adds `run`. Advice is deterministic mechanics, never model output. Exact-key overlap and core key-divergence are not ClaimPolicy advice. If a Claim commits but its feedback scan fails, success still returns that id/position, marks reconciliation unavailable, and advises `lor status`; it never tells the caller to repeat the append.
 
-Two suites automate the same staged journeys:
+Two suites automate the same journeys:
 
 - **application suite** (`bun:test`, fast, majority of cases) — drives the surface-neutral application API directly;
 - **CLI conformance suite** — drives the compiled binary with `--json`, asserting equivalent semantic results, parseable envelopes, runnable renderings, and stable exits.
@@ -171,18 +171,24 @@ This CLI journey is implemented. On an empty matching scope, the command returns
 
 ```text
 $ lor lore --activity investigate --scope repo=rozoro
-orientation: current=1 patterns=0 candidates=0 conflicts=0 needs_revalidation=0
+orientation: current=1 patterns=0 candidates=0 conflicts=0 needs_revalidation=0 attention=0
+activity: investigate
+filters: {"scope":{"pair_count":1,"pairs":[{"key":"repo","value":"rozoro"}]}}
 current: returned=1 total=1
-  (code-area command-registration) location = src/cli/commands   [clm_3333333333333333, resolved]
+  item: <bounded deterministic summary>
+    key: <bounded descriptor anchored at clm_1111111111111111> state=preferred values=1
+    claims: lor claims --same-key-as clm_1111111111111111
+    representative: clm_3333333333333333
+      disclosure: lor show clm_3333333333333333
+      disclosure: lor history clm_3333333333333333
 patterns: returned=0 total=0
 candidates: returned=0 total=0
 conflicts: returned=0 total=0
 needs_revalidation: returned=0 total=0
 budget: used_items=1/40 used_chars=<bounded>/12000
-basis:
-  stream_position: 5
-  ruleset: { core: loredu.reconciliation/v1, claim_policy: { id: loredu.default, version: "1" }, ranker: { id: loredu.baseline, version: "1" } }
-  query: { operation: lore, activity: investigate, valid_at: <computed point>, scope: { repo: rozoro } }
+computed_at: <canonical timestamp>
+reconciliation: {"state":"not-applicable","related":[]}
+basis: {"stream_position":5,"ruleset":{"core":"loredu.reconciliation/v1","claim_policy":{"id":"loredu.default","version":"1"},"ranker":{"id":"loredu.baseline","version":"1"}},"query":{"operation":"lore","activity":"investigate","valid_at":"<same canonical timestamp>","scope":{"repo":"rozoro"}}}
 ```
 
 The application item carries compact state/count/evidence, a key descriptor with anchor Claim and at most two canonical Scope preview pairs, and exactly one or two representative handles copied from M2's exposed values in M2 order. M3 never independently selects them again or reorders them; the disclosure anchor may differ from a selected Resolution replacement representative. `lor claims --same-key-as <anchor-claim>` provides exact-key disclosure rather than raw values/history. `lor show <anchor-claim>` exposes the full key/Scope; the anchored list exposes every value/history under that exact key. All five count lines render even when zero. A section that truncates states full `returned`/`total` and emits its own `lor lore --cursor ...` continuation, including a `returned=0,total>0` section whose cursor resumes `before-first`. Bounded, ranked, and linked — not a record dump.
