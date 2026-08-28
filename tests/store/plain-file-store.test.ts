@@ -1,5 +1,5 @@
 import { afterAll, describe, expect, test } from "bun:test";
-import { mkdir, mkdtemp, readdir, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
@@ -19,7 +19,7 @@ import {
 import {
   decodePlainFileRecord,
   encodePlainFileRecord,
-  PLAIN_FILE_FORMAT,
+  initializePlainFileStore,
   PlainFileStore,
   recordFileName,
 } from "@loredu/store-plainfile";
@@ -28,11 +28,9 @@ const roots = new Set<string>();
 const textDecoder = new TextDecoder();
 
 async function freshRoot(): Promise<string> {
-  const root = await mkdtemp(join(tmpdir(), "loredu-m1f-"));
+  const root = await mkdtemp(join(tmpdir(), "loredu-m1d-"));
   roots.add(root);
-  await mkdir(join(root, ".loredu", "tmp"), { recursive: true });
-  await mkdir(join(root, "records"));
-  await writeFile(join(root, ".loredu", "format.json"), `${JSON.stringify({ format: PLAIN_FILE_FORMAT })}\n`);
+  await initializePlainFileStore(root);
   return root;
 }
 

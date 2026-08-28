@@ -5,11 +5,13 @@ duplicate preservation, hand-inspectable Markdown replay, roots/isolation, locki
 atomic visibility, durable append, scan/stream/head, and crash-safe prefix behavior.
 
 M1-K ships the reusable conformance kit under `@loredu/kernel/testing` and runs it
-against the M1-complete InMemoryStore for T10, T13, and T15. M1-F runs those cases
-unchanged against PlainFileStore and owns T11, T12, and T14. M1-D later owns
-locking, initialization/root resolution, and durable/crash-prefix evidence in
-T16–T18. T19 is not store conformance: application reference semantics live in M0
-records tests, and a semantics-ignorant store must not reject references.
+against the M1-complete InMemoryStore for T10, T13, and T15. The same cases run
+unchanged against PlainFileStore. Provider tests own T11, T12, and T14 replay/codec
+evidence plus T16–T18 locking, initialization/root isolation, durable commit order,
+and injected-failure plus process-kill prefix evidence at every commit boundary. T19
+is not store conformance: application reference
+semantics live in M0 records tests, and a semantics-ignorant store must not reject
+references.
 
 Isolate durable tests with a temporary `LOREDU_HOME`; never write to a real home.
 Contract: [store](../../docs/architecture/contracts/store.md).
