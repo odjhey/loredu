@@ -454,7 +454,7 @@ test("every M1.5 semantic command returns one equivalent JSON envelope — @cove
   expect(json(await invoke(home, ["skill", "--json"]))).toMatchObject({ ok: true, basis: null });
 });
 
-test("compiled Claim additions render every M1.5 policy feedback and committed fallback — @covers T53", async () => {
+test("compiled Claim additions render M2 pair feedback and committed fallback — @covers T53", async () => {
   const home = await freshHome();
   expect((await invoke(home, ["init", "feedback", "--json"])).exitCode).toBe(0);
   const claimArgs = [
@@ -482,7 +482,7 @@ test("compiled Claim additions render every M1.5 policy feedback and committed f
 
   const second = json(await invoke(home, [...claimArgs, "--value", "ready", "--json"]));
   expect(second.reconciliation).toMatchObject({
-    state: "corroboration",
+    state: "duplicate",
     related_count: 1,
     related: [{ id: firstId }],
   });

@@ -211,15 +211,16 @@ describe("M1.5 application mutations and overlap", () => {
 
     expect(callbackCalls).toEqual(["first.validate", "first.semantics"]);
     expect(added.basis.ruleset.claim_policy).toEqual({ id: "test.first", version: "1" });
-    expect([...descriptorReads.values()]).toEqual([1, 1, 1, 1]);
+    expect([...descriptorReads.values()]).toEqual([1, 1, 1, 1, 1]);
   });
 
-  test("same-key values corroborate or conflict with bounded exact-key feedback — @covers T61, T62", async () => {
+  test("M2 Claim feedback selects the exact pair class and preserves bounded conflict advice — @covers T61, T62", async () => {
     const app = application();
-    const first = await app.add(claimDraft({ path: "src/commands", stable: true }));
-    const corroboration = await app.add(claimDraft({ stable: true, path: "src/commands" }));
-    expect(corroboration.reconciliation).toMatchObject({
-      state: "corroboration",
+    const value = { path: "src/commands", stable: true };
+    const first = await app.add(claimDraft(value));
+    const duplicate = await app.add(claimDraft({ stable: true, path: "src/commands" }));
+    expect(duplicate.reconciliation).toMatchObject({
+      state: "duplicate",
       related_count: 1,
       related: [{ id: first.result.id }],
       claims: {
@@ -236,12 +237,20 @@ describe("M1.5 application mutations and overlap", () => {
         },
       },
     });
-    expect(corroboration.advice).toEqual([]);
+    expect(duplicate.advice).toEqual([]);
+
+    const support = await app.add({ ...claimDraft(value), confidence: "confirmed" });
+    expect(support.reconciliation).toMatchObject({ state: "support", related_count: 2 });
+    const corroboration = await app.add({
+      ...claimDraft(value),
+      actor: { type: "human", id: "test.human" },
+    });
+    expect(corroboration.reconciliation).toMatchObject({ state: "corroboration", related_count: 3 });
 
     const conflict = await app.add(claimDraft("src/cli/commands"));
     expect(conflict.reconciliation).toMatchObject({
       state: "conflict-candidate",
-      related_count: 2,
+      related_count: 4,
       related: [{ id: first.result.id }],
     });
     expect(conflict.advice.map(({ action }) => action)).toEqual([
@@ -251,6 +260,23 @@ describe("M1.5 application mutations and overlap", () => {
     ]);
     expect(conflict.advice[1]?.params).toEqual({ id: first.result.id });
     expect(conflict.advice[2]?.params).toEqual({ id: conflict.result.id });
+
+    const temporalApp = application();
+    const january = await temporalApp.add({
+      ...claimDraft("old"),
+      valid_until: "2026-01-31T23:59:59.999Z",
+    });
+    const february = await temporalApp.add({
+      ...claimDraft("new"),
+      valid_from: "2026-02-01T00:00:00.000Z",
+    });
+    expect(february.reconciliation).toMatchObject({
+      state: "temporal-succession",
+      related_count: 1,
+      related: [{ id: january.result.id }],
+    });
+    expect(february.advice).toEqual([]);
+    expect((await temporalApp.status()).result.healthy).toBe(true);
 
     const coexisting: ClaimPolicy = {
       id: "test.coexisting",
@@ -437,6 +463,41 @@ describe("M1.5 application filters, health, and disclosure", () => {
       },
     } satisfies RecordStore;
     await expect(application(corruptStore).status()).rejects.toMatchObject({ code: "STORE_CORRUPT" });
+  });
+
+  test("M2 status resolves only overlapping exclusive conflict endpoints while succession stays healthy — @covers T64", async () => {
+    const app = application();
+    const old = await app.add({
+      ...claimDraft("old"),
+      valid_until: "2026-01-31T23:59:59.999Z",
+    });
+    const alternative = await app.add({
+      ...claimDraft("alternative"),
+      valid_until: "2026-01-31T23:59:59.999Z",
+    });
+    const future = await app.add({
+      ...claimDraft("future"),
+      valid_from: "2026-02-01T00:00:00.000Z",
+    });
+    expect(future.reconciliation.state).toBe("temporal-succession");
+    expect((await app.status()).result).toMatchObject({
+      healthy: false,
+      health: { unresolved_exclusive_groups: 1 },
+      attention: [{ kind: "unresolved-exclusive-group", claim_count: 2 }],
+    });
+
+    await app.add({
+      kind: "resolution",
+      actor,
+      targets: [old.result.id, alternative.result.id] as never,
+      decision: "prefer",
+      replacement: alternative.result.id as never,
+      reason: "covers the exact overlapping conflict set",
+    });
+    expect((await app.status()).result).toMatchObject({
+      healthy: true,
+      health: { unresolved_exclusive_groups: 0 },
+    });
   });
 
   test("generic equal-value key divergence is advisory-only and backward duplicate edges suppress it — @covers T68", async () => {

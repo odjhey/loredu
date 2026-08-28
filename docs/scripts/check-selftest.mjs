@@ -116,7 +116,7 @@ const CASES = [
     name: "T-number accounted for nowhere",
     script: "check-catalog.mjs",
     expect: "unaccounted",
-    mutate: (root) => editJson(root, STATUS, (d) => delete d.deferred.T20),
+    mutate: (root) => editJson(root, STATUS, (d) => delete d.deferred.T24),
   },
   {
     name: "T-number both implemented and deferred",
@@ -126,7 +126,7 @@ const CASES = [
       write(
         root,
         "tests/records/entry.test.ts",
-        'import { test, expect } from "bun:test"\n\n// @covers T20\ntest("store conformance", () => { expect(1).toBe(1) })\n',
+        'import { test, expect } from "bun:test"\n\n// @covers T24\ntest("store conformance", () => { expect(1).toBe(1) })\n',
       ),
   },
   {
@@ -143,11 +143,11 @@ const CASES = [
     script: "check-catalog.mjs",
     expect: "placeholder",
     mutate: (root) => {
-      editJson(root, STATUS, (d) => delete d.deferred.T20);
+      editJson(root, STATUS, (d) => delete d.deferred.T24);
       write(
         root,
         "tests/records/entry.test.ts",
-        'import { test } from "bun:test"\n\n// @covers T20\ntest("store conformance", () => {})\n',
+        'import { test } from "bun:test"\n\n// @covers T24\ntest("store conformance", () => {})\n',
       );
     },
   },
@@ -156,11 +156,11 @@ const CASES = [
     script: "check-catalog.mjs",
     expect: "placeholder",
     mutate: (root) => {
-      editJson(root, STATUS, (d) => delete d.deferred.T20);
+      editJson(root, STATUS, (d) => delete d.deferred.T24);
       write(
         root,
         "tests/records/entry.test.ts",
-        'import { test, expect } from "bun:test"\n\n// @covers T20\ntest.skip("store conformance", () => { expect(1).toBe(1) })\n',
+        'import { test, expect } from "bun:test"\n\n// @covers T24\ntest.skip("store conformance", () => { expect(1).toBe(1) })\n',
       );
     },
   },
@@ -170,7 +170,7 @@ const CASES = [
     expect: "status",
     mutate: (root) =>
       editJson(root, STATUS, (d) => {
-        d.deferred.T20 = { reason: "no milestone given" };
+        d.deferred.T24 = { reason: "no milestone given" };
       }),
   },
 ];

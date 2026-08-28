@@ -3,26 +3,6 @@
   "catalog": "docs/v0.x/execution/first-user-journey.md",
   "note": "Every catalog T-number is either claimed by an executable test under tests/ (via an @covers annotation) or listed here with the milestone that will implement it. Never both, never neither. See ADR 0015.",
   "deferred": {
-    "T20": {
-      "milestone": "M2",
-      "group": "M2 — reconciliation, resolution, projections",
-      "reason": "reconciliation and projection engine not implemented yet"
-    },
-    "T21": {
-      "milestone": "M2",
-      "group": "M2 — reconciliation, resolution, projections",
-      "reason": "reconciliation and projection engine not implemented yet"
-    },
-    "T22": {
-      "milestone": "M2",
-      "group": "M2 — reconciliation, resolution, projections",
-      "reason": "reconciliation and projection engine not implemented yet"
-    },
-    "T23": {
-      "milestone": "M2",
-      "group": "M2 — reconciliation, resolution, projections",
-      "reason": "reconciliation and projection engine not implemented yet"
-    },
     "T24": {
       "milestone": "M2",
       "group": "M2 — reconciliation, resolution, projections",
@@ -107,11 +87,6 @@
       "milestone": "M3",
       "group": "Pagination and link-following (ADR 0009)",
       "reason": "Working Lore section continuation lands in M3"
-    },
-    "T86": {
-      "milestone": "M2",
-      "group": "M2 — reconciliation, resolution, projections",
-      "reason": "value canonicalization lands with the kernel in M0; its use in conflict detection is M2"
     }
   }
 }

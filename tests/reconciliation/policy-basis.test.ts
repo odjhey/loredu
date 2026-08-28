@@ -215,14 +215,14 @@ describe("M0 ClaimPolicy seam", () => {
     expect(Object.isFrozen(first)).toBe(true);
   });
 
-  test("custom policy identity is validated without callback execution and remapping is rejected", async () => {
+  test("custom policy identity and optional advice are captured without callback execution; remapping rejects", async () => {
     const key = claimKeyOf(claim);
     const customIssue: LoreduIssue = Object.freeze({
       code: "FORMAT",
       path: "/predicate",
       message: "consumer policy refuses this predicate",
     });
-    const calls = { validate: 0, semantics: 0 };
+    const calls = { validate: 0, semantics: 0, advise: 0 };
     const custom: ClaimPolicy = {
       id: "consumer.policy",
       version: "2024-08-28",
@@ -236,12 +236,16 @@ describe("M0 ClaimPolicy seam", () => {
         calls.semantics++;
         return "coexisting";
       },
+      advise() {
+        calls.advise++;
+        return [];
+      },
     };
     expect(createRulesetIdentity(custom)).toEqual({
       core: "loredu.reconciliation/v1",
       claim_policy: { id: "consumer.policy", version: "2024-08-28" },
     });
-    expect(calls).toEqual({ validate: 0, semantics: 0 });
+    expect(calls).toEqual({ validate: 0, semantics: 0, advise: 0 });
     expect(custom.validateClaimKey(key)).toEqual([customIssue]);
     expect(custom.validateClaimKey(key)).toEqual([customIssue]);
     expect(custom.semantics(key)).toBe("coexisting");
@@ -261,6 +265,8 @@ describe("M0 ClaimPolicy seam", () => {
         })
       ).record.kind,
     ).toBe("entry");
+    await app.append({ ...claim, predicate: "accepted-by-consumer" });
+    expect(calls.advise).toBe(0);
 
     let remapCalls = 0;
     const remapping = {
@@ -295,7 +301,8 @@ describe("M0 ClaimPolicy seam", () => {
       { ...custom, version: "" },
       { id: "consumer.policy", version: "1", semantics: custom.semantics },
       { id: "consumer.policy", version: "1", validateClaimKey: custom.validateClaimKey },
-      { ...custom, advise: () => [] },
+      { ...custom, advise: "not-callable" },
+      { ...custom, advisories: () => [] },
     ])
       expect(() => createRulesetIdentity(malformed as ClaimPolicy)).toThrow(LoreduError);
   });
@@ -310,9 +317,12 @@ describe("M0 ClaimPolicy seam", () => {
       semantics() {
         return "exclusive";
       },
+      advise() {
+        return Object.freeze([]);
+      },
     };
 
-    for (const field of ["id", "version", "validateClaimKey", "semantics"] as const) {
+    for (const field of ["id", "version", "validateClaimKey", "semantics", "advise"] as const) {
       let getterCalls = 0;
       const accessorPolicy = { ...custom };
       Object.defineProperty(accessorPolicy, field, {

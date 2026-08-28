@@ -12,10 +12,11 @@ import {
   scalarLength,
 } from "../domain/portable-json";
 import { LoreduError, type LoreduIssue, type LoreduIssueCode } from "../errors";
+import type { ClaimPolicyAdviceContext, PolicyAdvisoryDraft } from "../reconciliation";
 
 const TOKEN = /^[a-z0-9](?:[a-z0-9._:/-]*[a-z0-9])?$/;
-const POLICY_FIELDS = new Set(["id", "version", "validateClaimKey", "semantics"]);
-const FORBIDDEN_POLICY_FIELDS = ["identity", "advise", "advisories"] as const;
+const POLICY_FIELDS = new Set(["id", "version", "validateClaimKey", "semantics", "advise"]);
+const FORBIDDEN_POLICY_FIELDS = ["identity", "advisories"] as const;
 const ISSUE_CODES: ReadonlySet<LoreduIssueCode> = new Set([
   "REQUIRED",
   "TYPE",
@@ -38,6 +39,7 @@ export interface ClaimPolicy {
   readonly version: string;
   validateClaimKey(key: ClaimKey): readonly LoreduIssue[];
   semantics(key: ClaimKey): ClaimSemantics;
+  advise?(context: ClaimPolicyAdviceContext): readonly PolicyAdvisoryDraft[];
 }
 
 function orderedIssues(issues: readonly LoreduIssue[]): readonly LoreduIssue[] {
@@ -151,6 +153,7 @@ export interface ValidatedClaimPolicy {
   readonly version: string;
   validateClaimKey(key: ClaimKey): unknown;
   semantics(key: ClaimKey): unknown;
+  advise?(context: ClaimPolicyAdviceContext): unknown;
 }
 
 function invalidCallbackResult(message: string): readonly LoreduIssue[] {
@@ -269,11 +272,14 @@ export function validateClaimPolicy(policy: unknown): ValidatedClaimPolicy {
   const version = readDataProperty(policy, "version", "/version", issues);
   const validator = readDataProperty(policy, "validateClaimKey", "/validateClaimKey", issues);
   const semantics = readDataProperty(policy, "semantics", "/semantics", issues);
+  const advise = readDataProperty(policy, "advise", "/advise", issues);
   const parsedId = validateToken(id, "/id", issues);
   const parsedVersion = validateToken(version, "/version", issues);
   if (typeof validator !== "function")
     issues.push(makeIssue("TYPE", "/validateClaimKey", "must be a function"));
   if (typeof semantics !== "function") issues.push(makeIssue("TYPE", "/semantics", "must be a function"));
+  if (advise !== undefined && typeof advise !== "function")
+    issues.push(makeIssue("TYPE", "/advise", "must be a function when present"));
 
   const ordered = orderedIssues(issues);
   if (
@@ -281,12 +287,14 @@ export function validateClaimPolicy(policy: unknown): ValidatedClaimPolicy {
     !parsedId ||
     !parsedVersion ||
     typeof validator !== "function" ||
-    typeof semantics !== "function"
+    typeof semantics !== "function" ||
+    (advise !== undefined && typeof advise !== "function")
   )
     throw new LoreduError("VALIDATION_FAILED", "ClaimPolicy validation failed", ordered);
   const capturedPolicy = policy as ClaimPolicy;
   const capturedValidator = validator;
   const capturedSemantics = semantics;
+  const capturedAdvise = advise;
   return Object.freeze({
     policy: capturedPolicy,
     id: parsedId,
@@ -297,5 +305,12 @@ export function validateClaimPolicy(policy: unknown): ValidatedClaimPolicy {
     semantics(key: ClaimKey): unknown {
       return intrinsicReflectApply(capturedSemantics, capturedPolicy, [key]);
     },
+    ...(typeof capturedAdvise !== "function"
+      ? {}
+      : {
+          advise(context: ClaimPolicyAdviceContext): unknown {
+            return intrinsicReflectApply(capturedAdvise, capturedPolicy, [context]);
+          },
+        }),
   });
 }
