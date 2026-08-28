@@ -195,9 +195,7 @@ function backwardResolution(
   visibleById: ReadonlyMap<string, PositionedRecord>,
 ): boolean {
   const replacement =
-    resolution.record.replacement === undefined
-      ? undefined
-      : visibleById.get(resolution.record.replacement);
+    resolution.record.replacement === undefined ? undefined : visibleById.get(resolution.record.replacement);
   return (
     resolution.record.targets.length > 0 &&
     resolution.record.targets.every((id) => {
