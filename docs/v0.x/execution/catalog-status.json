@@ -2,21 +2,5 @@
   "schema": "loredu.catalog-status/v1",
   "catalog": "docs/v0.x/execution/first-user-journey.md",
   "note": "Every catalog T-number is either claimed by an executable test under tests/ (via an @covers annotation) or listed here with the milestone that will implement it. Never both, never neither. See ADR 0015.",
-  "deferred": {
-    "T40": {
-      "milestone": "M3-E",
-      "group": "M3 — Working Lore",
-      "reason": "requires compiled five-line lore rendering and exit behavior; the M3-L application slice does not claim it"
-    },
-    "T54": {
-      "milestone": "M3-E",
-      "group": "CLI conformance (compiled binary)",
-      "reason": "the M2 narrative is covered, but the full row awaits M3-E compiled Working Lore revalidation"
-    },
-    "T56": {
-      "milestone": "M3-E",
-      "group": "CLI conformance (compiled binary)",
-      "reason": "the M1.5 and M2 portions are implemented; the complete journey awaits M3-E compiled lore"
-    }
-  }
+  "deferred": {}
 }

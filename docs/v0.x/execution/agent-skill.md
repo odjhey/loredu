@@ -1,6 +1,6 @@
 ---
 name: agent_skill
-description: "Agent guide shipped inside the lor binary (printed by `lor skill`), with M2 Current Knowledge and temporal projection guidance."
+description: "Agent guide shipped inside the lor binary (printed by `lor skill`), with bounded M3 Working Lore and exact disclosure guidance."
 type: plan
 tags: [v0.x, execution, agents, skill]
 status: current
@@ -8,14 +8,13 @@ generated: "Claude Fable 5 (Claude Code) and OpenAI coding agent gpt-5.6-sol, 20
 created_at: 2026-08-26T00:00:00+08:00
 ---
 
-# Agent skill (M2 v2)
+# Agent skill (M3 v3)
 
 This is the source guide embedded in the `lor` binary and printed by `lor skill`.
-Version 2 adds M2 computed Current Knowledge while retaining explicit human/agent
-judgment; it is revised again when M3 (`lor lore`) lands. A repo-level
-`.agents/skills` wrapper should defer to `lor skill` rather than duplicating this
-text. Every command and rendered continuation or disclosure action named below is
-executable.
+Version 3 adds bounded Working Lore while retaining M2 Current Knowledge and
+explicit human/agent judgment. A repo-level `.agents/skills` wrapper should defer
+to `lor skill` rather than duplicating this text. Every command and rendered
+continuation or disclosure action named below is executable.
 
 ---
 
@@ -33,13 +32,17 @@ agent's) start from what you record now.
 
 ### The loop
 
-1. **Orient.** `lor current --scope <key=value> --json` — read bounded Current
-   Knowledge, its Basis, and mechanical reconciliation before starting. Follow
-   its continuation command when the first page is insufficient. Then run
-   `lor status --json` to see unresolved health and advisories. If either reports
-   `STORE_NOT_FOUND`, run `lor init` for the default store and retry. Use
-   `lor claims --scope <key=value>` when you need canonical Claim history rather
-   than the projection.
+1. **Orient with Working Lore.**
+   `lor lore --activity <activity> --scope <key=value> --json` returns bounded
+   current knowledge plus separate patterns, candidates, conflicts, and
+   revalidation attention for this activity. It always reports full section
+   totals, page-local budget use, `computed_at`, and a Basis. If it reports
+   `STORE_NOT_FOUND`, run `lor init` for the default store and retry. Then run
+   `lor status --json` to see blocking health and non-blocking advisories.
+   Use `lor current --scope <key=value> --json` instead when you need the full
+   mechanical projection, temporal queries, or combined-stream pagination rather
+   than an activity packet. Use `lor claims --scope <key=value>` for canonical
+   Claim records rather than either projection.
 2. **Record entries as you go.** Every finding worth keeping:
    `echo "<free text>" | lor add entry --actor agent:<agent-id> --type finding --title "..." --source-json '{"ref":"<source>","snapshot":"<version>"}' --body -`
    Entries are cheap. When in doubt, record.
@@ -52,11 +55,13 @@ agent's) start from what you record now.
    reconciliation only works when keys converge.
 4. **Follow the response.** Run each `advice:` command that appears.
    Corrective advice points only at real, mechanical issues (same-key overlap,
-   unresolved groups, dangling references), never guesses.
-   Responses are also your map: navigate by the embedded commands and ids
-   instead of constructing calls from memory. When a list says more exists,
-   the continuation command (with its `--cursor`) is in the response — use
-   it only if the bounded view was not enough.
+   unresolved groups, dangling references), never guesses. Responses are also
+   your map: navigate by embedded commands instead of constructing hidden calls
+   from memory. Working Lore gives each truncated section its own
+   `lor lore --cursor ...` command, even when that section returned zero items.
+   Follow only the sections needed for the activity. Start with default budgets;
+   use `--max-items` and `--max-chars` to make the packet smaller or to change a
+   continuation page. Full totals remain pinned while page-local use changes.
 5. **Judge conflicts yourself.** When lor reports a conflict candidate, run
    its exact-key `lor claims` advice and every continuation command. Inspect
    every Claim in the complete current group and verify against the source.
@@ -71,12 +76,17 @@ agent's) start from what you record now.
    question beats a guessed answer. Never try to delete the losing claim. A
    Claim appended after your list reopens the group; follow `status` and record
    a later Resolution covering the enlarged group.
-6. **Time-travel when needed.** `lor current --as-of <rfc3339>` asks what was
-   recorded by that inclusive instant and also uses it as the default valid-time
-   point. `lor current --valid-at <rfc3339>` uses all recorded knowledge about
-   that external-world point. Combine both flags to keep recorded and valid time
-   independent. Current Knowledge is derived and bounded; follow its Claim,
-   show, history, and continuation actions for complete canonical disclosure.
+6. **Disclose and time-travel when needed.** A Working Lore item carries an
+   exact-key `lor claims --same-key-as <anchor-claim>` action and one or two
+   representative handles. Follow the anchored Claim list and every continuation
+   to inspect every value, including omitted or superseded history. `show` on the
+   anchor exposes the complete key and Scope; representative `show` and `history`
+   reach evidence and referenced Entries. SourceRefs are terminal external
+   provenance, not Loredu record ids. For time travel,
+   `lor current --as-of <rfc3339>` asks what was recorded by that inclusive
+   instant and uses it as the default valid-time point. `--valid-at <rfc3339>`
+   selects the external-world point; combine both flags to keep the dimensions
+   independent.
 7. **Relate what you notice.** If two claims support or contradict each other
    and lor has not linked them, record it:
    `lor relate --actor agent:<agent-id> --from <a> --to <b> --type supports`
@@ -101,6 +111,13 @@ agent's) start from what you record now.
 - Provenance always: `--source-json` with a snapshot on entries and
   `--derived-from` on claims. A claim you cannot trace is a claim nobody can
   trust later.
+- Treat Working Lore as orientation, not truth. Its Ranker orders mechanically;
+  it does not judge. Record a Relation, Resolution, or Verification for every
+  judgment instead of guessing or treating packet rank as a decision.
+- Check Basis before reusing a packet: store head, query, core, ClaimPolicy, and
+  Ranker identity must still match. Any append makes v0.x Working Lore stale.
+  Continue an emitted cursor for its pinned old packet; make a fresh cursorless
+  call when you need the new head.
 - Reasons on resolutions state what you verified, not your reasoning chain.
 - Use `--json` when you need to parse. Exit 0 is ordinary success; exit 5 is
   also successful execution but means `status --check` found unhealthy state.
@@ -111,5 +128,5 @@ agent's) start from what you record now.
 
 ## Revision triggers
 
-- **M3:** orientation step becomes `lor lore --activity <kind> --scope <scope>`;
-  drill-down guidance for handles.
+- **M4:** revise ranking guidance only after a real consumer supplies and evaluates
+  a versioned custom Ranker; deterministic baseline rank is not a quality claim.

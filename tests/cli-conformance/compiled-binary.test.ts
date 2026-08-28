@@ -1129,6 +1129,97 @@ test("bare binary is live orientation and command help is strict — @covers T58
   expect((json(unknown).error as { message: string }).message).toContain("--wat");
 });
 
+test("compiled empty Working Lore is definitive and grammar-safe — @covers T40", async () => {
+  const home = await freshHome();
+  const selector = "empty-lore";
+  const initialized = json(await invoke(home, ["init", selector, "--json"]));
+  const root = (initialized.result as { root: string }).root;
+  const before = await snapshotStoreArtifacts(root);
+
+  const text = await invoke(home, [
+    "lore",
+    "--store",
+    selector,
+    "--activity",
+    "investigate",
+    "--scope",
+    "repo=loredu",
+  ]);
+  expect(text.exitCode).toBe(0);
+  expect(text.stderr).toBe("");
+  for (const section of ["current", "patterns", "candidates", "conflicts", "needs_revalidation"])
+    expect(text.stdout).toContain(`${section}: returned=0 total=0`);
+  expect(text.stdout).toContain("budget: used_items=0/40 used_chars=0/12000");
+  expect(text.stdout).toContain('"ranker":{"id":"loredu.baseline","version":"1"}');
+  expect(text.stdout).toContain("computed_at: ");
+
+  const response = json(
+    await invoke(home, [
+      "lore",
+      "--store",
+      selector,
+      "--activity",
+      "investigate",
+      "--scope",
+      "repo=loredu",
+      "--json",
+    ]),
+  );
+  const packet = (response.result as { packet: Record<string, unknown> }).packet as {
+    budget: { max_items: number; max_chars: number; used_items: number; used_chars: number };
+    sections: { name: string; items: unknown[]; page: { returned: number; total: number } }[];
+    orientation: Record<string, number>;
+  };
+  expect(packet.budget).toEqual({ max_items: 40, max_chars: 12000, used_items: 0, used_chars: 0 });
+  expect(packet.sections.map(({ name, items, page }) => ({ name, items, page }))).toEqual(
+    ["current", "patterns", "candidates", "conflicts", "needs_revalidation"].map((name) => ({
+      name,
+      items: [],
+      page: { returned: 0, total: 0 },
+    })),
+  );
+  expect(packet.orientation).toEqual({
+    current_count: 0,
+    pattern_count: 0,
+    candidate_count: 0,
+    conflict_count: 0,
+    needs_revalidation_count: 0,
+    attention_count: 0,
+  });
+  expect(response.basis).toMatchObject({
+    stream_position: 0,
+    ruleset: { ranker: { id: "loredu.baseline", version: "1" } },
+    query: { operation: "lore", activity: "investigate", scope: { repo: "loredu" } },
+  });
+  expect((response.result as { computed_at: string }).computed_at).toMatch(/^\d{4}-\d{2}-\d{2}T.*\.\d{3}Z$/);
+  expect(response.advice).toEqual([]);
+  expect(await snapshotStoreArtifacts(root)).toEqual(before);
+
+  const help = await invoke(home, ["lore", "--help"]);
+  expect(help).toMatchObject({ exitCode: 0, stderr: "" });
+  expect(help.stdout).toStartWith("usage: lor lore --activity <token>");
+  for (const args of [
+    ["lore", "--store", selector, "--wat", "--json"],
+    ["lore", "--store", selector, "--activity", "one", "--activity", "two", "--json"],
+    ["lore", "--store", selector, "--cursor", "bad", "--activity", "one", "--json"],
+    [
+      "lore",
+      "--store",
+      selector,
+      "--activity",
+      "one",
+      "--corpus-json",
+      '{"ref":"repo=loredu","snapshot":"v1","extra":true}',
+      "--json",
+    ],
+  ]) {
+    const failed = await invoke(home, args);
+    expect(failed.exitCode).toBe(2);
+    expect(["CLI_USAGE", "VALIDATION_FAILED"]).toContain((json(failed).error as { code: string }).code);
+  }
+  expect(await snapshotStoreArtifacts(root)).toEqual(before);
+});
+
 test("claims/history filters and status checks paginate with preserved selectors and limits", async () => {
   const home = await freshHome();
   const selector = join(home, "query store's records");
@@ -1688,9 +1779,116 @@ test("compiled cursors reject malformed and wrong operation/query/ruleset/store 
   expect(wrongStore.exitCode).toBe(2);
   expect((json(wrongStore).error as { code: string }).code).toBe("CURSOR_MISMATCH");
   expect(json(wrongStore).result as unknown).toBeNull();
+
+  const firstLore = json(
+    await invoke(home, [
+      "lore",
+      "--store",
+      "left",
+      "--activity",
+      "cursor-test",
+      "--max-items",
+      "1",
+      "--max-chars",
+      "512",
+      "--json",
+    ]),
+  );
+  const loreCurrent = (
+    firstLore.result as {
+      packet: {
+        sections: Array<{ name: string; page: { cursor?: string; returned: number; total: number } }>;
+      };
+    }
+  ).packet.sections.find(({ name }) => name === "current");
+  const loreCursor = loreCurrent?.page.cursor as string;
+  expect(loreCurrent?.page).toMatchObject({ returned: 1, total: 3 });
+  const validLoreContinuation = json(
+    await invoke(home, [
+      "lore",
+      "--store",
+      "left",
+      "--cursor",
+      loreCursor,
+      "--max-items",
+      "1",
+      "--max-chars",
+      "512",
+      "--json",
+    ]),
+  );
+  expect(
+    (
+      validLoreContinuation.result as {
+        packet: {
+          sections: Array<{
+            name: string;
+            items: unknown[];
+            page: { returned: number; total: number; cursor?: string };
+          }>;
+        };
+      }
+    ).packet.sections,
+  ).toEqual([
+    {
+      name: "current",
+      items: expect.any(Array),
+      page: { returned: 1, total: 3, cursor: expect.any(String) },
+    },
+  ]);
+
+  const loreFailures: Array<{ args: string[]; code: string }> = [
+    {
+      args: ["claims", "--store", "left", "--cursor", loreCursor, "--json"],
+      code: "CURSOR_MISMATCH",
+    },
+    {
+      args: ["lore", "--store", "right", "--cursor", loreCursor, "--json"],
+      code: "CURSOR_MISMATCH",
+    },
+  ];
+  const malformedDigest = cursorPayload(loreCursor);
+  (malformedDigest.rank as { permutation_digest: string }).permutation_digest = "*";
+  loreFailures.push({
+    args: ["lore", "--store", "left", "--cursor", encodeCursor(malformedDigest), "--json"],
+    code: "INVALID_CURSOR",
+  });
+  const changedDigest = cursorPayload(loreCursor);
+  (changedDigest.rank as { permutation_digest: string }).permutation_digest = "A".repeat(43);
+  loreFailures.push({
+    args: ["lore", "--store", "left", "--cursor", encodeCursor(changedDigest), "--json"],
+    code: "CURSOR_MISMATCH",
+  });
+  const mismatchedQuery = cursorPayload(loreCursor);
+  (mismatchedQuery.query as { activity: string }).activity = "other";
+  loreFailures.push({
+    args: ["lore", "--store", "left", "--cursor", encodeCursor(mismatchedQuery), "--json"],
+    code: "INVALID_CURSOR",
+  });
+  const changedRuleset = cursorPayload(loreCursor);
+  (changedRuleset.basis as { ruleset: { ranker: { version: string } } }).ruleset.ranker.version = "foreign";
+  loreFailures.push({
+    args: ["lore", "--store", "left", "--cursor", encodeCursor(changedRuleset), "--json"],
+    code: "CURSOR_MISMATCH",
+  });
+  const impossibleResume = cursorPayload(loreCursor);
+  const resume = (impossibleResume.rank as { resume: { section_ordinal: number } }).resume;
+  resume.section_ordinal = 99;
+  loreFailures.push({
+    args: ["lore", "--store", "left", "--cursor", encodeCursor(impossibleResume), "--json"],
+    code: "CURSOR_MISMATCH",
+  });
+  for (const { args, code } of loreFailures) {
+    const failure = await invoke(home, args);
+    expect(failure.exitCode).toBe(2);
+    const envelope = json(failure);
+    expect((envelope.error as { code: string }).code).toBe(code);
+    expect(envelope.result).toBeNull();
+  }
+  expect(Number(await new PlainFileStore(join(home, "stores", "left")).head())).toBe(3);
 });
 
-test("M2 scenario A compares technical derivation with manual judgment without changing history", async () => {
+test("compiled scenario A adds bounded Working Lore and revalidation — @covers T54", async () => {
   const home = await freshHome();
   const selector = "scenario-a";
   const initialized = json(await invoke(home, ["init", selector, "--json"]));
@@ -1998,6 +2196,476 @@ test("M2 scenario A compares technical derivation with manual judgment without c
   expect(await run("2026-04-01T00:00:00.000Z", ["current", "--scope", "repo=loredu"])).toEqual(current);
   expect(Number(await new PlainFileStore(root).head())).toBe(10);
   expect(await snapshotStoreArtifacts(root)).toEqual(artifactsBeforeProjection);
+
+  const revalidation = await run("2026-04-02T00:00:00.000Z", [
+    "add",
+    "verification",
+    "--actor",
+    "agent:scenario-a",
+    "--target",
+    claimThreeId,
+    "--verified-against-json",
+    '{"ref":"repo=loredu","locator":"commands","snapshot":"code-v3"}',
+    "--result",
+    "needs_revalidation",
+  ]);
+  expect((revalidation.result as { id: string }).id).toMatch(/^ver_/);
+  for (let index = 0; index < 89; index += 1) {
+    await addEntry(
+      `2026-04-${String(3 + (index % 26)).padStart(2, "0")}T00:00:00.000Z`,
+      `Historical investigation note ${index}`,
+      `growth-${index}`,
+    );
+  }
+  expect(Number(await new PlainFileStore(root).head())).toBe(100);
+  const scanAtHundred = await new PlainFileStore(root).scan();
+  expect(scanAtHundred.records).toHaveLength(100);
+  expect(scanAtHundred.records.filter(({ record }) => record.kind === "entry")).toHaveLength(92);
+  const artifactsAtHundred = await snapshotStoreArtifacts(root);
+
+  const lore = await run("2026-05-01T00:00:00.000Z", [
+    "lore",
+    "--activity",
+    "investigate",
+    "--scope",
+    "repo=loredu",
+    "--corpus-json",
+    '{"ref":"repo=loredu","locator":"commands","snapshot":"code-v4"}',
+    "--max-items",
+    "1",
+    "--max-chars",
+    "512",
+  ]);
+  const loreResult = lore.result as {
+    computed_at: string;
+    packet: {
+      orientation: Record<string, number>;
+      budget: Record<string, number>;
+      sections: Array<{
+        name: string;
+        items: Array<{
+          summary: string;
+          revalidation?: { verification_count: number; snapshot_mismatch_count: number };
+          knowledge: {
+            claims: { run: string };
+            representatives: Array<{ id: string; affordances: Array<{ action: string; run: string }> }>;
+          };
+        }>;
+        page: { returned: number; total: number; cursor?: string };
+      }>;
+    };
+  };
+  expect(lore).toMatchObject({
+    ok: true,
+    basis: {
+      stream_position: 100,
+      ruleset: { ranker: { id: "loredu.baseline", version: "1" } },
+      query: { operation: "lore", activity: "investigate", scope: { repo: "loredu" } },
+    },
+  });
+  expect(loreResult.computed_at).toBe("2026-05-01T00:00:00.000Z");
+  expect(loreResult.packet.orientation).toMatchObject({
+    current_count: 1,
+    conflict_count: 0,
+    needs_revalidation_count: 1,
+  });
+  expect(loreResult.packet.budget).toMatchObject({
+    max_items: 1,
+    max_chars: 512,
+    used_items: 1,
+  });
+  expect(loreResult.packet.budget.used_chars).toBeLessThanOrEqual(512);
+  const currentSection = loreResult.packet.sections.find(({ name }) => name === "current");
+  const revalidationSection = loreResult.packet.sections.find(({ name }) => name === "needs_revalidation");
+  expect(currentSection?.page).toMatchObject({ returned: 0, total: 1 });
+  expect(currentSection?.page.cursor).toStartWith("loredu.cursor.v1.");
+  expect(revalidationSection?.page).toEqual({ returned: 1, total: 1 });
+  expect(revalidationSection?.items[0]?.revalidation).toEqual({
+    verification_count: 1,
+    snapshot_mismatch_count: 1,
+  });
+  const oldContinuation = (
+    lore.advice as Array<{ action: string; params: { cursor?: string }; run: string }>
+  ).find(({ action, params }) => action === "lore.read" && params.cursor === currentSection?.page.cursor);
+  expect(oldContinuation?.run).toContain(" --store scenario-a lore --cursor ");
+  expect(oldContinuation?.run).toContain(" --max-items 1 --max-chars 512");
+
+  const attentionItem = revalidationSection?.items[0];
+  const anchoredFirst = json(
+    await invokeShell(home, `${attentionItem?.knowledge.claims.run as string} --limit 2 --json`),
+  );
+  const anchoredIds = (anchoredFirst.result as Array<{ id: string }>).map(({ id }) => id);
+  const anchoredNext = (anchoredFirst.advice as Array<{ action: string; run: string }>).find(
+    ({ action }) => action === "claims.list",
+  );
+  expect(anchoredNext?.run).toContain(" --store scenario-a claims --cursor ");
+  const anchoredSecond = json(await invokeShell(home, `${anchoredNext?.run as string} --json`));
+  anchoredIds.push(...(anchoredSecond.result as Array<{ id: string }>).map(({ id }) => id));
+  expect(anchoredIds).toEqual([claimOneId, claimTwoId, claimThreeId]);
+
+  const representative = attentionItem?.knowledge.representatives[0];
+  expect(representative?.id).toBe(claimThreeId);
+  const representativeShow = representative?.affordances.find(({ action }) => action === "record.show")?.run;
+  const representativeHistory = representative?.affordances.find(
+    ({ action }) => action === "record.history",
+  )?.run;
+  const shownRepresentative = json(await invokeShell(home, `${representativeShow as string} --json`));
+  const historyRepresentative = json(await invokeShell(home, `${representativeHistory as string} --json`));
+  expect((historyRepresentative.result as Array<{ id: string }>).map(({ id }) => id)).toContain(claimThreeId);
+  const entryThreeId = (entryThree.result as { id: string }).id;
+  const entryHandle = (
+    shownRepresentative.result as {
+      handles: Array<{ id: string; affordances: Array<{ action: string; run: string }> }>;
+    }
+  ).handles.find(({ id }) => id === entryThreeId);
+  const shownEntryFromHandle = json(
+    await invokeShell(
+      home,
+      `${entryHandle?.affordances.find(({ action }) => action === "record.show")?.run as string} --json`,
+    ),
+  );
+  expect((shownEntryFromHandle.result as { record: { sources: JsonValue[] } }).record.sources).toEqual([
+    { ref: "repo=loredu", locator: "commands", snapshot: "code-v3" },
+  ]);
+  expect(await snapshotStoreArtifacts(root)).toEqual(artifactsAtHundred);
+
+  const appended = await addClaim(
+    "2026-05-02T00:00:00.000Z",
+    "src/cli/commands plus dynamic plugins",
+    entryThreeId,
+    "2026-05-01T00:00:00.000Z",
+  );
+  expect((appended.result as { id: string }).id).toMatch(/^clm_/);
+  expect(Number(await new PlainFileStore(root).head())).toBe(101);
+  const artifactsAfterAppend = await snapshotStoreArtifacts(root);
+  const continuedOld = json(await invokeShell(home, `${oldContinuation?.run as string} --json`));
+  expect(continuedOld.basis).toMatchObject({ stream_position: 100 });
+  expect((continuedOld.result as { computed_at: string }).computed_at).toBe("2026-05-01T00:00:00.000Z");
+  expect(
+    (continuedOld.result as { packet: { sections: Array<{ name: string }> } }).packet.sections.map(
+      ({ name }) => name,
+    ),
+  ).toEqual(["current"]);
+  const freshLore = await run("2026-05-03T00:00:00.000Z", [
+    "lore",
+    "--activity",
+    "investigate",
+    "--scope",
+    "repo=loredu",
+    "--corpus-json",
+    '{"ref":"repo=loredu","locator":"commands","snapshot":"code-v4"}',
+    "--max-items",
+    "1",
+    "--max-chars",
+    "512",
+  ]);
+  expect(freshLore.basis).toMatchObject({ stream_position: 101 });
+  expect((freshLore.result as { computed_at: string }).computed_at).toBe("2026-05-03T00:00:00.000Z");
+  expect(await snapshotStoreArtifacts(root)).toEqual(artifactsAfterAppend);
+});
+
+test("one compiled fresh-store journey runs orientation through Working Lore — @covers T56", async () => {
+  const home = await freshHome();
+  const selector = "journey-m3";
+  const initialized = json(await invoke(home, ["init", selector, "--json"]));
+  const root = (initialized.result as { root: string }).root;
+  let ordinal = 140;
+  const run = async (instant: string, args: readonly string[]): Promise<Record<string, unknown>> => {
+    const invocation = await invokeConformance(
+      home,
+      [...args, "--store", selector, "--json"],
+      scenarioCapabilities(instant, ordinal++),
+    );
+    expect(invocation.exitCode).toBe(0);
+    return json(invocation);
+  };
+
+  const orientation = await run("2026-07-01T00:00:00.000Z", []);
+  expect(orientation).toMatchObject({
+    result: { healthy: true },
+    page: { returned: 0, total: 0 },
+    basis: { stream_position: 0 },
+  });
+  const entry = await run("2026-07-01T01:00:00.000Z", [
+    "add",
+    "entry",
+    "--actor",
+    "agent:journey",
+    "--type",
+    "finding",
+    "--title",
+    "command path",
+    "--source-json",
+    '{"ref":"repo=loredu","locator":"packages/cli","snapshot":"journey-v1"}',
+    "--body",
+    "The compiled command path changed.",
+  ]);
+  const entryId = (entry.result as { id: string }).id;
+  const claimArgs = (value: string, confidence: string) => [
+    "add",
+    "claim",
+    "--actor",
+    "agent:journey",
+    "--scope",
+    "repo=loredu",
+    "--subject-type",
+    "code-area",
+    "--subject",
+    "compiled-command-path",
+    "--predicate",
+    "location",
+    "--value",
+    value,
+    "--derived-from",
+    entryId,
+    "--confidence",
+    confidence,
+  ];
+  const firstClaim = await run("2026-07-01T02:00:00.000Z", [
+    ...claimArgs("packages/old-cli", "candidate"),
+    "--class",
+    "pattern",
+  ]);
+  const secondClaim = await run("2026-07-01T03:00:00.000Z", claimArgs("packages/cli", "confirmed"));
+  const firstClaimId = (firstClaim.result as { id: string }).id;
+  const secondClaimId = (secondClaim.result as { id: string }).id;
+  expect(secondClaim.reconciliation).toMatchObject({ state: "conflict-candidate" });
+  const conflictRuns = secondClaim.advice as Array<{ action: string; run: string }>;
+  expect(conflictRuns.every(({ run: command }) => command.includes("--store journey-m3"))).toBe(true);
+  const emittedConflictList = conflictRuns.find(({ action }) => action === "claims.list")?.run;
+  const conflictList = json(await invokeShell(home, `${emittedConflictList as string} --json`));
+  expect((conflictList.result as Array<{ id: string }>).map(({ id }) => id)).toEqual([
+    firstClaimId,
+    secondClaimId,
+  ]);
+  for (const command of conflictRuns
+    .filter(({ action }) => action === "record.show")
+    .map(({ run: command }) => command)) {
+    expect((await invokeShell(home, `${command} --json`)).exitCode).toBe(0);
+  }
+  const unhealthy = await invokeConformance(
+    home,
+    ["status", "--check", "--store", selector, "--json"],
+    scenarioCapabilities("2026-07-01T03:30:00.000Z", ordinal++),
+  );
+  expect(unhealthy.exitCode).toBe(5);
+  expect((json(unhealthy).result as { healthy: boolean }).healthy).toBe(false);
+
+  const relation = await run("2026-07-01T04:00:00.000Z", [
+    "relate",
+    "--actor",
+    "agent:journey",
+    "--from",
+    secondClaimId,
+    "--to",
+    firstClaimId,
+    "--type",
+    "contradicts",
+  ]);
+  expect((relation.result as { id: string }).id).toMatch(/^rel_/);
+  const resolution = await run("2026-07-01T05:00:00.000Z", [
+    "resolve",
+    "--actor",
+    "agent:journey",
+    "--target",
+    firstClaimId,
+    "--target",
+    secondClaimId,
+    "--decision",
+    "prefer",
+    "--replacement",
+    secondClaimId,
+    "--reason",
+    "compiled source and snapshot inspected",
+  ]);
+  expect((resolution.result as { id: string }).id).toMatch(/^res_/);
+  const verification = await run("2026-07-01T06:00:00.000Z", [
+    "add",
+    "verification",
+    "--actor",
+    "agent:journey",
+    "--target",
+    secondClaimId,
+    "--verified-against-json",
+    '{"ref":"repo=loredu","locator":"packages/cli","snapshot":"journey-v1"}',
+    "--result",
+    "needs_revalidation",
+  ]);
+  expect((verification.result as { id: string }).id).toMatch(/^ver_/);
+  expect(Number(await new PlainFileStore(root).head())).toBe(6);
+  const persistedAfterWrites = await snapshotStoreArtifacts(root);
+
+  const current = await run("2026-07-02T00:00:00.000Z", ["current", "--scope", "repo=loredu"]);
+  expect(current).toMatchObject({
+    page: { returned: 1, total: 1 },
+    basis: { stream_position: 6, query: { operation: "current", scope: { repo: "loredu" } } },
+  });
+  const historical = await run("2026-07-02T00:00:00.000Z", [
+    "current",
+    "--scope",
+    "repo=loredu",
+    "--as-of",
+    "2026-07-01T03:00:00.000Z",
+  ]);
+  expect(historical.basis).toMatchObject({
+    query: { as_of: "2026-07-01T03:00:00.000Z", valid_at: "2026-07-01T03:00:00.000Z" },
+  });
+
+  const lore = await run("2026-07-02T01:00:00.000Z", [
+    "lore",
+    "--activity",
+    "investigate",
+    "--scope",
+    "repo=loredu",
+    "--corpus-json",
+    '{"ref":"repo=loredu","locator":"packages/cli","snapshot":"journey-v2"}',
+    "--max-items",
+    "1",
+    "--max-chars",
+    "512",
+  ]);
+  expect(lore).toMatchObject({
+    basis: {
+      stream_position: 6,
+      ruleset: { ranker: { id: "loredu.baseline", version: "1" } },
+    },
+    result: {
+      packet: {
+        orientation: { current_count: 1, needs_revalidation_count: 1 },
+        budget: { max_items: 1, max_chars: 512, used_items: 1 },
+      },
+    },
+  });
+  expectRenderedAffordances(lore, selector);
+  const lorePacket = (
+    lore.result as {
+      packet: {
+        sections: Array<{
+          name: string;
+          items: Array<{
+            knowledge: {
+              claims: { run: string };
+              representatives: Array<{
+                id: string;
+                affordances: Array<{ action: string; run: string }>;
+              }>;
+            };
+          }>;
+          page: { returned: number; total: number; cursor?: string };
+        }>;
+      };
+    }
+  ).packet;
+  expect(lorePacket.sections.map(({ name, page }) => ({ name, ...page }))).toEqual([
+    { name: "current", returned: 0, total: 1, cursor: expect.stringContaining("loredu.cursor.v1.") },
+    { name: "patterns", returned: 0, total: 0 },
+    { name: "candidates", returned: 0, total: 0 },
+    { name: "conflicts", returned: 0, total: 0 },
+    { name: "needs_revalidation", returned: 1, total: 1 },
+  ]);
+  const continuation = (lore.advice as Array<{ action: string; run: string }>).find(
+    ({ action }) => action === "lore.read",
+  );
+  expect(continuation?.run).toContain(" --cursor ");
+  expect(continuation?.run).toContain(" --max-items 1 --max-chars 512");
+  const continued = json(await invokeShell(home, `${continuation?.run as string} --json`));
+  expect(
+    (continued.result as { packet: { sections: Array<{ name: string }> } }).packet.sections.map(
+      ({ name }) => name,
+    ),
+  ).toEqual(["current"]);
+  expectRenderedAffordances(continued, selector);
+
+  const attentionItem = lorePacket.sections.find(({ name }) => name === "needs_revalidation")?.items[0];
+  const anchored = json(
+    await invokeShell(home, `${attentionItem?.knowledge.claims.run as string} --limit 1 --json`),
+  );
+  const anchoredIds = (anchored.result as Array<{ id: string }>).map(({ id }) => id);
+  const anchoredContinuation = (anchored.advice as Array<{ action: string; run: string }>).find(
+    ({ action }) => action === "claims.list",
+  );
+  expect(anchoredContinuation?.run).toContain(" --store journey-m3 claims --cursor ");
+  const anchoredLast = json(await invokeShell(home, `${anchoredContinuation?.run as string} --json`));
+  anchoredIds.push(...(anchoredLast.result as Array<{ id: string }>).map(({ id }) => id));
+  expect(anchoredIds).toEqual([firstClaimId, secondClaimId]);
+
+  const representative = attentionItem?.knowledge.representatives[0];
+  expect(representative?.id).toBe(secondClaimId);
+  const shownClaim = json(
+    await invokeShell(
+      home,
+      `${representative?.affordances.find(({ action }) => action === "record.show")?.run as string} --json`,
+    ),
+  );
+  const claimHistory = json(
+    await invokeShell(
+      home,
+      `${representative?.affordances.find(({ action }) => action === "record.history")?.run as string} --json`,
+    ),
+  );
+  expect((claimHistory.result as Array<{ id: string }>).map(({ id }) => id)).toEqual([
+    secondClaimId,
+    (relation.result as { id: string }).id,
+    (resolution.result as { id: string }).id,
+    (verification.result as { id: string }).id,
+  ]);
+  const entryHandle = (
+    shownClaim.result as {
+      handles: Array<{ id: string; affordances: Array<{ action: string; run: string }> }>;
+    }
+  ).handles.find(({ id }) => id === entryId);
+  const shownEntry = json(
+    await invokeShell(
+      home,
+      `${entryHandle?.affordances.find(({ action }) => action === "record.show")?.run as string} --json`,
+    ),
+  );
+  expect((shownEntry.result as { record: { sources: JsonValue[] } }).record.sources).toEqual([
+    { ref: "repo=loredu", locator: "packages/cli", snapshot: "journey-v1" },
+  ]);
+
+  const missing = await invoke(home, [
+    "claims",
+    "--store",
+    selector,
+    "--same-key-as",
+    "clm_0000000000000000",
+    "--json",
+  ]);
+  expect(missing.exitCode).toBe(3);
+  expect((json(missing).error as { code: string }).code).toBe("RECORD_NOT_FOUND");
+  const wrongFamily = await invoke(home, ["claims", "--store", selector, "--same-key-as", entryId, "--json"]);
+  expect(wrongFamily.exitCode).toBe(2);
+  expect((json(wrongFamily).error as { code: string }).code).toBe("VALIDATION_FAILED");
+  const mutuallyExclusive = await invoke(home, [
+    "claims",
+    "--store",
+    selector,
+    "--same-key-as",
+    firstClaimId,
+    "--predicate",
+    "location",
+    "--json",
+  ]);
+  expect(mutuallyExclusive.exitCode).toBe(2);
+  expect((json(mutuallyExclusive).error as { code: string }).code).toBe("CLI_USAGE");
+
+  const finalStatus = await invokeConformance(
+    home,
+    ["status", "--check", "--store", selector, "--json"],
+    scenarioCapabilities("2026-07-03T00:00:00.000Z", ordinal++),
+  );
+  expect(finalStatus.exitCode).toBe(0);
+  expect((json(finalStatus).result as { healthy: boolean }).healthy).toBe(true);
+  expect((await new PlainFileStore(root).scan()).records.map(({ record }) => record.kind)).toEqual([
+    "entry",
+    "claim",
+    "claim",
+    "relation",
+    "resolution",
+    "verification",
+  ]);
+  expect(await snapshotStoreArtifacts(root)).toEqual(persistedAfterWrites);
 });
 
 test("compiled M2 scenario B preserves all four temporal modes and canonical history — @covers T55", async () => {
