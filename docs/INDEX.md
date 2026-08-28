@@ -91,5 +91,5 @@ created_at: 2026-08-26T12:10:00+08:00
 | [Execution](./v0.x/execution/README.md) | v0.x execution index |
 | [Implementation plan](./v0.x/execution/implementation-plan.md) | M0–M4 delivery sequence, including exact M1.5/M2/M3 contract exits and acceptance scenarios |
 | [First user journey](./v0.x/execution/first-user-journey.md) | Expected CLI usage journeys and the automated behavioral test catalog |
-| [Agent skill](./v0.x/execution/agent-skill.md) | The M2 guide embedded in the binary and printed by `lor skill` |
+| [Agent skill](./v0.x/execution/agent-skill.md) | The M3 v3 guide embedded in the binary and printed by `lor skill` |
 | [Catalog status](./v0.x/execution/catalog-status.json) | Which behavioral-catalog T-numbers are deferred, and to which milestone |

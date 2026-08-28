@@ -22,6 +22,8 @@ import {
   type RecordId,
   type Scope,
   type StatusQuery,
+  type WorkingLoreBasis,
+  type WorkingLoreQuery,
 } from "@loredu/kernel";
 import {
   defaultLoreduHome,
@@ -53,7 +55,7 @@ interface BaseResponse {
   readonly result: unknown;
   readonly reconciliation: unknown;
   readonly advice: readonly Affordance[];
-  readonly basis: ReturnType<typeof createBasis> | null;
+  readonly basis: ReturnType<typeof createBasis> | WorkingLoreBasis | null;
   readonly page?: { readonly returned: number; readonly total: number; readonly cursor?: string };
 }
 
@@ -100,6 +102,7 @@ const HELP: Readonly<Record<string, string>> = {
   claims: "usage: lor claims [filters] [--limit <n>] [--cursor <token>] [--json]",
   current:
     "usage: lor current [--scope <key=value>]... [--as-of <rfc3339>] [--valid-at <rfc3339>] [--limit <n>] [--cursor <token>] [--json]",
+  lore: "usage: lor lore --activity <token> [--scope <key=value>]... [--corpus-json <SourceRef>] [--max-items <n>] [--max-chars <n>] [--cursor <token>] [--json]",
   head: "usage: lor head [--json]",
   status: "usage: lor status [--check] [--limit <n>] [--cursor <token>] [--json]",
   skill: "usage: lor skill [--json]",
@@ -172,12 +175,15 @@ function recognizedValueOptions(argv: readonly string[]): ReadonlySet<string> {
       "--value-json",
       "--actor",
       "--since",
+      "--same-key-as",
       "--limit",
       "--cursor",
     );
   }
   if (path === "status") add("--limit", "--cursor");
   if (path === "current") add("--scope", "--as-of", "--valid-at", "--limit", "--cursor");
+  if (path === "lore")
+    add("--activity", "--scope", "--corpus-json", "--max-items", "--max-chars", "--cursor");
   return values;
 }
 
@@ -327,6 +333,10 @@ function parseActor(value: string): unknown {
   return { type: value.slice(0, separator), id: value.slice(separator + 1) };
 }
 
+function escapePointer(value: string): string {
+  return value.replaceAll("~", "~0").replaceAll("/", "~1");
+}
+
 function parseScope(values: readonly string[]): Scope | undefined {
   if (values.length === 0) return undefined;
   const scope = Object.create(null) as Record<string, string>;
@@ -340,7 +350,11 @@ function parseScope(values: readonly string[]): Scope | undefined {
     const key = pair.slice(0, separator);
     if (Object.hasOwn(scope, key)) {
       throw new LoreduError("VALIDATION_FAILED", "scope keys must be unique", [
-        Object.freeze({ code: "DUPLICATE", path: `/scope/${key}`, message: "duplicates a scope key" }),
+        Object.freeze({
+          code: "DUPLICATE",
+          path: `/scope/${escapePointer(key)}`,
+          message: "duplicates a scope key",
+        }),
       ]);
     }
     scope[key] = pair.slice(separator + 1);
@@ -472,6 +486,22 @@ function runFor(affordance: Affordance, selector: string | undefined): string {
     if (params.limit !== undefined) command += ` --limit ${String(params.limit)}`;
     return command;
   }
+  if (affordance.action === "lore.read") {
+    let command = `${prefix} lore`;
+    const query = params.query as Record<string, JsonValue> | undefined;
+    if (query !== undefined) {
+      command += ` --activity ${shellWord(String(query.activity))}`;
+      const scope = query.scope as Record<string, string> | undefined;
+      if (scope !== undefined)
+        for (const key of Object.keys(scope).sort())
+          command += ` --scope ${shellWord(`${key}=${scope[key]}`)}`;
+      if (query.corpus !== undefined) command += ` --corpus-json ${shellWord(JSON.stringify(query.corpus))}`;
+    }
+    if (params.cursor !== undefined) command += ` --cursor ${shellWord(String(params.cursor))}`;
+    if (params.max_items !== undefined) command += ` --max-items ${String(params.max_items)}`;
+    if (params.max_chars !== undefined) command += ` --max-chars ${String(params.max_chars)}`;
+    return command;
+  }
   if (affordance.action === "store.init") {
     const target = shellWord(String(params.selector));
     return String(params.selector).startsWith("-") ? `lor init --store ${target}` : `lor init ${target}`;
@@ -484,6 +514,7 @@ function runFor(affordance: Affordance, selector: string | undefined): string {
   const query = params.query as Record<string, JsonValue> | undefined;
   let command = `${prefix} claims`;
   if (query !== undefined) {
+    if (query.same_key_as !== undefined) command += ` --same-key-as ${shellWord(String(query.same_key_as))}`;
     const scope = query.scope as Record<string, string> | undefined;
     if (scope !== undefined) {
       for (const key of Object.keys(scope).sort()) command += ` --scope ${shellWord(`${key}=${scope[key]}`)}`;
@@ -586,6 +617,10 @@ function renderSemanticNode(value: unknown, selector: string | undefined): unkno
       renderedHistory.latest_resolution = renderHandle(history.latest_resolution, selector);
     output.history = renderedHistory;
   }
+  if (semantic.packet !== undefined) output.packet = renderSemanticNode(semantic.packet, selector);
+  if (Array.isArray(semantic.sections))
+    output.sections = semantic.sections.map((item) => renderSemanticNode(item, selector));
+  if (semantic.knowledge !== undefined) output.knowledge = renderSemanticNode(semantic.knowledge, selector);
   if (Array.isArray(semantic.items))
     output.items = semantic.items.map((item) => renderSemanticNode(item, selector));
   if (Array.isArray(semantic.attention))
@@ -615,6 +650,7 @@ function emitJson(io: CliIo, value: unknown): void {
 
 function emitText(io: CliIo, response: BaseResponse, selector: string | undefined): void {
   const result = response.result as Record<string, unknown>;
+  let remainingAdvice = response.advice;
   if (typeof result.id === "string") {
     io.out(`${result.id}\nkind: ${String(result.kind)}\nposition: ${String(result.position)}\n`);
     const resultHandle = result.handle as { readonly affordances?: readonly Affordance[] } | undefined;
@@ -632,6 +668,64 @@ function emitText(io: CliIo, response: BaseResponse, selector: string | undefine
     }
   } else if (typeof result.root === "string") {
     io.out(`initialized store at ${result.root}\nselector: ${String(result.selector)}\n`);
+  } else if (result.packet !== undefined && typeof result.computed_at === "string") {
+    const packet = result.packet as Record<string, unknown>;
+    const orientation = packet.orientation as Record<string, number>;
+    io.out(
+      `orientation: current=${orientation.current_count} patterns=${orientation.pattern_count} candidates=${orientation.candidate_count} conflicts=${orientation.conflict_count} needs_revalidation=${orientation.needs_revalidation_count} attention=${orientation.attention_count}\n`,
+    );
+    io.out(`activity: ${String(packet.activity)}\nfilters: ${JSON.stringify(packet.filters)}\n`);
+    const continuationCursors = new Set<string>();
+    const packetSections = new Map(
+      (packet.sections as readonly Record<string, unknown>[]).map((section) => [section.name, section]),
+    );
+    const sectionCounts = [
+      ["current", "current_count"],
+      ["patterns", "pattern_count"],
+      ["candidates", "candidate_count"],
+      ["conflicts", "conflict_count"],
+      ["needs_revalidation", "needs_revalidation_count"],
+    ] as const;
+    for (const [name, count] of sectionCounts) {
+      const section = packetSections.get(name);
+      const page = section?.page as
+        | { readonly returned: number; readonly total: number; readonly cursor?: string }
+        | undefined;
+      io.out(`${name}: returned=${page?.returned ?? 0} total=${page?.total ?? orientation[count]}\n`);
+      for (const item of (section?.items as readonly Record<string, unknown>[] | undefined) ?? []) {
+        const knowledge = item.knowledge as Record<string, unknown>;
+        io.out(`  item: ${String(item.summary)}\n`);
+        io.out(
+          `    key: ${JSON.stringify(knowledge.key)} state=${String(knowledge.state)} values=${String(knowledge.value_count)}\n`,
+        );
+        io.out(`    claims: ${runFor(knowledge.claims as Affordance, selector)}\n`);
+        for (const representative of knowledge.representatives as readonly Record<string, unknown>[]) {
+          io.out(`    representative: ${String(representative.id)}\n`);
+          for (const affordance of (representative.affordances as readonly Affordance[]) ?? [])
+            io.out(`      disclosure: ${runFor(affordance, selector)}\n`);
+        }
+      }
+      if (page?.cursor !== undefined) {
+        continuationCursors.add(page.cursor);
+        const continuation = response.advice.find(
+          (item) => item.action === "lore.read" && item.params.cursor === page.cursor,
+        );
+        if (continuation !== undefined) io.out(`  continuation: ${runFor(continuation, selector)}\n`);
+      }
+    }
+    remainingAdvice = response.advice.filter(
+      (item) =>
+        !(
+          item.action === "lore.read" &&
+          typeof item.params.cursor === "string" &&
+          continuationCursors.has(item.params.cursor)
+        ),
+    );
+    const budget = packet.budget as Record<string, number>;
+    io.out(
+      `budget: used_items=${budget.used_items}/${budget.max_items} used_chars=${budget.used_chars}/${budget.max_chars}\n`,
+    );
+    io.out(`computed_at: ${result.computed_at}\n`);
   } else if (Array.isArray(result.items) && typeof result.computed_at === "string") {
     for (const item of result.items as readonly Record<string, unknown>[]) {
       if (item.kind === "knowledge") {
@@ -657,7 +751,7 @@ function emitText(io: CliIo, response: BaseResponse, selector: string | undefine
     }
   } else io.out(`${JSON.stringify(renderSemanticNode(result, selector))}\n`);
   io.out(`reconciliation: ${JSON.stringify(renderSemanticNode(response.reconciliation, selector))}\n`);
-  for (const advice of response.advice) io.out(`advice: ${runFor(advice, selector)}\n`);
+  for (const advice of remainingAdvice) io.out(`advice: ${runFor(advice, selector)}\n`);
   if (response.basis !== null) io.out(`basis: ${JSON.stringify(response.basis)}\n`);
   if (response.page !== undefined) {
     io.out(`page: returned=${response.page.returned} total=${response.page.total}\n`);
@@ -785,9 +879,19 @@ async function execute(
     path = `add ${tokens[1]}`;
     optionTokens = tokens.slice(2);
   } else if (
-    ["init", "relate", "resolve", "show", "history", "claims", "current", "head", "status", "skill"].includes(
-      first,
-    )
+    [
+      "init",
+      "relate",
+      "resolve",
+      "show",
+      "history",
+      "claims",
+      "current",
+      "lore",
+      "head",
+      "status",
+      "skill",
+    ].includes(first)
   ) {
     path = first;
     optionTokens = tokens.slice(1);
@@ -1065,6 +1169,7 @@ async function execute(
         "--value-json": { value: true },
         "--actor": { value: true },
         "--since": { value: true },
+        "--same-key-as": { value: true },
         "--limit": { value: true },
         "--cursor": { value: true },
       },
@@ -1085,6 +1190,7 @@ async function execute(
       "--value-json",
       "--actor",
       "--since",
+      "--same-key-as",
     ] as const;
     if (cursor !== undefined && hasAnyOption(parsed, filterOptions))
       usage("claim filters cannot accompany --cursor");
@@ -1103,6 +1209,10 @@ async function execute(
       const jsonValue = option(parsed, "--value-json");
       if (scalarValue !== undefined && jsonValue !== undefined)
         usage("--value and --value-json are mutually exclusive");
+      const sameKeyAs = option(parsed, "--same-key-as");
+      const otherFilters = filterOptions.filter((name) => name !== "--same-key-as");
+      if (sameKeyAs !== undefined && hasAnyOption(parsed, otherFilters))
+        usage("--same-key-as is mutually exclusive with every other claim filter");
       const actorValue = option(parsed, "--actor");
       const subjectType = option(parsed, "--subject-type");
       const subject = option(parsed, "--subject");
@@ -1111,6 +1221,7 @@ async function execute(
       const scope =
         scopePairs.length === 0 ? (exactScope ? ({} as Scope) : undefined) : parseScope(scopePairs);
       query = {
+        ...(sameKeyAs === undefined ? {} : { same_key_as: sameKeyAs }),
         ...(scope === undefined ? {} : { scope }),
         ...(exactScope ? { scope_match: "exact" as const } : {}),
         ...(subjectType === undefined ? {} : { subject_type: subjectType }),
@@ -1125,7 +1236,7 @@ async function execute(
         ...(actorValue === undefined ? {} : { actor: parseActor(actorValue) as Actor }),
         ...(since === undefined ? {} : { since }),
         ...(limit === undefined ? {} : { limit }),
-      };
+      } as ClaimQuery;
     }
     return {
       response: await composeApplication(parsed.store, runOptions).application.claims(query),
@@ -1166,6 +1277,49 @@ async function execute(
         : { cursor, ...(limit === undefined ? {} : { limit }) };
     return {
       response: await composeApplication(parsed.store, runOptions).application.current(query),
+      exit: 0,
+      json: parsed.json,
+      ...(parsed.store === undefined ? {} : { selector: parsed.store }),
+    };
+  }
+
+  if (path === "lore") {
+    const parsed = parseOptions(
+      optionTokens,
+      {
+        "--activity": { value: true },
+        "--scope": { value: true, repeat: true },
+        "--corpus-json": { value: true },
+        "--max-items": { value: true },
+        "--max-chars": { value: true },
+        "--cursor": { value: true },
+      },
+      global,
+    );
+    if (parsed.positionals.length > 0) usage("lore accepts no positional arguments");
+    const cursor = option(parsed, "--cursor");
+    if (cursor !== undefined && hasAnyOption(parsed, ["--activity", "--scope", "--corpus-json"]))
+      usage("lore filters cannot accompany --cursor");
+    const maxItemsText = option(parsed, "--max-items");
+    const maxCharsText = option(parsed, "--max-chars");
+    const budgets = {
+      ...(maxItemsText === undefined ? {} : { max_items: Number(maxItemsText) }),
+      ...(maxCharsText === undefined ? {} : { max_chars: Number(maxCharsText) }),
+    };
+    let query: WorkingLoreQuery;
+    if (cursor !== undefined) query = { cursor, ...budgets };
+    else {
+      const scope = parseScope(options(parsed, "--scope"));
+      const corpusText = option(parsed, "--corpus-json");
+      query = {
+        activity: requiredOption(parsed, "--activity"),
+        ...(scope === undefined ? {} : { scope }),
+        ...(corpusText === undefined ? {} : { corpus: parseJson(corpusText, "/corpus") }),
+        ...budgets,
+      } as WorkingLoreQuery;
+    }
+    return {
+      response: await composeApplication(parsed.store, runOptions).application.lore(query),
       exit: 0,
       json: parsed.json,
       ...(parsed.store === undefined ? {} : { selector: parsed.store }),

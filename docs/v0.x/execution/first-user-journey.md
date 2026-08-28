@@ -9,9 +9,9 @@ created_at: 2026-08-26T00:00:00+08:00
 
 # First user journey and behavioral test cases
 
-The first user is the project owner plus their agents, driving Loredu through the CLI ([decision 0007](../../decisions/0007-typescript-bun.md)). The binary is `lor` — short enough for agents to type constantly. This document describes usage step by step and derives the behavioral tests that must be automated. [Decision 0026](../../decisions/0026-m15-application-cli-contract.md) fixes the implemented M1.5 protocol; [decision 0027](../../decisions/0027-m2-reconciliation-projection-contract.md) fixes the additive M2 `current`/temporal projection protocol; [decision 0030](../../decisions/0030-working-lore-ranker-contract.md) fixes the additive M3 `lore`/Ranker/budget protocol. M2 and the M3-L Working Lore application/Ranker slice are implemented; M3-E CLI journeys remain staged.
+The first user is the project owner plus their agents, driving Loredu through the CLI ([decision 0007](../../decisions/0007-typescript-bun.md)). The binary is `lor` — short enough for agents to type constantly. This document describes usage step by step and derives the behavioral tests that must be automated. [Decision 0026](../../decisions/0026-m15-application-cli-contract.md) fixes the implemented M1.5 protocol; [decision 0027](../../decisions/0027-m2-reconciliation-projection-contract.md) fixes the additive M2 `current`/temporal projection protocol; [decision 0030](../../decisions/0030-working-lore-ranker-contract.md) fixes the additive M3 `lore`/Ranker/budget protocol. M2 and M3 are implemented through the compiled Working Lore journeys.
 
-The CLI arrives right after M1, before full projection wiring, and its semantic responses are **agent-reactive** ([decision 0008](../../decisions/0008-cli-first-agent-reactive.md)): they expose mechanical feedback, health, and deterministic affordances when applicable so an agent can chain calls until health passes. M1.5 orientation remains status plus filtered record queries, with M2 Claim feedback and overlap-aware health. M2 adds bounded public Current Knowledge and temporal projection without replacing that protocol; M3-L adds Working Lore to the application API, while `lor lore` remains M3-E.
+The CLI arrives right after M1, before full projection wiring, and its semantic responses are **agent-reactive** ([decision 0008](../../decisions/0008-cli-first-agent-reactive.md)): they expose mechanical feedback, health, and deterministic affordances when applicable so an agent can chain calls until health passes. M1.5 orientation remains status plus filtered record queries, with M2 Claim feedback and overlap-aware health. M2 adds bounded public Current Knowledge and temporal projection without replacing that protocol; M3 adds Working Lore to both the application API and compiled `lor lore` surface.
 
 ## Response envelope
 
@@ -45,7 +45,7 @@ Claim/history lists and the combined status attention/advisory collection add `p
 
 Application advice contains surface-neutral `{rel,action,params,why}`; only CLI JSON adds `run`. Advice is deterministic mechanics, never model output. Exact-key overlap and core key-divergence are not ClaimPolicy advice. If a Claim commits but its feedback scan fails, success still returns that id/position, marks reconciliation unavailable, and advises `lor status`; it never tells the caller to repeat the append.
 
-Two suites automate the same staged journeys:
+Two suites automate the same journeys:
 
 - **application suite** (`bun:test`, fast, majority of cases) — drives the surface-neutral application API directly;
 - **CLI conformance suite** — drives the compiled binary with `--json`, asserting equivalent semantic results, parseable envelopes, runnable renderings, and stable exits.
@@ -74,7 +74,7 @@ no claims
 page: returned=0 total=0
 ```
 
-Both are definitive empty successes with Basis position zero. Bare `lor` is exactly the first status view. This is the M1.5 orientation promised by ADR 0008; the compiled empty Working Lore packet is deferred to M3-E and appears in journey 4.
+Both are definitive empty successes with Basis position zero. Bare `lor` is exactly the first status view. This is the M1.5 orientation promised by ADR 0008; the compiled empty Working Lore packet appears in journey 4.
 
 ## Journey 2 — record what was learned
 
@@ -167,22 +167,28 @@ The shell is the rest of the query engine; lor does not need to grow one.
 
 ## Journey 4 — M3 Working Lore reflects it
 
-This CLI journey begins only when M3-E lands; M3-L already exposes the underlying application operation. On an empty matching scope, the same command returns a definitive packet with five zero-count sections, Basis, `computed_at`, zero budget use, and exit 0. After the complete Resolution in journey 3b, the current packet reflects that judgment:
+This CLI journey is implemented. On an empty matching scope, the command returns a definitive packet with five zero-count sections, Basis, `computed_at`, zero budget use, and exit 0. After the complete Resolution in journey 3b, the current packet reflects that judgment:
 
 ```text
 $ lor lore --activity investigate --scope repo=rozoro
-orientation: current=1 patterns=0 candidates=0 conflicts=0 needs_revalidation=0
+orientation: current=1 patterns=0 candidates=0 conflicts=0 needs_revalidation=0 attention=0
+activity: investigate
+filters: {"scope":{"pair_count":1,"pairs":[{"key":"repo","value":"rozoro"}]}}
 current: returned=1 total=1
-  (code-area command-registration) location = src/cli/commands   [clm_3333333333333333, resolved]
+  item: <bounded deterministic summary>
+    key: <bounded descriptor anchored at clm_1111111111111111> state=preferred values=1
+    claims: lor claims --same-key-as clm_1111111111111111
+    representative: clm_3333333333333333
+      disclosure: lor show clm_3333333333333333
+      disclosure: lor history clm_3333333333333333
 patterns: returned=0 total=0
 candidates: returned=0 total=0
 conflicts: returned=0 total=0
 needs_revalidation: returned=0 total=0
 budget: used_items=1/40 used_chars=<bounded>/12000
-basis:
-  stream_position: 5
-  ruleset: { core: loredu.reconciliation/v1, claim_policy: { id: loredu.default, version: "1" }, ranker: { id: loredu.baseline, version: "1" } }
-  query: { operation: lore, activity: investigate, valid_at: <computed point>, scope: { repo: rozoro } }
+computed_at: <canonical timestamp>
+reconciliation: {"state":"not-applicable","related":[]}
+basis: {"stream_position":5,"ruleset":{"core":"loredu.reconciliation/v1","claim_policy":{"id":"loredu.default","version":"1"},"ranker":{"id":"loredu.baseline","version":"1"}},"query":{"operation":"lore","activity":"investigate","valid_at":"<same canonical timestamp>","scope":{"repo":"rozoro"}}}
 ```
 
 The application item carries compact state/count/evidence, a key descriptor with anchor Claim and at most two canonical Scope preview pairs, and exactly one or two representative handles copied from M2's exposed values in M2 order. M3 never independently selects them again or reorders them; the disclosure anchor may differ from a selected Resolution replacement representative. `lor claims --same-key-as <anchor-claim>` provides exact-key disclosure rather than raw values/history. `lor show <anchor-claim>` exposes the full key/Scope; the anchored list exposes every value/history under that exact key. All five count lines render even when zero. A section that truncates states full `returned`/`total` and emits its own `lor lore --cursor ...` continuation, including a `returned=0,total>0` section whose cursor resumes `before-first`. Bounded, ranked, and linked — not a record dump.
@@ -235,7 +241,7 @@ M1.5 can compare any response Basis to this store-wide head and can continue an 
 
 ## Journey 9 — teach the agents
 
-The skill ships **inside the binary**: build embeds [the one agent guide source](./agent-skill.md). Text `lor skill` strips only YAML frontmatter and prints the remaining Markdown bytes exactly without resolving a store; `--json` returns the same guide string. The M2 guide instructs agents to orient with bounded `current`, check status, inspect canonical Claims, provide actor and provenance, follow embedded commands/cursors, and record rather than guess judgment. The M3-E `lor lore` delivery remains its next revision trigger. A repo-level `.agents/skills` wrapper can simply defer to `lor skill`.
+The skill ships **inside the binary**: build embeds [the one agent guide source](./agent-skill.md). Text `lor skill` strips only YAML frontmatter and prints the remaining Markdown bytes exactly without resolving a store; `--json` returns the same guide string. The M3 guide instructs agents to orient with bounded Working Lore, choose `current` for full or temporal projection, inspect canonical Claims through exact-key disclosure, provide actor and provenance, follow embedded commands/cursors, check Basis staleness, and record rather than guess judgment. A repo-level `.agents/skills` wrapper can simply defer to `lor skill`.
 
 ## Behavioral test catalog
 
@@ -307,9 +313,9 @@ Grouped by milestone; **AC n** = acceptance criterion in [goal and scope](../sco
 | T51 | exits are exact: 0 executed, 2 usage/validation/reference/cursor, 3 not-found, 4 store/provider, 5 unhealthy `--check`, 6 capability/internal | agent ergonomics, ADR 0026 |
 | T52 | `add entry --body -` reads stdin; body round-trips byte-exact through store and `show` | journey 2 |
 | T53 | `add claim` prints new/conflict/coexisting feedback plus M2-R's exact duplicate/corroboration/support/temporal-succession classes with related fields limited to the selected class; a post-commit read failure prints committed-but-feedback-unavailable with status advice and still exits 0 | journey 2–3, ADR 0026/0027 |
-| T54 | after M3-E exposes Working Lore through the binary, end-to-end scenario A combines the implemented three-run M2 narrative with revalidation surfaced through the binary | S A, staged M3-E |
+| T54 | end-to-end scenario A combines the three-run M2 narrative with bounded Working Lore and revalidation surfaced through the compiled binary | S A, M3 |
 | T55 | after M2 temporal projection exists, end-to-end scenario B (30→60-day amendment, all four temporal queries) through the binary | S B, M2 |
-| T56 | staged end-to-end journey 0→8 as one scripted fresh-store session: implemented M1.5 record/query/health and M2 current/time, then M3-E CLI lore when it lands | AC 12 (ergonomics), ADR 0026, staged M3-E |
+| T56 | end-to-end journey 0→8 as one scripted fresh-store compiled session: M1.5 record/query/health, M2 current/time, and M3 Working Lore plus continuation | AC 12 (ergonomics), ADR 0026/0030, M3 |
 | T57 | AC 12 measured at M1.5: journey 2 (entry + claim) is ≤ 2 commands; empty orientation is one bare `lor` status command (a scoped claims query is optional follow-up) | AC 12, ADR 0026 |
 | T58 | content first: bare `lor` prints the orientation/status view (live data, exit 0), not help; `lor <command> --help` prints a concise per-command reference; an unknown flag fails with an actionable error, never ignored | agent ergonomics, journey 3b |
 

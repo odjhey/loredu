@@ -37,4 +37,4 @@ port. Concrete adapter status lives in the
 
 ## State
 
-M0, M1, M1.5, and M2 remain intact. M3-L now exposes `lore` with mechanical five-section membership, M2-owned representatives, compact descriptors, global and section budgets, validated versioned Ranker permutations, digest-bound continuation, conservative staleness, and anchored exact-key Claim disclosure. The engine never appends or caches derived records. M3-E still owns CLI wiring, rendering, skill text, and compiled journeys; adapter status is in [`packages/cli`](../cli/README.md).
+M0, M1, M1.5, and M2 remain intact. M3-L exposes `lore` with mechanical five-section membership, M2-owned representatives, compact descriptors, global and section budgets, validated versioned Ranker permutations, digest-bound continuation, conservative staleness, and anchored exact-key Claim disclosure. The engine never appends or caches derived records. M3-E now supplies the compiled adapter, skill, and journeys without changing this kernel surface; adapter status is in [`packages/cli`](../cli/README.md).

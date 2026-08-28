@@ -37,6 +37,7 @@ const editJson = (root, rel, fn) => {
 
 const A_DOC = "docs/architecture/product-architecture.md";
 const STATUS = "docs/v0.x/execution/catalog-status.json";
+const T40_TEST = "tests/cli-conformance/compiled-binary.test.ts";
 
 const CASES = [
   {
@@ -116,18 +117,16 @@ const CASES = [
     name: "T-number accounted for nowhere",
     script: "check-catalog.mjs",
     expect: "unaccounted",
-    mutate: (root) => editJson(root, STATUS, (d) => delete d.deferred.T40),
+    mutate: (root) => edit(root, T40_TEST, (t) => t.replace(" — @covers T40", "")),
   },
   {
     name: "T-number both implemented and deferred",
     script: "check-catalog.mjs",
     expect: "double-counted",
     mutate: (root) =>
-      write(
-        root,
-        "tests/records/entry.test.ts",
-        'import { test, expect } from "bun:test"\n\n// @covers T40\ntest("store conformance", () => { expect(1).toBe(1) })\n',
-      ),
+      editJson(root, STATUS, (d) => {
+        d.deferred.T40 = { milestone: "M3-E", reason: "synthetic duplicate" };
+      }),
   },
   {
     name: "status file invents an unknown T-number",
@@ -143,7 +142,7 @@ const CASES = [
     script: "check-catalog.mjs",
     expect: "placeholder",
     mutate: (root) => {
-      editJson(root, STATUS, (d) => delete d.deferred.T40);
+      edit(root, T40_TEST, (t) => t.replace(" — @covers T40", ""));
       write(
         root,
         "tests/records/entry.test.ts",
@@ -156,7 +155,7 @@ const CASES = [
     script: "check-catalog.mjs",
     expect: "placeholder",
     mutate: (root) => {
-      editJson(root, STATUS, (d) => delete d.deferred.T40);
+      edit(root, T40_TEST, (t) => t.replace(" — @covers T40", ""));
       write(
         root,
         "tests/records/entry.test.ts",

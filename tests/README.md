@@ -7,7 +7,7 @@ Tests here normally exercise **published package exports** or the compiled `lor`
 binary. Package-local tests own implementation details; the
 [reconciliation group](./reconciliation/README.md) documents M2-R's bounded temporary
 internal seam, M2-P exercises public Current Knowledge through package exports, and
-M2-E crosses the compiled CLI, plain-file persistence, and scenario narratives.
+M2-E and M3-E cross the compiled CLI, plain-file persistence, and scenario narratives.
 
 ```sh
 bun test                       # whole tree
@@ -24,7 +24,7 @@ bun test tests/store           # one group
 | [`reconciliation/`](./reconciliation/README.md) | M0 identity primitives (T81–T82); M2 reconciliation and public projections (T20–T30, T86) |
 | [`working-lore/`](./working-lore/README.md) | M3 — Working Lore application (T41–T45, T75; T40 remains CLI-owned) |
 | [`cli-conformance/`](./cli-conformance/README.md) | Compiled CLI conformance (T40, T50–T58, T65, T73–T74) plus adapter/rendering checks over application semantics |
-| [`scenarios/`](./scenarios/README.md) | M2 acceptance narratives A/B/C; scenario A completes under M3-E |
+| [`scenarios/`](./scenarios/README.md) | Completed M2/M3 acceptance narratives A/B/C |
 
 ## Claiming a catalog T-number
 
