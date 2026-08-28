@@ -27,11 +27,14 @@ API; only argv, store composition, recursive runnable rendering, and process exi
 selection remain here. M3 still owns `lore`.
 
 Compiled-binary evidence lives in
-[`../../tests/cli-conformance/`](../../tests/cli-conformance/README.md); executable
-`@covers` annotations and
+[`../../tests/cli-conformance/`](../../tests/cli-conformance/README.md), including
+M2-E's deterministic A/B/C narratives and T55's four-mode late-amendment journey;
+executable `@covers` annotations and
 [`catalog-status.json`](../../docs/v0.x/execution/catalog-status.json) own current
-row-level implementation accounting. The exported runner accepts explicit application
-policy and host-capability ports for embedded composition and conformance, while the
-shipped `lor` entry keeps the default policy and production Clock/RandomSource.
+row-level implementation accounting. T54 remains staged for M3 because its scenario-A
+row requires Working Lore/revalidation. The exported runner accepts explicit
+application policy and host-capability ports for embedded composition and conformance,
+while the shipped `lor` entry keeps the default policy and production
+Clock/RandomSource.
 Surface-neutral application semantics are covered separately in
 [`../../tests/application/`](../../tests/application/README.md).

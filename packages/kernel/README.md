@@ -1,7 +1,7 @@
 # `@loredu/kernel`
 
-The application kernel: record semantics, ports, and (as M0/M2 land) the append
-path, reconciliation, projections, and Working Lore.
+The application kernel: record semantics, ports, append path, reconciliation, and
+projections. M3 will add Working Lore.
 
 ## Invariants this package is built to keep
 
@@ -37,4 +37,4 @@ port. Concrete adapter status lives in the
 
 ## State
 
-M0, M1, and M1.5 remain intact. M2 now exposes `current` over one atomic snapshot with all four temporal modes, complete Resolution/Relation precedence, bounded history/evidence summaries, policy advisories, Basis-pinned combined-stream cursors, and deterministic replay/invalidation semantics. The engine never appends or caches derived records. Scenario-level compiled M2 exit work remains separately staged; CLI adapter status is in [`packages/cli`](../cli/README.md).
+M0, M1, and M1.5 remain intact. M2 exposes `current` over one atomic snapshot with all four temporal modes, complete Resolution/Relation precedence, bounded history/evidence summaries, policy advisories, Basis-pinned combined-stream cursors, and deterministic replay/invalidation semantics. The engine never appends or caches derived records. Deterministic compiled M2 scenarios now exercise this public surface end to end; M3 Working Lore remains separately staged. CLI adapter status is in [`packages/cli`](../cli/README.md).
