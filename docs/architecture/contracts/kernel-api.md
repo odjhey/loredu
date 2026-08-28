@@ -314,6 +314,8 @@ interface Ranker {
 
 Omission selects the frozen `DEFAULT_RANKER`, whose exact identity is `{id:"loredu.baseline",version:"1"}` and whose callback returns candidate indexes unchanged. Assembly validates/captures the exact closed ranker shape but does not invoke it. Existing operations ignore Ranker and keep their exact M0–M2 `RulesetIdentity`/`Basis`; only Working Lore uses `WorkingLoreRulesetIdentity`, which extends the structural identity with `ranker:{id,version}`.
 
+The M3 item shape narrows `WorkingLoreKnowledgeSummary.representatives` to `readonly [RecordHandle] | readonly [RecordHandle, RecordHandle]`. For every included item, core copies exactly `currentKnowledgeItem.values.map(value => value.representative)` into a newly detached, recursively frozen tuple in M2 order. Retracted zero-value M2 items are omitted. M3 performs no independent selection, sorting, filtering, replacement, preference, or deduplication; Ranker, section, corpus-per-value choice, budgets, and continuation cannot alter the tuple after whole-group admission, and `anchor_claim` remains separate.
+
 The application additively gains:
 
 ```ts
@@ -327,4 +329,4 @@ interface LoreduApplication {
 
 The M3 `same_key_as` Claim filter is mutually exclusive with every other cursorless Claim filter except `limit`. It resolves one visible anchor Claim to its complete exact ClaimKey and lists that group through normal ordering/pagination; it is the bounded Working Lore exact-key disclosure path and does not alter M0–M2 Scope, ClaimKey, decoder, history, or replay behavior.
 
-A successful lore response has read feedback exactly `{state:"not-applicable",related:[]}`. The exact activity/scope/corpus query, bounded Scope/key/filter descriptors, compact section/item shapes, summary truncation, baseline/custom Ranker validation, global budgets, pure-SHA-256 permutation-bound per-section cursors, anchored exact-key disclosure, staleness, replay, and CLI upgrade are in the [Working Lore contract](./working-lore.md). `Affordance` additively accepts `lore/lore.read` and `continue/lore.read` there. No Working Lore item, derived relation, rank result, or cursor is persisted.
+A successful lore response has read feedback exactly `{state:"not-applicable",related:[]}`. The exact activity/scope/corpus query, bounded Scope/key/filter descriptors, compact section/item shapes, M2-authoritative representative tuples, summary truncation, baseline/custom Ranker validation, global budgets, pure-SHA-256 permutation-bound per-section cursors, anchored exact-key disclosure, staleness, replay, and CLI upgrade are in the [Working Lore contract](./working-lore.md). `Affordance` additively accepts `lore/lore.read` and `continue/lore.read` there. No Working Lore item, derived relation, rank result, or cursor is persisted.
