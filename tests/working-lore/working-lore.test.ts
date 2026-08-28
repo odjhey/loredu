@@ -386,6 +386,9 @@ describe("M3 Working Lore public application", () => {
     const firstPage = await application.claims({ same_key_as: must(ids[0]), limit: 1 });
     expect(firstPage.result.map(({ id }) => id)).toEqual([must(ids[0])]);
     expect(firstPage.page).toMatchObject({ returned: 1, total: 3 });
+    await expect(application.lore({ cursor: must(firstPage.page.cursor) })).rejects.toMatchObject({
+      code: "CURSOR_MISMATCH",
+    });
     const secondPage = await application.claims({ cursor: must(firstPage.page.cursor), limit: 2 });
     expect(secondPage.result.map(({ id }) => id)).toEqual(ids.slice(1));
     await expect(

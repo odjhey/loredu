@@ -669,19 +669,12 @@ function decodeLoreCursor(token: string): LoreCursor {
       string,
       unknown
     >;
-    if (
-      !parsed ||
-      typeof parsed !== "object" ||
-      Array.isArray(parsed) ||
-      Object.keys(parsed).sort().join(",") !== "anchor,basis,computed_at,operation,query,rank,version"
-    )
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) cursorInvalid();
+    if (parsed.version !== 1 || typeof parsed.operation !== "string") cursorInvalid();
+    if (parsed.operation !== "lore") cursorMismatch("Cursor belongs to another operation");
+    if (Object.keys(parsed).sort().join(",") !== "anchor,basis,computed_at,operation,query,rank,version")
       cursorInvalid();
-    if (
-      parsed.version !== 1 ||
-      parsed.operation !== "lore" ||
-      typeof parsed.anchor !== "string" ||
-      (!RECORD_ID.test(parsed.anchor) && parsed.anchor !== "empty")
-    )
+    if (typeof parsed.anchor !== "string" || (!RECORD_ID.test(parsed.anchor) && parsed.anchor !== "empty"))
       cursorInvalid();
     const issues: LoreduIssue[] = [];
     const query = copyJsonObject(parsed.query, "/query", issues);
